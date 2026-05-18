@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta name="viewport"
+          content="width=device-width, initial-scale=1.0">
+
+    <title>Invoice</title>
+
+    <style>
+
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            color: #333;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .header h1 {
+            margin: 0;
+            color: #1e88e5;
+        }
+
+        .invoice-info {
+            margin-bottom: 20px;
+        }
+
+        .invoice-info p {
+            margin: 4px 0;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        table th,
+        table td {
+            border: 1px solid #ccc;
+            padding: 10px;
+            text-align: left;
+        }
+
+        table th {
+            background-color: #f5f5f5;
+        }
+
+        .totals {
+            margin-top: 20px;
+            text-align: right;
+        }
+
+        .totals p {
+            margin: 5px 0;
+        }
+
+        .footer {
+            margin-top: 40px;
+            text-align: center;
+            font-size: 12px;
+            color: gray;
+        }
+
+    </style>
+
+</head>
+
+<body>
+
+    <div class="header">
+
+        <h1>PharmaCare Pro</h1>
+
+        <p>Pharmacy Management System</p>
+
+    </div>
+
+
+    <div class="invoice-info">
+
+        <p>
+            <strong>Bill Number:</strong>
+            {{bill_number}}
+        </p>
+
+        <p>
+            <strong>Bill Date:</strong>
+            {{bill_date}}
+        </p>
+
+        <p>
+            <strong>Patient Name:</strong>
+            {{patient_name}}
+        </p>
+
+        <p>
+            <strong>Mobile:</strong>
+            {{mobile_number}}
+        </p>
+
+    </div>
+
+
+    <table>
+
+        <thead>
+
+            <tr>
+                <th>Medicine</th>
+                <th>Qty</th>
+                <th>Price</th>
+                <th>GST</th>
+                <th>Total</th>
+            </tr>
+
+        </thead>
+
+        <tbody>
+
+            {{items}}
+
+        </tbody>
+
+    </table>
+
+
+    <div class="totals">
+
+        <p>
+            <strong>Subtotal:</strong>
+            ₹ {{subtotal}}
+        </p>
+
+        <p>
+            <strong>Discount:</strong>
+            ₹ {{discount}}
+        </p>
+
+        <p>
+            <strong>GST:</strong>
+            ₹ {{gst}}
+        </p>
+
+        <p>
+            <strong>Grand Total:</strong>
+            ₹ {{grand_total}}
+        </p>
+
+    </div>
+
+
+    <div class="footer">
+
+        <p>
+            Thank You For Visiting PharmaCare Pro
+        </p>
+
+    </div>
+
+</body>
+
+</html>

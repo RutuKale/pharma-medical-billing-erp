@@ -17,10 +17,12 @@ import {
   Sparkles,
   Shield,
   ChevronRight,
+  Menu,
+  X,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 
-  const InputField = ({
+const InputField = ({
   label,
   name,
   type = "text",
@@ -31,39 +33,39 @@ import { Link } from "react-router-dom";
   onChange,
   error,
 }) => (
-    <div>
-      <label className="block text-sm font-medium text-gray-300 mb-2">
-        {label} {required && <span className="text-blue-400">*</span>}
-      </label>
-      <div className="relative">
-        {Icon && (
-          <div className="absolute left-3 top-1/2 -translate-y-1/2">
-            <Icon size={16} className="text-gray-500" />
-          </div>
-        )}
-        <input
-          type={type}
-          name={name}
-          value={value}
-          onChange={onchange}
-          placeholder={placeholder}
-          className={`w-full bg-white/10 border rounded-lg ${Icon ? "pl-10" : "pl-4"} pr-4 py-2.5 text-white placeholder-gray-400 outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all ${
-            error
-              ? "border-red-500 focus:ring-red-500"
-              : "border-white/20 hover:border-white/30"
-          }`}
-        />
-      </div>
-      {error && (
-        <p className="text-red-400 text-sm mt-1 flex items-center gap-1">
-          <AlertCircle size={14} />
-          {error}
-        </p>
+  <div className="w-full">
+    <label className="block text-xs sm:text-sm font-medium text-gray-300 mb-1.5 sm:mb-2">
+      {label} {required && <span className="text-blue-400">*</span>}
+    </label>
+    <div className="relative">
+      {Icon && (
+        <div className="absolute left-3 top-1/2 -translate-y-1/2">
+          <Icon size={16} className="text-gray-500" />
+        </div>
       )}
+      <input
+        type={type}
+        name={name}
+        value={value}
+        onChange={onChange}
+        placeholder={placeholder}
+        className={`w-full bg-white/10 border rounded-lg ${Icon ? "pl-10" : "pl-4"} pr-3 sm:pr-4 py-2 sm:py-2.5 text-sm sm:text-base text-white placeholder-gray-400 outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all ${
+          error
+            ? "border-red-500 focus:ring-red-500"
+            : "border-white/20 hover:border-white/30"
+        }`}
+      />
     </div>
-  );
+    {error && (
+      <p className="text-red-400 text-xs sm:text-sm mt-1 flex items-center gap-1">
+        <AlertCircle size={12} />
+        {error}
+      </p>
+    )}
+  </div>
+);
 
-  const SelectField = ({
+const SelectField = ({
   label,
   name,
   options,
@@ -74,42 +76,42 @@ import { Link } from "react-router-dom";
   onChange,
   error,
 }) => (
-    <div>
-      <label className="block text-sm font-medium text-gray-300 mb-2">
-        {label} {required && <span className="text-blue-400">*</span>}
-      </label>
-      <div className="relative">
-        {Icon && (
-          <div className="absolute left-3 top-1/2 -translate-y-1/2 z-10">
-            <Icon size={16} className="text-gray-500" />
-          </div>
-        )}
-        <select
-          name={name}
-          value={value}
-          onChange={onChange}
-          className={`w-full bg-white/10 border rounded-lg ${Icon ? "pl-10" : "pl-4"} pr-4 py-2.5 text-white outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all cursor-pointer ${
-            error
-              ? "border-red-500 focus:ring-red-500"
-              : "border-white/20 hover:border-white/30"
-          }`}
-        >
-          <option value="" className="bg-slate-800">{placeholder}</option>
-          {options.map((option, index) => (
-            <option key={index} value={option} className="bg-slate-800">
-              {option}
-            </option>
-          ))}
-        </select>
-      </div>
-      {error && (
-        <p className="text-red-400 text-sm mt-1 flex items-center gap-1">
-          <AlertCircle size={14} />
-          {error}
-        </p>
+  <div className="w-full">
+    <label className="block text-xs sm:text-sm font-medium text-gray-300 mb-1.5 sm:mb-2">
+      {label} {required && <span className="text-blue-400">*</span>}
+    </label>
+    <div className="relative">
+      {Icon && (
+        <div className="absolute left-3 top-1/2 -translate-y-1/2 z-10">
+          <Icon size={16} className="text-gray-500" />
+        </div>
       )}
+      <select
+        name={name}
+        value={value}
+        onChange={onChange}
+        className={`w-full bg-white/10 border rounded-lg ${Icon ? "pl-10" : "pl-4"} pr-3 sm:pr-4 py-2 sm:py-2.5 text-sm sm:text-base text-white outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all cursor-pointer ${
+          error
+            ? "border-red-500 focus:ring-red-500"
+            : "border-white/20 hover:border-white/30"
+        }`}
+      >
+        <option value="" className="bg-slate-800">{placeholder}</option>
+        {options.map((option, index) => (
+          <option key={index} value={option} className="bg-slate-800">
+            {option}
+          </option>
+        ))}
+      </select>
     </div>
-  );
+    {error && (
+      <p className="text-red-400 text-xs sm:text-sm mt-1 flex items-center gap-1">
+        <AlertCircle size={12} />
+        {error}
+      </p>
+    )}
+  </div>
+);
 
 const AddMedicines = () => {
   const [formData, setFormData] = useState({
@@ -296,86 +298,91 @@ const AddMedicines = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
-      {/* Animated Background Pattern */}
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 overflow-x-hidden">
+      {/* Animated Background Pattern - Optimized for mobile */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-0 -left-4 w-96 h-96 bg-blue-500/10 rounded-full filter blur-3xl"></div>
-        <div className="absolute bottom-1/4 -right-4 w-96 h-96 bg-indigo-500/10 rounded-full filter blur-3xl"></div>
-        <div className="absolute inset-0 opacity-5">
+        <div className="absolute top-0 -left-4 w-48 sm:w-72 md:w-96 h-48 sm:h-72 md:h-96 bg-blue-500/10 rounded-full filter blur-3xl"></div>
+        <div className="absolute bottom-1/4 -right-4 w-48 sm:w-72 md:w-96 h-48 sm:h-72 md:h-96 bg-indigo-500/10 rounded-full filter blur-3xl"></div>
+        <div className="absolute inset-0 opacity-5 hidden sm:block">
           <div className="h-full w-full bg-[linear-gradient(rgba(20,184,166,0.1)_1px,transparent_1px),linear-gradient(90deg,rgba(20,184,166,0.1)_1px,transparent_1px)] bg-[size:32px_32px]"></div>
         </div>
       </div>
 
-      <div className="relative z-10 p-4 md:p-6">
-        {/* HEADER */}
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
-          <div>
-            <div className="flex items-center gap-3">
-              <div className="relative group">
-                <div className="absolute inset-0 bg-gradient-to-r from-blue-400 to-indigo-400 rounded-xl blur-lg opacity-75 group-hover:opacity-100 transition-opacity"></div>
-                <div className="relative bg-gradient-to-br from-blue-500 to-indigo-600 p-2 rounded-xl shadow-lg">
-                  <Pill size={24} className="text-white" />
-                </div>
+      <div className="relative z-10 p-3 sm:p-4 md:p-6 lg:p-8">
+        {/* HEADER - Fully Responsive */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4 sm:mb-6">
+          <div className="flex items-start sm:items-center gap-3">
+            <div className="relative group flex-shrink-0">
+              <div className="absolute inset-0 bg-gradient-to-r from-blue-400 to-indigo-400 rounded-xl blur-lg opacity-75 group-hover:opacity-100 transition-opacity"></div>
+              <div className="relative bg-gradient-to-br from-blue-500 to-indigo-600 p-2 rounded-xl shadow-lg">
+                <Pill className="sm:size-6 md:size-8 text-white" />
               </div>
-              <div>
-                <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-400 to-indigo-400 bg-clip-text text-transparent">
-                  Add Medicine
-                </h1>
-                <p className="text-gray-400 text-sm mt-1">
-                  Add new medicine stock to inventory system
-                </p>
-              </div>
+            </div>
+            <div>
+              <h1 className="text-xl sm:text-2xl md:text-3xl font-bold bg-gradient-to-r from-blue-400 to-indigo-400 bg-clip-text text-transparent">
+                Add Medicine
+              </h1>
+              <p className="text-gray-400 text-xs sm:text-sm mt-0.5 sm:mt-1">
+                Add new medicine stock to inventory system
+              </p>
             </div>
           </div>
 
           <Link
             to="/inventory"
-            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-white/5 border border-white/10 text-gray-300 hover:bg-white/10 hover:text-white transition-all duration-200 w-fit group"
+            className="flex items-center justify-center gap-2 px-3 sm:px-4 py-2 rounded-lg bg-white/5 border border-white/10 text-gray-300 hover:bg-white/10 hover:text-white transition-all duration-200 w-full sm:w-auto group"
           >
-            <ArrowLeft size={18} className="group-hover:-translate-x-1 transition-transform" />
-            Back to Inventory
+            <ArrowLeft size={16} className="sm:size-[18px] group-hover:-translate-x-1 transition-transform" />
+            <span className="text-sm sm:text-base">Back to Inventory</span>
           </Link>
         </div>
 
-        {/* SECURITY BADGE */}
-        <div className="mb-6 bg-indigo-500/10 border border-indigo-500/20 rounded-xl p-3 flex items-center gap-3">
-          <div className="bg-indigo-500/20 p-1.5 rounded-lg">
-            <Shield size={14} className="text-indigo-400" />
+        {/* SECURITY BADGE - Responsive */}
+        <div className="mb-4 sm:mb-6 bg-indigo-500/10 border border-indigo-500/20 rounded-xl p-2.5 sm:p-3">
+          <div className="flex items-center gap-2 sm:gap-3">
+            <div className="bg-indigo-500/20 p-1.5 rounded-lg flex-shrink-0">
+              <Shield size={12} className="sm:size-[14px] text-indigo-400" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-white text-xs sm:text-sm font-medium truncate">Secure Medicine Registration</p>
+              <p className="text-indigo-300/70 text-[10px] sm:text-xs truncate sm:whitespace-normal">
+                All fields are validated • Batch tracking enabled • GST compliant
+              </p>
+            </div>
+            <Sparkles size={12} className="sm:size-[14px] text-indigo-400 animate-pulse flex-shrink-0" />
           </div>
-          <div>
-            <p className="text-white text-xs font-medium">Secure Medicine Registration</p>
-            <p className="text-indigo-300/70 text-xs">All fields are validated • Batch tracking enabled • GST compliant</p>
-          </div>
-          <Sparkles size={14} className="text-indigo-400 ml-auto animate-pulse" />
         </div>
 
-        {/* FORM */}
+        {/* FORM - Fully Responsive */}
         <form onSubmit={handleSubmit}>
-          <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl overflow-hidden">
-            {/* SECTION TITLE */}
-            <div className="border-b border-white/10 p-6">
-              <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-gradient-to-r from-blue-500 to-indigo-600">
-                  <Package size={18} className="text-white" />
+          <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-xl sm:rounded-2xl overflow-hidden">
+            {/* SECTION TITLE - Responsive */}
+            <div className="border-b border-white/10 p-4 sm:p-5 md:p-6">
+              <div className="flex items-center gap-2 sm:gap-3">
+                <div className="p-1.5 sm:p-2 rounded-lg bg-gradient-to-r from-blue-500 to-indigo-600 flex-shrink-0">
+                  <Package size={14} className="sm:size-[18px] text-white" />
                 </div>
-                <div>
-                  <h2 className="text-lg font-semibold text-white">
+                <div className="min-w-0">
+                  <h2 className="text-base sm:text-lg md:text-xl font-semibold text-white truncate sm:whitespace-normal">
                     Medicine Information
                   </h2>
-                  <p className="text-sm text-gray-400 mt-0.5">
+                  <p className="text-xs sm:text-sm text-gray-400 mt-0.5 sm:mt-1 hidden sm:block">
                     Fill all medicine details carefully. Fields marked with * are required.
                   </p>
                 </div>
               </div>
             </div>
 
-            {/* GRID */}
-            <div className="p-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+            {/* GRID - Responsive Breakpoints */}
+            <div className="p-4 sm:p-5 md:p-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 md:gap-5">
                 {/* Medicine Name */}
                 <InputField
                   label="Medicine Name"
                   name="medicineName"
+                  value={formData.medicineName}
+                  onChange={handleChange}
+                  error={errors.medicineName}
                   placeholder="Enter medicine name"
                   required
                   icon={Pill}
@@ -385,6 +392,8 @@ const AddMedicines = () => {
                 <InputField
                   label="Generic / Salt Name"
                   name="saltName"
+                  value={formData.saltName}
+                  onChange={handleChange}
                   placeholder="Enter salt name"
                   icon={Tag}
                 />
@@ -393,6 +402,8 @@ const AddMedicines = () => {
                 <InputField
                   label="Brand Name"
                   name="brandName"
+                  value={formData.brandName}
+                  onChange={handleChange}
                   placeholder="Enter brand name"
                   icon={Tag}
                 />
@@ -401,6 +412,8 @@ const AddMedicines = () => {
                 <InputField
                   label="Manufacturer"
                   name="manufacturer"
+                  value={formData.manufacturer}
+                  onChange={handleChange}
                   placeholder="Enter manufacturer"
                   icon={Building2}
                 />
@@ -409,6 +422,9 @@ const AddMedicines = () => {
                 <SelectField
                   label="Category"
                   name="category"
+                  value={formData.category}
+                  onChange={handleChange}
+                  error={errors.category}
                   options={categories}
                   placeholder="Select Category"
                   required
@@ -419,6 +435,8 @@ const AddMedicines = () => {
                 <InputField
                   label="Pack Size"
                   name="packSize"
+                  value={formData.packSize}
+                  onChange={handleChange}
                   placeholder="Example: Strip of 10"
                   icon={Package}
                 />
@@ -427,6 +445,8 @@ const AddMedicines = () => {
                 <SelectField
                   label="Unit"
                   name="unit"
+                  value={formData.unit}
+                  onChange={handleChange}
                   options={units}
                   placeholder="Select Unit"
                   icon={Boxes}
@@ -437,6 +457,9 @@ const AddMedicines = () => {
                   label="Purchase Price"
                   name="purchasePrice"
                   type="number"
+                  value={formData.purchasePrice}
+                  onChange={handleChange}
+                  error={errors.purchasePrice}
                   placeholder="Enter purchase price"
                   required
                   icon={DollarSign}
@@ -447,6 +470,9 @@ const AddMedicines = () => {
                   label="Selling Price (MRP)"
                   name="sellingPrice"
                   type="number"
+                  value={formData.sellingPrice}
+                  onChange={handleChange}
+                  error={errors.sellingPrice}
                   placeholder="Enter selling price"
                   required
                   icon={DollarSign}
@@ -457,6 +483,9 @@ const AddMedicines = () => {
                   label="GST %"
                   name="gst"
                   type="number"
+                  value={formData.gst}
+                  onChange={handleChange}
+                  error={errors.gst}
                   placeholder="Enter GST percentage"
                   icon={Percent}
                 />
@@ -465,6 +494,9 @@ const AddMedicines = () => {
                 <InputField
                   label="Batch Number"
                   name="batchNumber"
+                  value={formData.batchNumber}
+                  onChange={handleChange}
+                  error={errors.batchNumber}
                   placeholder="Enter batch number"
                   required
                   icon={Hash}
@@ -475,6 +507,9 @@ const AddMedicines = () => {
                   label="Manufacturing Date"
                   name="manufactureDate"
                   type="date"
+                  value={formData.manufactureDate}
+                  onChange={handleChange}
+                  error={errors.manufactureDate}
                   placeholder="Select date"
                   icon={Calendar}
                 />
@@ -484,6 +519,9 @@ const AddMedicines = () => {
                   label="Expiry Date"
                   name="expiryDate"
                   type="date"
+                  value={formData.expiryDate}
+                  onChange={handleChange}
+                  error={errors.expiryDate}
                   placeholder="Select date"
                   required
                   icon={Calendar}
@@ -493,6 +531,8 @@ const AddMedicines = () => {
                 <InputField
                   label="Rack / Shelf Location"
                   name="rackLocation"
+                  value={formData.rackLocation}
+                  onChange={handleChange}
                   placeholder="Example: Rack A-12"
                   icon={MapPin}
                 />
@@ -502,6 +542,9 @@ const AddMedicines = () => {
                   label="Minimum Stock Alert"
                   name="minStock"
                   type="number"
+                  value={formData.minStock}
+                  onChange={handleChange}
+                  error={errors.minStock}
                   placeholder="Enter minimum stock"
                   icon={AlertCircle}
                 />
@@ -511,37 +554,44 @@ const AddMedicines = () => {
                   label="Initial Stock Quantity"
                   name="quantity"
                   type="number"
+                  value={formData.quantity}
+                  onChange={handleChange}
+                  error={errors.quantity}
                   placeholder="Enter stock quantity"
                   required
                   icon={Boxes}
                 />
               </div>
 
-              {/* PREVIEW SECTION - Shows calculated values */}
+              {/* PREVIEW SECTION - Fully Responsive */}
               {formData.purchasePrice && formData.sellingPrice && (
-                <div className="mt-6 p-4 bg-gradient-to-r from-blue-500/10 to-indigo-500/10 border border-blue-500/20 rounded-xl">
-                  <h3 className="text-sm font-semibold text-blue-400 mb-3 flex items-center gap-2">
-                    <ChevronRight size={14} />
+                <div className="mt-4 sm:mt-6 p-3 sm:p-4 bg-gradient-to-r from-blue-500/10 to-indigo-500/10 border border-blue-500/20 rounded-xl">
+                  <h3 className="text-xs sm:text-sm font-semibold text-blue-400 mb-2 sm:mb-3 flex items-center gap-2">
+                    <ChevronRight size={12} className="sm:size-[14px]" />
                     Price Summary
                   </h3>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                    <div>
-                      <p className="text-xs text-gray-400">Purchase Price</p>
-                      <p className="text-white font-semibold">₹{formData.purchasePrice}</p>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-4">
+                    <div className="min-w-0">
+                      <p className="text-[10px] sm:text-xs text-gray-400">Purchase Price</p>
+                      <p className="text-sm sm:text-base md:text-lg text-white font-semibold break-words">
+                        ₹{formData.purchasePrice}
+                      </p>
                     </div>
-                    <div>
-                      <p className="text-xs text-gray-400">Selling Price</p>
-                      <p className="text-white font-semibold">₹{formData.sellingPrice}</p>
+                    <div className="min-w-0">
+                      <p className="text-[10px] sm:text-xs text-gray-400">Selling Price</p>
+                      <p className="text-sm sm:text-base md:text-lg text-white font-semibold break-words">
+                        ₹{formData.sellingPrice}
+                      </p>
                     </div>
-                    <div>
-                      <p className="text-xs text-gray-400">Margin</p>
-                      <p className="text-indigo-400 font-semibold">
+                    <div className="min-w-0">
+                      <p className="text-[10px] sm:text-xs text-gray-400">Margin</p>
+                      <p className="text-xs sm:text-sm md:text-base text-indigo-400 font-semibold break-words">
                         {((parseFloat(formData.sellingPrice) - parseFloat(formData.purchasePrice)) / parseFloat(formData.purchasePrice) * 100).toFixed(2)}%
                       </p>
                     </div>
-                    <div>
-                      <p className="text-xs text-gray-400">Profit per unit</p>
-                      <p className="text-indigo-400 font-semibold">
+                    <div className="min-w-0">
+                      <p className="text-[10px] sm:text-xs text-gray-400">Profit per unit</p>
+                      <p className="text-xs sm:text-sm md:text-base text-indigo-400 font-semibold break-words">
                         ₹{(parseFloat(formData.sellingPrice) - parseFloat(formData.purchasePrice)).toFixed(2)}
                       </p>
                     </div>
@@ -549,22 +599,22 @@ const AddMedicines = () => {
                 </div>
               )}
 
-              {/* BUTTONS */}
-              <div className="flex flex-col sm:flex-row gap-3 mt-8 pt-6 border-t border-white/10">
+              {/* BUTTONS - Fully Responsive */}
+              <div className="flex flex-col sm:flex-row gap-3 mt-6 sm:mt-8 pt-4 sm:pt-6 border-t border-white/10">
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white px-6 py-3 rounded-xl flex items-center justify-center gap-2 transition-all duration-200 shadow-lg shadow-blue-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white px-4 sm:px-6 py-2.5 sm:py-3 rounded-xl flex items-center justify-center gap-2 transition-all duration-200 shadow-lg shadow-blue-500/20 disabled:opacity-50 disabled:cursor-not-allowed text-sm sm:text-base"
                 >
                   {isSubmitting ? (
                     <>
                       <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                      Saving...
+                      <span>Saving...</span>
                     </>
                   ) : (
                     <>
-                      <Save size={18} />
-                      Save Medicine
+                      <Save size={16} className="sm:size-[18px]" />
+                      <span>Save Medicine</span>
                     </>
                   )}
                 </button>
@@ -572,7 +622,7 @@ const AddMedicines = () => {
                 <button
                   type="button"
                   onClick={handleReset}
-                  className="bg-white/10 hover:bg-white/20 border border-white/20 text-gray-300 hover:text-white px-6 py-3 rounded-xl flex items-center justify-center gap-2 transition-all duration-200"
+                  className="bg-white/10 hover:bg-white/20 border border-white/20 text-gray-300 hover:text-white px-4 sm:px-6 py-2.5 sm:py-3 rounded-xl flex items-center justify-center gap-2 transition-all duration-200 text-sm sm:text-base"
                 >
                   Reset Form
                 </button>

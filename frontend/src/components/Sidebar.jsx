@@ -179,7 +179,7 @@ const Sidebar = () => {
 
       {/* SIDEBAR */}
       <aside
-        className={`fixed lg:sticky top-0 left-0 z-50 h-screen w-72 bg-gradient-to-b from-slate-900 via-blue-950 to-slate-900 text-white flex flex-col transform transition-transform duration-300 border-r border-white/10
+        className={`fixed lg:sticky top-0 left-0 z-50 h-screen sm:w-72 w-full bg-gradient-to-b from-slate-900 via-blue-950 to-slate-900 text-white flex flex-col transform transition-transform duration-300 border-r border-white/10
         ${isOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}`}
       >
         {/* Animated Background Pattern */}
