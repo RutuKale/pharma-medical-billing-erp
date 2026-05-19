@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Pill,
   Save,
@@ -20,7 +20,10 @@ import {
   Menu,
   X,
 } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import axios from "axios";
+import Swal from "sweetalert2";
+const API_URL = "http://localhost:5000/api/medicines";
 
 const InputField = ({
   label,
@@ -96,7 +99,9 @@ const SelectField = ({
             : "border-white/20 hover:border-white/30"
         }`}
       >
-        <option value="" className="bg-slate-800">{placeholder}</option>
+        <option value="" className="bg-slate-800">
+          {placeholder}
+        </option>
         {options.map((option, index) => (
           <option key={index} value={option} className="bg-slate-800">
             {option}
@@ -132,9 +137,39 @@ const AddMedicines = () => {
     minStock: "",
     quantity: "",
   });
-
   const [errors, setErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const location = useLocation();
+  const navigate = useNavigate();
+  const editMode = location.state?.editMode || false;
+  const medicineData = location.state?.medicineData;
+
+  useEffect(() => {
+    if (editMode && medicineData) {
+      setFormData({
+        medicineName: medicineData.medicine_name || "",
+        saltName: medicineData.salt_name || "",
+        brandName: medicineData.brand_name || "",
+        manufacturer: medicineData.manufacturer || "",
+        category: medicineData.category || "",
+        packSize: medicineData.pack_size || "",
+        unit: medicineData.unit || "",
+        purchasePrice: medicineData.purchase_price || "",
+        sellingPrice: medicineData.selling_price || "",
+        gst: medicineData.gst || "",
+        batchNumber: medicineData.batch_number || "",
+        manufactureDate: medicineData.manufacture_date
+          ? medicineData.manufacture_date.split("T")[0]
+          : "",
+        expiryDate: medicineData.expiry_date
+          ? medicineData.expiry_date.split("T")[0]
+          : "",
+        rackLocation: medicineData.rack_location || "",
+        minStock: medicineData.min_stock || "",
+        quantity: medicineData.quantity || "",
+      });
+    }
+  }, [editMode, medicineData]);
 
   const categories = [
     "Tablet",
@@ -192,8 +227,11 @@ const AddMedicines = () => {
       newErrors.sellingPrice = "Selling price is required";
     } else if (parseFloat(formData.sellingPrice) <= 0) {
       newErrors.sellingPrice = "Selling price must be greater than 0";
-    } else if (parseFloat(formData.sellingPrice) <= parseFloat(formData.purchasePrice)) {
-      newErrors.sellingPrice = "Selling price should be greater than purchase price";
+    } else if (
+      parseFloat(formData.sellingPrice) <= parseFloat(formData.purchasePrice)
+    ) {
+      newErrors.sellingPrice =
+        "Selling price should be greater than purchase price";
     }
 
     if (!formData.batchNumber) {
@@ -221,7 +259,8 @@ const AddMedicines = () => {
     if (formData.manufactureDate) {
       const manufacture = new Date(formData.manufactureDate);
       if (manufacture >= expiry) {
-        newErrors.manufactureDate = "Manufacture date must be before expiry date";
+        newErrors.manufactureDate =
+          "Manufacture date must be before expiry date";
       }
     }
 
@@ -229,7 +268,10 @@ const AddMedicines = () => {
       newErrors.minStock = "Minimum stock cannot be negative";
     }
 
-    if (formData.gst && (parseFloat(formData.gst) < 0 || parseFloat(formData.gst) > 100)) {
+    if (
+      formData.gst &&
+      (parseFloat(formData.gst) < 0 || parseFloat(formData.gst) > 100)
+    ) {
       newErrors.gst = "GST must be between 0 and 100";
     }
 
@@ -243,58 +285,138 @@ const AddMedicines = () => {
 
     if (!validateForm()) return;
 
-    setIsSubmitting(true);
+    try {
+      setIsSubmitting(true);
 
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1000));
+      const medicinePayload = {
+        medicine_name: formData.medicineName,
+        salt_name: formData.saltName,
+        brand_name: formData.brandName,
+        manufacturer: formData.manufacturer,
+        category: formData.category,
+        pack_size: formData.packSize,
+        unit: formData.unit,
+        purchase_price: Number(formData.purchasePrice),
+        selling_price: Number(formData.sellingPrice),
+        gst: Number(formData.gst),
+        batch_number: formData.batchNumber,
+        manufacture_date: formData.manufactureDate,
+        expiry_date: formData.expiryDate,
+        quantity: Number(formData.quantity),
+        rack_location: formData.rackLocation,
+        min_stock: Number(formData.minStock),
+        status: "ACTIVE",
+      };
 
-    console.log("Medicine Data:", formData);
+      let response;
 
-    // API CALL HERE
-    alert("Medicine Added Successfully");
+      // EDIT MODE → PUT
+      if (editMode) {
+        response = await axios.put(
+          `http://localhost:5000/api/medicines/${medicineData.medicine_id}`,
+          medicinePayload,
+        );
 
-    setFormData({
-      medicineName: "",
-      saltName: "",
-      brandName: "",
-      manufacturer: "",
-      category: "",
-      packSize: "",
-      unit: "",
-      purchasePrice: "",
-      sellingPrice: "",
-      gst: "",
-      batchNumber: "",
-      manufactureDate: "",
-      expiryDate: "",
-      rackLocation: "",
-      minStock: "",
-      quantity: "",
-    });
+        await Swal.fire({
+          icon: "success",
+          iconColor: "#00ff00",
+          title: "Medicine Updated",
+          text: "Medicine updated successfully",
+          background: "#fff",
+          color: "#000",
+          confirmButtonColor: "#3b82f6",
+        });
+      }
 
-    setIsSubmitting(false);
+      // CREATE MODE → POST
+      else {
+        response = await axios.post(
+          "http://localhost:5000/api/medicines",
+          medicinePayload,
+        );
+
+        await Swal.fire({
+          icon: "success",
+          iconColor: "#00ff00",
+          title: "Medicine Added",
+          text: "Medicine added successfully",
+          background: "#fff",
+          color: "#000",
+          confirmButtonColor: "#3b82f6",
+        });
+      }
+
+      navigate("/inventory");
+    } catch (error) {
+      console.error(error);
+
+      if (error.response) {
+        console.log(error.response.data);
+      }
+
+      await Swal.fire({
+        icon: "error",
+        title: "Operation Failed",
+        text:
+          error.response?.data?.message ||
+          "Something went wrong while saving medicine",
+        background: "#fff",
+        iconColor: "#ff0000",
+        color: "#000",
+        confirmButtonColor: "#ef4444",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
-  const handleReset = () => {
-    setFormData({
-      medicineName: "",
-      saltName: "",
-      brandName: "",
-      manufacturer: "",
-      category: "",
-      packSize: "",
-      unit: "",
-      purchasePrice: "",
-      sellingPrice: "",
-      gst: "",
-      batchNumber: "",
-      manufactureDate: "",
-      expiryDate: "",
-      rackLocation: "",
-      minStock: "",
-      quantity: "",
+  const handleReset = async () => {
+    const result = await Swal.fire({
+      title: "Reset Form?",
+      text: "All entered data will be cleared.",
+      icon: "warning",
+      iconColor: "#ffe600",
+      showCancelButton: true,
+      confirmButtonColor: "#3b82f6",
+      cancelButtonColor: "#ef4444",
+      confirmButtonText: "Yes, Reset",
+      background: "#1e293b",
+      color: "#fff",
     });
-    setErrors({});
+
+    if (result.isConfirmed) {
+      setFormData({
+        medicineName: "",
+        saltName: "",
+        brandName: "",
+        manufacturer: "",
+        category: "",
+        packSize: "",
+        unit: "",
+        purchasePrice: "",
+        sellingPrice: "",
+        gst: "",
+        batchNumber: "",
+        manufactureDate: "",
+        expiryDate: "",
+        rackLocation: "",
+        minStock: "",
+        quantity: "",
+      });
+
+      setErrors({});
+
+      Swal.fire({
+        icon: "success",
+        title: "Form Reset",
+        text: "Form cleared successfully",
+        timer: 1500,
+        showConfirmButton: false,
+        background: "#fff",
+        iconColor: "#00ff00",
+        color: "#000",
+      });
+    }
   };
 
   return (
@@ -320,10 +442,12 @@ const AddMedicines = () => {
             </div>
             <div>
               <h1 className="text-xl sm:text-2xl md:text-3xl font-bold bg-gradient-to-r from-blue-400 to-indigo-400 bg-clip-text text-transparent">
-                Add Medicine
+                {editMode ? "Edit Medicine" : "Add Medicine"}
               </h1>
               <p className="text-gray-400 text-xs sm:text-sm mt-0.5 sm:mt-1">
-                Add new medicine stock to inventory system
+                {editMode
+                  ? "Update medicine inventory details"
+                  : "Add new medicine stock to inventory system"}
               </p>
             </div>
           </div>
@@ -332,7 +456,10 @@ const AddMedicines = () => {
             to="/inventory"
             className="flex items-center justify-center gap-2 px-3 sm:px-4 py-2 rounded-lg bg-white/5 border border-white/10 text-gray-300 hover:bg-white/10 hover:text-white transition-all duration-200 w-full sm:w-auto group"
           >
-            <ArrowLeft size={16} className="sm:size-[18px] group-hover:-translate-x-1 transition-transform" />
+            <ArrowLeft
+              size={16}
+              className="sm:size-[18px] group-hover:-translate-x-1 transition-transform"
+            />
             <span className="text-sm sm:text-base">Back to Inventory</span>
           </Link>
         </div>
@@ -344,12 +471,18 @@ const AddMedicines = () => {
               <Shield size={12} className="sm:size-[14px] text-indigo-400" />
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-white text-xs sm:text-sm font-medium truncate">Secure Medicine Registration</p>
+              <p className="text-white text-xs sm:text-sm font-medium truncate">
+                Secure Medicine Registration
+              </p>
               <p className="text-indigo-300/70 text-[10px] sm:text-xs truncate sm:whitespace-normal">
-                All fields are validated • Batch tracking enabled • GST compliant
+                All fields are validated • Batch tracking enabled • GST
+                compliant
               </p>
             </div>
-            <Sparkles size={12} className="sm:size-[14px] text-indigo-400 animate-pulse flex-shrink-0" />
+            <Sparkles
+              size={12}
+              className="sm:size-[14px] text-indigo-400 animate-pulse flex-shrink-0"
+            />
           </div>
         </div>
 
@@ -367,7 +500,8 @@ const AddMedicines = () => {
                     Medicine Information
                   </h2>
                   <p className="text-xs sm:text-sm text-gray-400 mt-0.5 sm:mt-1 hidden sm:block">
-                    Fill all medicine details carefully. Fields marked with * are required.
+                    Fill all medicine details carefully. Fields marked with *
+                    are required.
                   </p>
                 </div>
               </div>
@@ -572,27 +706,45 @@ const AddMedicines = () => {
                   </h3>
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-4">
                     <div className="min-w-0">
-                      <p className="text-[10px] sm:text-xs text-gray-400">Purchase Price</p>
+                      <p className="text-[10px] sm:text-xs text-gray-400">
+                        Purchase Price
+                      </p>
                       <p className="text-sm sm:text-base md:text-lg text-white font-semibold break-words">
                         ₹{formData.purchasePrice}
                       </p>
                     </div>
                     <div className="min-w-0">
-                      <p className="text-[10px] sm:text-xs text-gray-400">Selling Price</p>
+                      <p className="text-[10px] sm:text-xs text-gray-400">
+                        Selling Price
+                      </p>
                       <p className="text-sm sm:text-base md:text-lg text-white font-semibold break-words">
                         ₹{formData.sellingPrice}
                       </p>
                     </div>
                     <div className="min-w-0">
-                      <p className="text-[10px] sm:text-xs text-gray-400">Margin</p>
+                      <p className="text-[10px] sm:text-xs text-gray-400">
+                        Margin
+                      </p>
                       <p className="text-xs sm:text-sm md:text-base text-indigo-400 font-semibold break-words">
-                        {((parseFloat(formData.sellingPrice) - parseFloat(formData.purchasePrice)) / parseFloat(formData.purchasePrice) * 100).toFixed(2)}%
+                        {(
+                          ((parseFloat(formData.sellingPrice) -
+                            parseFloat(formData.purchasePrice)) /
+                            parseFloat(formData.purchasePrice)) *
+                          100
+                        ).toFixed(2)}
+                        %
                       </p>
                     </div>
                     <div className="min-w-0">
-                      <p className="text-[10px] sm:text-xs text-gray-400">Profit per unit</p>
+                      <p className="text-[10px] sm:text-xs text-gray-400">
+                        Profit per unit
+                      </p>
                       <p className="text-xs sm:text-sm md:text-base text-indigo-400 font-semibold break-words">
-                        ₹{(parseFloat(formData.sellingPrice) - parseFloat(formData.purchasePrice)).toFixed(2)}
+                        ₹
+                        {(
+                          parseFloat(formData.sellingPrice) -
+                          parseFloat(formData.purchasePrice)
+                        ).toFixed(2)}
                       </p>
                     </div>
                   </div>
@@ -609,12 +761,14 @@ const AddMedicines = () => {
                   {isSubmitting ? (
                     <>
                       <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                      <span>Saving...</span>
+                      <span>{editMode ? "Updating..." : "Saving..."}</span>
                     </>
                   ) : (
                     <>
                       <Save size={16} className="sm:size-[18px]" />
-                      <span>Save Medicine</span>
+                      <span>
+                        {editMode ? "Update Medicine" : "Save Medicine"}
+                      </span>
                     </>
                   )}
                 </button>

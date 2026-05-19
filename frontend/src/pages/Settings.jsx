@@ -64,7 +64,6 @@ const Settings = () => {
     setIsSaving(true);
     // Simulate API call
     await new Promise(resolve => setTimeout(resolve, 1500));
-    console.log(settings);
     alert("Settings saved successfully");
     setIsSaving(false);
   };

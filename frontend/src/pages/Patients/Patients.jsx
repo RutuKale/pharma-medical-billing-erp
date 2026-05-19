@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   Users,
   Search,
@@ -19,43 +19,11 @@ import {
   AlertCircle,
   ChevronLeft,
   ChevronRight,
+  Locate,
 } from "lucide-react";
-
-const patientsData = [
-  {
-    id: 1,
-    name: "Rahul Patil",
-    mobile: "9876543210",
-    age: 28,
-    gender: "Male",
-    doctorName: "Dr. Sharma",
-    prescriptionNumber: "RX1001",
-    remindersEnabled: true,
-    totalBills: 8,
-  },
-  {
-    id: 2,
-    name: "Sneha Kale",
-    mobile: "9090909090",
-    age: 34,
-    gender: "Female",
-    doctorName: "Dr. Joshi",
-    prescriptionNumber: "RX1002",
-    remindersEnabled: false,
-    totalBills: 3,
-  },
-  {
-    id: 3,
-    name: "Ajay Verma",
-    mobile: "9988776655",
-    age: 45,
-    gender: "Male",
-    doctorName: "Dr. Patil",
-    prescriptionNumber: "RX1003",
-    remindersEnabled: true,
-    totalBills: 12,
-  },
-];
+import axios from "axios";
+const API_URL = "http://localhost:5000/api/patients";
+import Swal from "sweetalert2";
 
 const Patients = () => {
   const [formData, setFormData] = useState({
@@ -63,28 +31,54 @@ const Patients = () => {
     mobile: "",
     age: "",
     gender: "",
+    address: "",
     doctorName: "",
     prescriptionNumber: "",
     remindersEnabled: true,
+    notes: "",
   });
   const [search, setSearch] = useState("");
   const [errors, setErrors] = useState({});
   const [currentPage, setCurrentPage] = useState(1);
+  const [patientsData, setPatientsData] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [editMode, setEditMode] = useState(false);
+  const [selectedPatient, setSelectedPatient] = useState(null);
+  const [showModal, setShowModal] = useState(false);
   const itemsPerPage = 4;
+
+  const fetchPatients = async () => {
+    try {
+      setLoading(true);
+      const response = await axios.get(API_URL);
+      if (response.data.success) {
+        setPatientsData(response.data.data);
+      }
+    } catch (error) {
+      console.error("Fetch Patients Error:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchPatients();
+  }, []);
 
   const filteredPatients = useMemo(() => {
     return patientsData.filter(
       (patient) =>
-        patient.name.toLowerCase().includes(search.toLowerCase()) ||
-        patient.mobile.includes(search)
+        patient.patient_name?.toLowerCase().includes(search.toLowerCase()) ||
+        patient.mobile_number?.includes(search),
     );
-  }, [search]);
+  }, [patientsData, search]);
 
   // Pagination
   const totalPages = Math.ceil(filteredPatients.length / itemsPerPage);
   const paginatedPatients = filteredPatients.slice(
     (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage
+    currentPage * itemsPerPage,
   );
 
   const handleChange = (e) => {
@@ -102,38 +96,232 @@ const Patients = () => {
     const newErrors = {};
     if (!formData.name.trim()) newErrors.name = "Patient name is required";
     if (!formData.mobile.trim()) newErrors.mobile = "Mobile number is required";
-    if (formData.mobile.length !== 10) newErrors.mobile = "Enter valid 10-digit mobile number";
+    if (formData.mobile.length !== 10)
+      newErrors.mobile = "Enter valid 10-digit mobile number";
     if (!formData.gender) newErrors.gender = "Please select gender";
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
+
     if (!validateForm()) return;
-    console.log(formData);
-    alert("Patient Registered Successfully");
-    setFormData({
-      name: "",
-      mobile: "",
-      age: "",
-      gender: "",
-      doctorName: "",
-      prescriptionNumber: "",
-      remindersEnabled: true,
-    });
+
+    try {
+      setSubmitting(true);
+
+      const patientPayload = {
+        patient_name: formData.name,
+        mobile_number: formData.mobile,
+        age: Number(formData.age),
+        gender: formData.gender,
+        address: formData.address,
+        doctor_name: formData.doctorName,
+        prescription_number: formData.prescriptionNumber,
+        reminders_enabled: formData.remindersEnabled,
+        notes: formData.notes,
+      };
+      let response;
+
+      // =========================
+      // EDIT → PUT
+      // =========================
+      if (editMode) {
+        response = await axios.put(
+          `${API_URL}/${selectedPatient.patient_id}`,
+          patientPayload,
+        );
+
+        await Swal.fire({
+          title: "Updated!",
+          text: "Patient Updated Successfully",
+          icon: "success",
+          iconColor: "#22c55e",
+          background: "#fff",
+          color: "#000",
+          confirmButtonColor: "#22c55e",
+        });
+      }
+
+      // =========================
+      // CREATE → POST
+      // =========================
+      else {
+        response = await axios.post(API_URL, patientPayload);
+
+        await Swal.fire({
+          title: "Success!",
+          text: "Patient Registered Successfully",
+          icon: "success",
+          iconColor: "#22c55e",
+          background: "#fff",
+          color: "#000",
+          confirmButtonColor: "#22c55e",
+        });
+      }
+
+      // Refresh table
+      fetchPatients();
+
+      // Reset form
+      setFormData({
+        name: "",
+        mobile: "",
+        age: "",
+        gender: "",
+        address: "",
+        doctorName: "",
+        prescriptionNumber: "",
+        remindersEnabled: true,
+        notes: "",
+      });
+
+      // Reset edit state
+      setEditMode(false);
+      setSelectedPatient(null);
+      setErrors({});
+      setShowModal(false);
+    } catch (error) {
+      console.error(
+        editMode ? "Update Patient Error:" : "Create Patient Error:",
+        error,
+      );
+
+      if (error.response) {
+        Swal.fire({
+          title: "Error!",
+          text: error.response.data.message,
+          icon: "error",
+          iconColor: "#ef4444",
+          background: "#fff",
+          color: "#000",
+          confirmButtonColor: "#ef4444",
+        });
+      } else {
+        Swal.fire({
+          title: "Server Error!",
+          text: "Something went wrong.",
+          icon: "error",
+          iconColor: "#ef4444",
+          background: "#fff",
+          color: "#000",
+          confirmButtonColor: "#ef4444",
+        });
+      }
+    } finally {
+      setSubmitting(false);
+    }
   };
 
-  const viewPatient = (patient) => console.log("View:", patient);
-  const editPatient = (patient) => console.log("Edit:", patient);
-  const deletePatient = (patient) => console.log("Delete:", patient);
+  const editPatient = (patient) => {
+    setEditMode(true);
+
+    setSelectedPatient(patient);
+
+    setFormData({
+      name: patient.patient_name || "",
+      mobile: patient.mobile_number || "",
+      age: patient.age || "",
+      gender: patient.gender || "",
+      address: patient.address || "",
+      doctorName: patient.doctor_name || "",
+      prescriptionNumber: patient.prescription_number || "",
+      remindersEnabled: patient.reminders_enabled || false,
+      notes: patient.notes || "",
+    });
+
+    setShowModal(true);
+  };
+
+  const deletePatient = async (patient) => {
+    const result = await Swal.fire({
+      title: "Are you sure?",
+      text: `Delete ${patient.patient_name}?`,
+      icon: "warning",
+      iconColor: "#ff0000",
+      color: "#000",
+      background: "#ffffff",
+      showCancelButton: true,
+      confirmButtonColor: "#ef4444",
+      cancelButtonColor: "#475569",
+      confirmButtonText: "Yes, Delete",
+      cancelButtonText: "Cancel",
+    });
+
+    if (!result.isConfirmed) return;
+
+    try {
+      const response = await axios.delete(`${API_URL}/${patient.patient_id}`);
+
+      if (response.data.success) {
+        await Swal.fire({
+          title: "Deleted!",
+          text: "Patient Deleted Successfully",
+          icon: "success",
+          iconColor: "#22c55e",
+          background: "#fff",
+          color: "#000",
+          confirmButtonColor: "#22c55e",
+        });
+
+        fetchPatients();
+
+        if (
+          selectedPatient &&
+          selectedPatient.patient_id === patient.patient_id
+        ) {
+          setEditMode(false);
+          setSelectedPatient(null);
+
+          setFormData({
+            name: "",
+            mobile: "",
+            age: "",
+            gender: "",
+            address: "",
+            doctorName: "",
+            prescriptionNumber: "",
+            remindersEnabled: true,
+            notes: "",
+          });
+        }
+      }
+    } catch (error) {
+      console.error("Delete Patient Error:", error);
+
+      Swal.fire({
+        title: "Error!",
+        text: error.response?.data?.message || "Failed to delete patient",
+        icon: "error",
+        iconColor: "#ef4444",
+        background: "#fff",
+        color: "#000",
+        confirmButtonColor: "#ef4444",
+      });
+    }
+  };
 
   const stats = {
     totalPatients: patientsData.length,
-    activeReminders: patientsData.filter((p) => p.remindersEnabled).length,
-    totalBills: patientsData.reduce((acc, patient) => acc + patient.totalBills, 0),
-    doctors: [...new Set(patientsData.map((p) => p.doctorName))].length,
+
+    activeReminders: patientsData.filter((p) => p.reminders_enabled).length,
+
+    totalBills: patientsData.reduce(
+      (acc, patient) => acc + (patient.total_bills || 0),
+      0,
+    ),
+
+    doctors: [...new Set(patientsData.map((p) => p.doctor_name))].length,
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-slate-900 flex items-center justify-center">
+        <div className="text-white text-xl">Loading Patients...</div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-950 to-slate-900">
@@ -236,164 +424,7 @@ const Patients = () => {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-          {/* Register Form */}
-          <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl shadow-xl overflow-hidden">
-            <div className="bg-gradient-to-r from-green-500/10 to-emerald-500/10 px-6 py-4 border-b border-white/10">
-              <div className="flex items-center gap-3">
-                <div className="bg-green-500/20 p-2 rounded-xl">
-                  <UserPlus size={20} className="text-green-400" />
-                </div>
-                <h2 className="text-lg font-semibold text-white">
-                  Register Patient
-                </h2>
-              </div>
-            </div>
-
-            <div className="p-6">
-              <form onSubmit={handleSubmit} className="space-y-5">
-                {/* Name */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">
-                    Patient Name *
-                  </label>
-                  <input
-                    type="text"
-                    name="name"
-                    value={formData.name}
-                    onChange={handleChange}
-                    placeholder="Enter patient name"
-                    className={`w-full bg-slate-800/50 border rounded-xl px-4 py-3 text-white placeholder-gray-400 outline-none focus:ring-2 focus:border-transparent transition-all ${
-                      errors.name
-                        ? "border-red-500/50 focus:ring-red-500/50"
-                        : "border-white/10 focus:ring-blue-500/50"
-                    }`}
-                  />
-                  {errors.name && (
-                    <p className="text-red-400 text-sm mt-1">{errors.name}</p>
-                  )}
-                </div>
-
-                {/* Mobile */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">
-                    Mobile Number *
-                  </label>
-                  <input
-                    type="text"
-                    name="mobile"
-                    value={formData.mobile}
-                    onChange={handleChange}
-                    placeholder="Enter mobile number"
-                    className={`w-full bg-slate-800/50 border rounded-xl px-4 py-3 text-white placeholder-gray-400 outline-none focus:ring-2 focus:border-transparent transition-all ${
-                      errors.mobile
-                        ? "border-red-500/50 focus:ring-red-500/50"
-                        : "border-white/10 focus:ring-blue-500/50"
-                    }`}
-                  />
-                  {errors.mobile && (
-                    <p className="text-red-400 text-sm mt-1">{errors.mobile}</p>
-                  )}
-                </div>
-
-                {/* Age */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">
-                    Age
-                  </label>
-                  <input
-                    type="number"
-                    name="age"
-                    value={formData.age}
-                    onChange={handleChange}
-                    placeholder="Enter age"
-                    className="w-full bg-slate-800/50 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-gray-400 outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-transparent transition-all"
-                  />
-                </div>
-
-                {/* Gender */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">
-                    Gender *
-                  </label>
-                  <select
-                    name="gender"
-                    value={formData.gender}
-                    onChange={handleChange}
-                    className={`w-full bg-slate-800/50 border rounded-xl px-4 py-3 text-white outline-none focus:ring-2 focus:border-transparent transition-all ${
-                      errors.gender
-                        ? "border-red-500/50 focus:ring-red-500/50"
-                        : "border-white/10 focus:ring-blue-500/50"
-                    }`}
-                  >
-                    <option value="" className="bg-slate-900">
-                      Select Gender
-                    </option>
-                    <option className="bg-slate-900">Male</option>
-                    <option className="bg-slate-900">Female</option>
-                    <option className="bg-slate-900">Other</option>
-                  </select>
-                  {errors.gender && (
-                    <p className="text-red-400 text-sm mt-1">{errors.gender}</p>
-                  )}
-                </div>
-
-                {/* Doctor */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">
-                    Doctor Name
-                  </label>
-                  <input
-                    type="text"
-                    name="doctorName"
-                    value={formData.doctorName}
-                    onChange={handleChange}
-                    placeholder="Enter doctor name"
-                    className="w-full bg-slate-800/50 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-gray-400 outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-transparent transition-all"
-                  />
-                </div>
-
-                {/* Prescription */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">
-                    Prescription Number
-                  </label>
-                  <input
-                    type="text"
-                    name="prescriptionNumber"
-                    value={formData.prescriptionNumber}
-                    onChange={handleChange}
-                    placeholder="Enter prescription number"
-                    className="w-full bg-slate-800/50 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-gray-400 outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-transparent transition-all"
-                  />
-                </div>
-
-                {/* Reminders */}
-                <div className="flex items-center gap-3">
-                  <input
-                    type="checkbox"
-                    name="remindersEnabled"
-                    checked={formData.remindersEnabled}
-                    onChange={handleChange}
-                    className="w-5 h-5 rounded border-white/10 bg-slate-800/50 text-blue-600 focus:ring-blue-500/50"
-                  />
-                  <label className="text-sm text-gray-300">
-                    Enable WhatsApp refill reminders
-                  </label>
-                </div>
-
-                {/* Submit Button */}
-                <button
-                  type="submit"
-                  className="w-full bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white px-4 py-3 rounded-xl flex items-center justify-center gap-2 transition-all duration-200 shadow-lg"
-                >
-                  <UserPlus size={18} />
-                  Register Patient
-                </button>
-              </form>
-            </div>
-          </div>
-
+        <div className="grid grid-cols-1 gap-6">
           {/* Patient Table */}
           <div className="xl:col-span-2 bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl shadow-xl overflow-hidden">
             <div className="bg-gradient-to-r from-blue-500/10 to-indigo-500/10 px-6 py-4 border-b border-white/10">
@@ -407,19 +438,49 @@ const Patients = () => {
                   </p>
                 </div>
 
-                {/* Search */}
-                <div className="relative w-full lg:w-80">
-                  <Search size={18} className="absolute left-3 top-3 text-gray-400" />
-                  <input
-                    type="text"
-                    placeholder="Search patient..."
-                    value={search}
-                    onChange={(e) => {
-                      setSearch(e.target.value);
-                      setCurrentPage(1);
+                <div className="flex gap-3">
+                  {/* Search */}
+                  <div className="relative w-full lg:w-80">
+                    <Search
+                      size={18}
+                      className="absolute left-3 top-3 text-gray-400"
+                    />
+                    <input
+                      type="text"
+                      placeholder="Search patient..."
+                      value={search}
+                      onChange={(e) => {
+                        setSearch(e.target.value);
+                        setCurrentPage(1);
+                      }}
+                      className="w-full bg-slate-800/50 border border-white/10 rounded-xl pl-10 pr-4 py-3 text-white placeholder-gray-400 outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-transparent transition-all"
+                    />
+                  </div>
+                  {/* Add Patient Button */}
+                  <button
+                    onClick={() => {
+                      setEditMode(false);
+                      setSelectedPatient(null);
+
+                      setFormData({
+                        name: "",
+                        mobile: "",
+                        age: "",
+                        gender: "",
+                        address: "",
+                        doctorName: "",
+                        prescriptionNumber: "",
+                        remindersEnabled: true,
+                        notes: "",
+                      });
+
+                      setShowModal(true);
                     }}
-                    className="w-full bg-slate-800/50 border border-white/10 rounded-xl pl-10 pr-4 py-3 text-white placeholder-gray-400 outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-transparent transition-all"
-                  />
+                    className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white px-5 py-3 rounded-xl flex items-center justify-center gap-2 transition-all duration-200 shadow-lg whitespace-nowrap"
+                  >
+                    <UserPlus size={18} />
+                    Add Patient
+                  </button>
                 </div>
               </div>
             </div>
@@ -435,10 +496,16 @@ const Patients = () => {
                       Mobile
                     </th>
                     <th className="text-left p-4 text-sm font-semibold text-gray-300">
+                      Address
+                    </th>
+                    <th className="text-left p-4 text-sm font-semibold text-gray-300">
+                      Prescription Number
+                    </th>
+                    <th className="text-left p-4 text-sm font-semibold text-gray-300">
                       Doctor
                     </th>
                     <th className="text-left p-4 text-sm font-semibold text-gray-300">
-                      Bills
+                      Remark
                     </th>
                     <th className="text-left p-4 text-sm font-semibold text-gray-300">
                       Reminders
@@ -451,31 +518,42 @@ const Patients = () => {
                 <tbody>
                   {paginatedPatients.map((patient) => (
                     <tr
-                      key={patient.id}
+                      key={patient.patient_id}
                       className="border-b border-white/5 hover:bg-white/5 transition-colors"
                     >
                       <td className="p-4">
                         <div>
                           <h3 className="font-semibold text-white">
-                            {patient.name}
+                            {patient.patient_name}
                           </h3>
                           <p className="text-sm text-gray-400 mt-1">
                             {patient.age} yrs • {patient.gender}
                           </p>
                         </div>
-                       </td>
+                      </td>
                       <td className="p-4">
                         <div className="flex items-center gap-2 text-gray-300">
                           <Phone size={16} className="text-gray-500" />
-                          {patient.mobile}
+                          {patient.mobile_number}
                         </div>
-                       </td>
-                      <td className="p-4 text-gray-300">{patient.doctorName}</td>
-                      <td className="p-4 font-semibold text-white">
-                        {patient.totalBills}
                       </td>
                       <td className="p-4">
-                        {patient.remindersEnabled ? (
+                        <div className="flex items-center gap-2 text-gray-300">
+                          <Locate size={16} className="text-gray-500" />
+                          {patient.address}
+                        </div>
+                      </td>
+                      <td className="p-4 text-gray-300">
+                        {patient.prescription_number}
+                      </td>
+                      <td className="p-4 text-gray-300">
+                        {patient.doctor_name}
+                      </td>
+                      <td className="p-4 font-semibold text-white">
+                        {patient.notes}
+                      </td>
+                      <td className="p-4">
+                        {patient.reminders_enabled ? (
                           <span className="bg-green-500/20 text-green-400 px-3 py-1 rounded-full text-xs flex items-center gap-1 w-fit border border-green-500/30">
                             <CheckCircle2 size={14} />
                             Enabled
@@ -486,15 +564,9 @@ const Patients = () => {
                             Disabled
                           </span>
                         )}
-                       </td>
+                      </td>
                       <td className="p-4">
                         <div className="flex gap-2">
-                          <button
-                            onClick={() => viewPatient(patient)}
-                            className="bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 p-2 rounded-lg transition-all duration-200 hover:scale-110"
-                          >
-                            <Eye size={16} />
-                          </button>
                           <button
                             onClick={() => editPatient(patient)}
                             className="bg-yellow-500/20 hover:bg-yellow-500/30 text-yellow-400 p-2 rounded-lg transition-all duration-200 hover:scale-110"
@@ -508,15 +580,18 @@ const Patients = () => {
                             <Trash2 size={16} />
                           </button>
                         </div>
-                       </td>
-                     </tr>
+                      </td>
+                    </tr>
                   ))}
                 </tbody>
               </table>
 
               {filteredPatients.length === 0 && (
                 <div className="text-center py-12">
-                  <AlertCircle className="mx-auto text-gray-400 mb-3" size={48} />
+                  <AlertCircle
+                    className="mx-auto text-gray-400 mb-3"
+                    size={48}
+                  />
                   <p className="text-gray-400">No patients found.</p>
                 </div>
               )}
@@ -527,12 +602,17 @@ const Patients = () => {
               <div className="border-t border-white/10 px-6 py-4 flex items-center justify-between">
                 <p className="text-sm text-gray-400">
                   Showing {(currentPage - 1) * itemsPerPage + 1} to{" "}
-                  {Math.min(currentPage * itemsPerPage, filteredPatients.length)} of{" "}
-                  {filteredPatients.length} entries
+                  {Math.min(
+                    currentPage * itemsPerPage,
+                    filteredPatients.length,
+                  )}{" "}
+                  of {filteredPatients.length} entries
                 </p>
                 <div className="flex gap-2">
                   <button
-                    onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+                    onClick={() =>
+                      setCurrentPage((prev) => Math.max(prev - 1, 1))
+                    }
                     disabled={currentPage === 1}
                     className="p-2 rounded-lg bg-slate-800/50 border border-white/10 text-white hover:bg-white/5 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                   >
@@ -554,6 +634,245 @@ const Patients = () => {
               </div>
             )}
           </div>
+
+          {/* Patient Modal */}
+          {showModal && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+              <div className="w-full max-w-2xl max-h-[95vh] overflow-y-auto bg-slate-900 border border-white/10 rounded-2xl shadow-2xl">
+                {/* Modal Header */}
+                <div className="sticky top-0 bg-slate-900 border-b border-white/10 px-6 py-4 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="bg-green-500/20 p-2 rounded-xl">
+                      <UserPlus size={20} className="text-green-400" />
+                    </div>
+
+                    <h2 className="text-lg font-semibold text-white">
+                      {editMode ? "Edit Patient" : "Register Patient"}
+                    </h2>
+                  </div>
+
+                  <button
+                    onClick={() => {
+                      setShowModal(false);
+                      setEditMode(false);
+                    }}
+                    className="text-gray-400 hover:text-white text-2xl"
+                  >
+                    ×
+                  </button>
+                </div>
+
+                {/* Modal Body */}
+                <div className="p-6">
+                  <form onSubmit={handleSubmit} className="space-y-5">
+                    {/* Name */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-1">
+                        Patient Name *
+                      </label>
+
+                      <input
+                        type="text"
+                        name="name"
+                        value={formData.name}
+                        onChange={handleChange}
+                        placeholder="Enter patient name"
+                        className={`w-full bg-slate-800/50 border rounded-xl px-4 py-2 text-white placeholder-gray-400 outline-none focus:ring-2 focus:border-transparent transition-all ${
+                          errors.name
+                            ? "border-red-500/50 focus:ring-red-500/50"
+                            : "border-white/10 focus:ring-blue-500/50"
+                        }`}
+                      />
+
+                      {errors.name && (
+                        <p className="text-red-400 text-sm mt-1">
+                          {errors.name}
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Mobile */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-1">
+                        Mobile Number *
+                      </label>
+
+                      <input
+                        type="text"
+                        name="mobile"
+                        value={formData.mobile}
+                        onChange={handleChange}
+                        placeholder="Enter mobile number"
+                        className={`w-full bg-slate-800/50 border rounded-xl px-4 py-2 text-white placeholder-gray-400 outline-none focus:ring-2 focus:border-transparent transition-all ${
+                          errors.mobile
+                            ? "border-red-500/50 focus:ring-red-500/50"
+                            : "border-white/10 focus:ring-blue-500/50"
+                        }`}
+                      />
+
+                      {errors.mobile && (
+                        <p className="text-red-400 text-sm mt-1">
+                          {errors.mobile}
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Age + Gender */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-300 mb-1">
+                          Age
+                        </label>
+
+                        <input
+                          type="number"
+                          name="age"
+                          value={formData.age}
+                          onChange={handleChange}
+                          placeholder="Enter age"
+                          className="w-full bg-slate-800/50 border border-white/10 rounded-xl px-4 py-2 text-white placeholder-gray-400 outline-none focus:ring-2 focus:ring-blue-500/50"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-300 mb-1">
+                          Gender *
+                        </label>
+
+                        <select
+                          name="gender"
+                          value={formData.gender}
+                          onChange={handleChange}
+                          className={`w-full bg-slate-800/50 border rounded-xl px-4 py-2 text-white outline-none focus:ring-2 ${
+                            errors.gender
+                              ? "border-red-500/50 focus:ring-red-500/50"
+                              : "border-white/10 focus:ring-blue-500/50"
+                          }`}
+                        >
+                          <option value="" className="bg-slate-900">
+                            Select Gender
+                          </option>
+
+                          <option className="bg-slate-900">Male</option>
+                          <option className="bg-slate-900">Female</option>
+                          <option className="bg-slate-900">Other</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    {/* Doctor */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-1">
+                        Doctor Name
+                      </label>
+
+                      <input
+                        type="text"
+                        name="doctorName"
+                        value={formData.doctorName}
+                        onChange={handleChange}
+                        placeholder="Enter doctor name"
+                        className="w-full bg-slate-800/50 border border-white/10 rounded-xl px-4 py-2 text-white placeholder-gray-400 outline-none focus:ring-2 focus:ring-blue-500/50"
+                      />
+                    </div>
+
+                    {/* Prescription */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-1">
+                        Prescription Number
+                      </label>
+
+                      <input
+                        type="text"
+                        name="prescriptionNumber"
+                        value={formData.prescriptionNumber}
+                        onChange={handleChange}
+                        placeholder="Enter prescription number"
+                        className="w-full bg-slate-800/50 border border-white/10 rounded-xl px-4 py-2 text-white placeholder-gray-400 outline-none focus:ring-2 focus:ring-blue-500/50"
+                      />
+                    </div>
+
+                    {/* Address */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-1">
+                        Address
+                      </label>
+
+                      <textarea
+                        name="address"
+                        value={formData.address}
+                        onChange={handleChange}
+                        placeholder="Enter patient address"
+                        rows={2}
+                        className="w-full bg-slate-800/50 border border-white/10 rounded-xl px-4 py-2 text-white placeholder-gray-400 outline-none focus:ring-2 focus:ring-blue-500/50 resize-none"
+                      />
+                    </div>
+
+                    {/* Notes */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-1">
+                        Remark
+                      </label>
+
+                      <textarea
+                        name="notes"
+                        value={formData.notes}
+                        onChange={handleChange}
+                        placeholder="Enter Patient Notes"
+                        rows={2}
+                        className="w-full bg-slate-800/50 border border-white/10 rounded-xl px-4 py-2 text-white placeholder-gray-400 outline-none focus:ring-2 focus:ring-blue-500/50"
+                      />
+                    </div>
+
+                    {/* Reminder */}
+                    <div className="flex items-center gap-3">
+                      <input
+                        type="checkbox"
+                        name="remindersEnabled"
+                        checked={formData.remindersEnabled}
+                        onChange={handleChange}
+                        className="w-5 h-5 rounded border-white/10 bg-slate-800/50 text-blue-600"
+                      />
+
+                      <label className="text-sm text-gray-300">
+                        Enable WhatsApp refill reminders
+                      </label>
+                    </div>
+
+                    {/* Buttons */}
+                    <div className="flex justify-end gap-3 pt-2">
+                      <button
+                        type="submit"
+                        disabled={submitting}
+                        className="flex-1 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white px-4 py-3 rounded-xl flex items-center justify-center gap-2 transition-all duration-200 shadow-lg"
+                      >
+                        <UserPlus size={18} />
+
+                        {editMode
+                          ? submitting
+                            ? "Updating..."
+                            : "Update Patient"
+                          : submitting
+                            ? "Registering..."
+                            : "Register Patient"}
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowModal(false);
+                          setEditMode(false);
+                        }}
+                        className="px-5 py-3 rounded-xl border border-white/10 text-gray-300 hover:bg-white/5"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Information Panel */}

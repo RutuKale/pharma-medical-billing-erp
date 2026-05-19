@@ -1,10 +1,11 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   Search,
   User,
   Receipt,
   Plus,
   Trash2,
+  Edit,
   Calculator,
   IndianRupee,
   AlertTriangle,
@@ -16,39 +17,13 @@ import {
   Clock,
   TrendingUp,
 } from "lucide-react";
-
-const medicinesData = [
-  {
-    id: 1,
-    name: "Paracetamol 500mg",
-    batch: "PCM101",
-    price: 35,
-    gst: 12,
-    stock: 120,
-    expiry: "2026-01-15",
-  },
-  {
-    id: 2,
-    name: "Azithromycin",
-    batch: "AZ220",
-    price: 120,
-    gst: 18,
-    stock: 8,
-    expiry: "2025-06-10",
-  },
-  {
-    id: 3,
-    name: "Vitamin D Capsules",
-    batch: "VD100",
-    price: 180,
-    gst: 5,
-    stock: 0,
-    expiry: "2025-05-18",
-  },
-];
+import axios from "axios";
+import Swal from "sweetalert2";
+import { printBill, downloadBillPDF } from "../../utils/billUtils";
 
 const Billing = () => {
   const [patient, setPatient] = useState({
+    patientId: "",
     name: "",
     mobile: "",
     age: "",
@@ -56,18 +31,73 @@ const Billing = () => {
     doctorName: "",
     prescriptionNumber: "",
   });
+  const [patients, setPatients] = useState([]);
+  const [selectedPatientId, setSelectedPatientId] = useState("");
   const [search, setSearch] = useState("");
   const [selectedMedicine, setSelectedMedicine] = useState(null);
-  const [quantity, setQuantity] = useState(1);
-  const [discount, setDiscount] = useState(0);
+  const [quantity, setQuantity] = useState("");
+  const [discount, setDiscount] = useState("");
   const [billItems, setBillItems] = useState([]);
   const [paymentMode, setPaymentMode] = useState("Cash");
+  const [medicinesData, setMedicinesData] = useState([]);
+  const [loading, setLoading] = useState(false);
+
+  const fetchPatients = async () => {
+    try {
+      const response = await axios.get("http://localhost:5000/api/patients");
+      setPatients(response.data.data || []);
+    } catch (error) {
+      console.error(error);
+      Swal.fire({
+        icon: "error",
+        title: "Failed to Load Patients",
+        text: "Unable to fetch patient records",
+        background: "#1e293b",
+        color: "#fff",
+        confirmButtonColor: "#ef4444",
+      });
+    }
+  };
+
+  const fetchMedicines = async () => {
+    try {
+      setLoading(true);
+      const response = await axios.get("http://localhost:5000/api/medicines");
+      const formattedMedicines = response.data.data.map((medicine) => ({
+        id: medicine.medicine_id,
+        name: medicine.medicine_name,
+        batch: medicine.batch_number,
+        price: Number(medicine.selling_price),
+        gst: Number(medicine.gst),
+        stock: Number(medicine.quantity),
+        expiry: medicine.expiry_date,
+      }));
+      setMedicinesData(formattedMedicines);
+    } catch (error) {
+      console.error(error);
+      Swal.fire({
+        icon: "error",
+        title: "Failed to Load Medicines",
+        text: "Unable to fetch medicine inventory",
+        background: "#1e293b",
+        color: "#fff",
+        confirmButtonColor: "#ef4444",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchMedicines();
+    fetchPatients();
+  }, []);
 
   const filteredMedicines = useMemo(() => {
     return medicinesData.filter((medicine) =>
-      medicine.name.toLowerCase().includes(search.toLowerCase())
+      medicine.name.toLowerCase().includes(search.toLowerCase()),
     );
-  }, [search]);
+  }, [search, medicinesData]);
 
   const isExpired = (expiryDate) => {
     return new Date(expiryDate) < new Date();
@@ -76,71 +106,281 @@ const Billing = () => {
   const addMedicineToBill = () => {
     if (!selectedMedicine) return;
     if (isExpired(selectedMedicine.expiry)) {
-      alert("Expired medicines cannot be billed.");
+      Swal.fire({
+        icon: "error",
+        title: "Expired Medicine",
+        text: "Expired medicines cannot be billed.",
+        background: "#1e293b",
+        color: "#fff",
+      });
+      return;
+    }
+    if (quantity <= 0) {
+      Swal.fire({
+        icon: "warning",
+        title: "Invalid Quantity",
+        text: "Quantity must be greater than 0",
+        background: "#1e293b",
+        color: "#fff",
+      });
       return;
     }
     if (quantity > selectedMedicine.stock) {
-      alert("Insufficient stock available.");
+      Swal.fire({
+        icon: "error",
+        title: "Insufficient Stock",
+        text: `Only ${selectedMedicine.stock} items available`,
+        background: "#1e293b",
+        color: "#fff",
+      });
       return;
     }
+    const price = Number(selectedMedicine.price);
+    const qty = Number(quantity);
+    const gst = Number(selectedMedicine.gst);
+    const discountPercent = Number(discount);
+    const subtotal = price * qty;
+    const discountAmount = (subtotal * discountPercent) / 100;
+    const taxableAmount = subtotal - discountAmount;
+    const gstAmount = (taxableAmount * gst) / 100;
+    const finalTotal = taxableAmount + gstAmount;
+    const newItem = {
+      medicine_id: selectedMedicine.id,
+      id: selectedMedicine.id,
+      name: selectedMedicine.name,
+      batch: selectedMedicine.batch,
+      quantity: qty,
+      price,
+      gst,
+      discount: discountPercent,
+      subtotal,
+      discountAmount,
+      gstAmount,
+      total: finalTotal,
+    };
 
-    const existingItem = billItems.find((item) => item.id === selectedMedicine.id);
+    const existingItem = billItems.find(
+      (item) => item.id === selectedMedicine.id,
+    );
+
     if (existingItem) {
-      const updatedItems = billItems.map((item) =>
-        item.id === selectedMedicine.id
-          ? { ...item, quantity: item.quantity + quantity }
-          : item
-      );
-      setBillItems(updatedItems);
-    } else {
-      setBillItems([
-        ...billItems,
-        { ...selectedMedicine, quantity, discount },
-      ]);
+      Swal.fire({
+        icon: "warning",
+        title: "Medicine Already Added",
+        text: "Remove the medicine and add again with new quantity",
+        background: "#1e293b",
+        color: "#fff",
+      });
+      return;
     }
+    setBillItems([...billItems, newItem]);
     setSearch("");
     setSelectedMedicine(null);
-    setQuantity(1);
-    setDiscount(0);
+    setQuantity("");
+    setDiscount("");
   };
 
   const removeItem = (id) => {
     setBillItems(billItems.filter((item) => item.id !== id));
   };
 
+  const handlePatientSelect = (e) => {
+    const patientId = e.target.value;
+    setSelectedPatientId(patientId);
+    const selectedPatient = patients.find(
+      (p) => p.patient_id === Number(patientId),
+    );
+
+    if (selectedPatient) {
+      setPatient({
+        patientId: selectedPatient.patient_id,
+        name: selectedPatient.patient_name || "",
+        mobile: selectedPatient.mobile_number || "",
+        age: selectedPatient.age || "",
+        gender: selectedPatient.gender || "",
+        doctorName: selectedPatient.doctor_name || "",
+        prescriptionNumber: selectedPatient.prescription_number || "",
+      });
+    }
+  };
+
   const totals = useMemo(() => {
     let subtotal = 0;
     let gstTotal = 0;
     let discountTotal = 0;
+    let grandTotal = 0;
+
     billItems.forEach((item) => {
-      const itemTotal = item.price * item.quantity;
-      const itemDiscount = (item.discount / 100) * itemTotal;
-      const taxableAmount = itemTotal - itemDiscount;
-      const gstAmount = (item.gst / 100) * taxableAmount;
-      subtotal += itemTotal;
-      discountTotal += itemDiscount;
-      gstTotal += gstAmount;
+      subtotal += item.subtotal;
+      gstTotal += item.gstAmount;
+      discountTotal += item.discountAmount;
+      grandTotal += item.total;
     });
+
     return {
       subtotal,
-      discountTotal,
       gstTotal,
-      grandTotal: subtotal - discountTotal + gstTotal,
+      discountTotal,
+      grandTotal,
     };
   }, [billItems]);
 
-  const generateBill = () => {
-    if (!patient.name || !patient.mobile) {
-      alert("Patient name and mobile required.");
-      return;
+  const generateBillData = () => {
+    if (!patient.patientId) {
+      Swal.fire({
+        icon: "warning",
+        title: "Patient Required",
+        text: "Please select patient",
+        background: "#1e293b",
+        color: "#fff",
+      });
+
+      return null;
     }
+
     if (billItems.length === 0) {
-      alert("Please add medicines.");
-      return;
+      Swal.fire({
+        icon: "warning",
+        title: "No Medicines Added",
+        text: "Please add medicines to bill",
+        background: "#1e293b",
+        color: "#fff",
+      });
+
+      return null;
     }
-    const billData = { patient, medicines: billItems, paymentMode, totals };
-    console.log(billData);
-    alert("Bill Generated Successfully");
+
+    return {
+      invoiceNo: `INV-${Date.now()}`,
+      date: new Date().toLocaleString(),
+      patient,
+      medicines: billItems,
+      paymentMode,
+      totals,
+    };
+  };
+
+  const handlePrintBill = () => {
+    const billData = generateBillData();
+
+    if (!billData) return;
+
+    printBill(billData);
+  };
+
+  const handleDownloadPDF = () => {
+    const billData = generateBillData();
+
+    if (!billData) return;
+
+    downloadBillPDF(billData);
+  };
+
+  const generateBill = () => {
+    const billData = generateBillData();
+    if (!billData) return;
+    Swal.fire({
+      icon: "success",
+      title: "Bill Generated",
+      text: "Bill generated successfully",
+      background: "#1e293b",
+      color: "#fff",
+      confirmButtonColor: "#22c55e",
+    });
+  };
+
+  const editItem = (id) => {
+    const itemToEdit = billItems.find((item) => item.id === id);
+    if (!itemToEdit) return;
+    Swal.fire({
+      title: "Edit Medicine",
+      html: `
+      <label>Qunatity</label>
+      <input 
+        id="edit-quantity" 
+        type="number" 
+        class="swal2-input" 
+        placeholder="Quantity"
+        value="${itemToEdit.quantity}"
+      />
+
+      <label>Discount %</label>
+      <input 
+        id="edit-discount" 
+        type="number" 
+        class="swal2-input" 
+        placeholder="Discount %"
+        value="${itemToEdit.discount}"
+      />
+    `,
+      background: "#1e293b",
+      color: "#fff",
+      confirmButtonColor: "#22c55e",
+      cancelButtonColor: "#ef4444",
+      showCancelButton: true,
+      confirmButtonText: "Update",
+
+      preConfirm: () => {
+        const quantity = Number(document.getElementById("edit-quantity").value);
+
+        const discount = Number(document.getElementById("edit-discount").value);
+
+        if (quantity <= 0) {
+          Swal.showValidationMessage("Quantity must be greater than 0");
+          return false;
+        }
+
+        if (discount < 0 || discount > 100) {
+          Swal.showValidationMessage("Discount must be between 0 and 100");
+
+          return false;
+        }
+
+        return {
+          quantity,
+          discount,
+        };
+      },
+    }).then((result) => {
+      if (!result.isConfirmed) return;
+
+      const { quantity, discount } = result.value;
+
+      const updatedItems = billItems.map((item) => {
+        if (item.id !== id) return item;
+
+        const subtotal = item.price * quantity;
+
+        const discountAmount = (subtotal * discount) / 100;
+
+        const taxableAmount = subtotal - discountAmount;
+
+        const gstAmount = (taxableAmount * item.gst) / 100;
+
+        const total = taxableAmount + gstAmount;
+
+        return {
+          ...item,
+          quantity,
+          discount,
+          subtotal,
+          discountAmount,
+          gstAmount,
+          total,
+        };
+      });
+
+      setBillItems(updatedItems);
+
+      Swal.fire({
+        icon: "success",
+        title: "Medicine Updated",
+        text: "Medicine details updated successfully",
+        background: "#1e293b",
+        color: "#fff",
+        confirmButtonColor: "#22c55e",
+      });
+    });
   };
 
   return (
@@ -185,11 +425,11 @@ const Billing = () => {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 relative z-0">
           {/* LEFT SECTION */}
-          <div className="xl:col-span-2 space-y-6">
+          <div className="xl:col-span-2 space-y-6 relative z-50">
             {/* Patient Info Card */}
-            <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl shadow-xl overflow-hidden">
+            <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl shadow-xl overflow-hidden relative z-0">
               <div className="bg-gradient-to-r from-blue-500/10 to-indigo-500/10 px-6 py-4 border-b border-white/10">
                 <div className="flex items-center gap-3">
                   <div className="bg-blue-500/20 p-2 rounded-xl">
@@ -203,38 +443,51 @@ const Billing = () => {
 
               <div className="p-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                  <input
-                    type="text"
-                    placeholder="Patient Name *"
-                    value={patient.name}
-                    onChange={(e) =>
-                      setPatient({ ...patient, name: e.target.value })
-                    }
-                    className="bg-slate-800/50 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-gray-400 outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-transparent transition-all"
-                  />
+                  <select
+                    value={selectedPatientId}
+                    onChange={handlePatientSelect}
+                    className="bg-slate-800/50 border border-white/10 rounded-xl px-4 py-3 text-white outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-transparent transition-all"
+                  >
+                    <option value="" className="bg-slate-900">
+                      Select Patient *
+                    </option>
+
+                    {patients.map((patient) => (
+                      <option
+                        key={patient.patient_id}
+                        value={patient.patient_id}
+                        className="bg-slate-900"
+                      >
+                        {patient.patient_name} - {patient.mobile_number}
+                      </option>
+                    ))}
+                  </select>
                   <input
                     type="text"
                     placeholder="Mobile Number *"
                     value={patient.mobile}
-                    onChange={(e) =>
-                      setPatient({ ...patient, mobile: e.target.value })
-                    }
+                    // onChange={(e) =>
+                    //   setPatient({ ...patient, mobile: e.target.value })
+                    // }
+                    readOnly
                     className="bg-slate-800/50 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-gray-400 outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-transparent transition-all"
                   />
                   <input
                     type="number"
                     placeholder="Age"
                     value={patient.age}
-                    onChange={(e) =>
-                      setPatient({ ...patient, age: e.target.value })
-                    }
+                    // onChange={(e) =>
+                    //   setPatient({ ...patient, age: e.target.value })
+                    // }
+                    readOnly
                     className="bg-slate-800/50 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-gray-400 outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-transparent transition-all"
                   />
                   <select
                     value={patient.gender}
-                    onChange={(e) =>
-                      setPatient({ ...patient, gender: e.target.value })
-                    }
+                    // onChange={(e) =>
+                    //   setPatient({ ...patient, gender: e.target.value })
+                    // }
+                    readOnly
                     className="bg-slate-800/50 border border-white/10 rounded-xl px-4 py-3 text-white outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-transparent transition-all"
                   >
                     <option value="" className="bg-slate-900">
@@ -248,21 +501,23 @@ const Billing = () => {
                     type="text"
                     placeholder="Doctor Name"
                     value={patient.doctorName}
-                    onChange={(e) =>
-                      setPatient({ ...patient, doctorName: e.target.value })
-                    }
+                    // onChange={(e) =>
+                    //   setPatient({ ...patient, doctorName: e.target.value })
+                    // }
+                    readOnly
                     className="bg-slate-800/50 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-gray-400 outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-transparent transition-all"
                   />
                   <input
                     type="text"
                     placeholder="Prescription Number"
                     value={patient.prescriptionNumber}
-                    onChange={(e) =>
-                      setPatient({
-                        ...patient,
-                        prescriptionNumber: e.target.value,
-                      })
-                    }
+                    // onChange={(e) =>
+                    //   setPatient({
+                    //     ...patient,
+                    //     prescriptionNumber: e.target.value,
+                    //   })
+                    // }
+                    readOnly
                     className="bg-slate-800/50 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-gray-400 outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-transparent transition-all"
                   />
                 </div>
@@ -270,7 +525,7 @@ const Billing = () => {
             </div>
 
             {/* Add Medicine Card */}
-            <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl shadow-xl overflow-hidden">
+            <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl shadow-xl overflow-visible">
               <div className="bg-gradient-to-r from-purple-500/10 to-pink-500/10 px-6 py-4 border-b border-white/10">
                 <div className="flex items-center gap-3">
                   <div className="bg-purple-500/20 p-2 rounded-xl">
@@ -284,7 +539,7 @@ const Billing = () => {
 
               <div className="p-6">
                 {/* Search */}
-                <div className="relative mb-5">
+                <div className="relative mb-5 z-50">
                   <Search
                     size={18}
                     className="absolute left-3 top-3 text-gray-400"
@@ -298,34 +553,44 @@ const Billing = () => {
                   />
 
                   {search && (
-                    <div className="absolute z-20 bg-slate-800 border border-white/10 rounded-xl shadow-2xl mt-2 w-full max-h-60 overflow-y-auto backdrop-blur-xl">
-                      {filteredMedicines.map((medicine) => (
-                        <button
-                          type="button"
-                          key={medicine.id}
-                          onClick={() => {
-                            setSelectedMedicine(medicine);
-                            setSearch(medicine.name);
-                          }}
-                          className="w-full text-left p-4 hover:bg-white/5 transition-colors border-b border-white/10"
-                        >
-                          <div className="flex items-center justify-between">
-                            <div>
-                              <h3 className="font-medium text-white">
-                                {medicine.name}
-                              </h3>
-                              <p className="text-sm text-gray-400 mt-1">
-                                Stock: {medicine.stock}
-                              </p>
+                    <div className="absolute left-0 right-0 top-full mt-2 z-[9999] bg-slate-800 border border-white/10 rounded-xl shadow-2xl w-full max-h-72 overflow-y-auto backdrop-blur-xl custom-scrollbar">
+                      {loading ? (
+                        <div className="p-4 text-center text-gray-400">
+                          Loading medicines...
+                        </div>
+                      ) : filteredMedicines.length > 0 ? (
+                        filteredMedicines.map((medicine) => (
+                          <button
+                            type="button"
+                            key={medicine.id}
+                            onClick={() => {
+                              setSelectedMedicine(medicine);
+                              setSearch(medicine.name);
+                            }}
+                            className="w-full text-left p-4 hover:bg-white/5 transition-colors duration-200 border-b border-white/10"
+                          >
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <h3 className="font-medium text-white">
+                                  {medicine.name}
+                                </h3>
+                                <p className="text-sm text-gray-400 mt-1">
+                                  Stock: {medicine.stock}
+                                </p>
+                              </div>
+                              {medicine.stock === 0 && (
+                                <span className="bg-red-500/20 text-red-400 px-3 py-1 rounded-full text-xs border border-red-500/30">
+                                  Out Of Stock
+                                </span>
+                              )}
                             </div>
-                            {medicine.stock === 0 && (
-                              <span className="bg-red-500/20 text-red-400 px-3 py-1 rounded-full text-xs border border-red-500/30">
-                                Out Of Stock
-                              </span>
-                            )}
-                          </div>
-                        </button>
-                      ))}
+                          </button>
+                        ))
+                      ) : (
+                        <div className="p-4 text-center text-gray-400">
+                          No medicines found
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
@@ -360,7 +625,7 @@ const Billing = () => {
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-5">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-5">
                       <input
                         type="number"
                         placeholder="Quantity"
@@ -401,12 +666,10 @@ const Billing = () => {
             {/* Bill Table */}
             <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl shadow-xl overflow-hidden">
               <div className="bg-gradient-to-r from-green-500/10 to-emerald-500/10 px-6 py-4 border-b border-white/10">
-                <h2 className="text-lg font-semibold text-white">
-                  Bill Items
-                </h2>
+                <h2 className="text-lg font-semibold text-white">Bill Items</h2>
               </div>
 
-              <div className="overflow-x-auto">
+              <div className="overflow-x-auto relative z-0">
                 <table className="w-full min-w-[900px]">
                   <thead className="bg-slate-800/50 border-b border-white/10">
                     <tr>
@@ -435,7 +698,7 @@ const Billing = () => {
                   </thead>
                   <tbody>
                     {billItems.map((item) => {
-                      const total = item.price * item.quantity;
+                      const total = item.total;
                       return (
                         <tr
                           key={item.id}
@@ -444,22 +707,41 @@ const Billing = () => {
                           <td className="p-4 font-medium text-white">
                             {item.name}
                           </td>
+                          <td className="p-4 text-gray-300">{item.quantity}</td>
                           <td className="p-4 text-gray-300">
-                            {item.quantity}
+                            ₹{item.price.toFixed(2)}
                           </td>
-                          <td className="p-4 text-gray-300">₹{item.price}</td>
-                          <td className="p-4 text-gray-300">{item.gst}%</td>
-                          <td className="p-4 text-gray-300">{item.discount}%</td>
+                          <td className="p-4 text-gray-300">
+                            {item.gst}%<br />
+                            <span className="text-xs text-green-400">
+                              ₹{item.gstAmount.toFixed(2)}
+                            </span>
+                          </td>
+                          <td className="p-4 text-gray-300">
+                            {item.discount}%<br />
+                            <span className="text-xs text-red-400">
+                              ₹{item.discountAmount.toFixed(2)}
+                            </span>
+                          </td>
                           <td className="p-4 font-semibold text-white">
-                            ₹{total}
+                            ₹{item.total.toFixed(2)}
                           </td>
                           <td className="p-4">
-                            <button
-                              onClick={() => removeItem(item.id)}
-                              className="bg-red-500/20 hover:bg-red-500/30 text-red-400 p-2 rounded-lg transition-all"
-                            >
-                              <Trash2 size={16} />
-                            </button>
+                            <div className="flex items-center gap-2">
+                              <button
+                                onClick={() => editItem(item.id)}
+                                className="bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 p-2 rounded-lg transition-all"
+                              >
+                                <Edit size={16} />
+                              </button>
+
+                              <button
+                                onClick={() => removeItem(item.id)}
+                                className="bg-red-500/20 hover:bg-red-500/30 text-red-400 p-2 rounded-lg transition-all"
+                              >
+                                <Trash2 size={16} />
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       );
@@ -546,47 +828,21 @@ const Billing = () => {
                     <Receipt size={18} />
                     Generate Bill
                   </button>
-                  <button className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white px-4 py-3 rounded-xl flex items-center justify-center gap-2 transition-all duration-200 shadow-lg">
+                  <button
+                    onClick={handlePrintBill}
+                    className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white px-4 py-3 rounded-xl flex items-center justify-center gap-2 transition-all duration-200 shadow-lg"
+                  >
                     <Printer size={18} />
                     Print Bill
                   </button>
-                  <button className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white px-4 py-3 rounded-xl flex items-center justify-center gap-2 transition-all duration-200 shadow-lg">
+                  <button
+                    onClick={handleDownloadPDF}
+                    className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white px-4 py-3 rounded-xl flex items-center justify-center gap-2 transition-all duration-200 shadow-lg"
+                  >
                     <Download size={18} />
                     Download PDF
                   </button>
                 </div>
-              </div>
-            </div>
-
-            {/* Billing Rules */}
-            <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl shadow-xl overflow-hidden">
-              <div className="bg-gradient-to-r from-blue-500/10 to-indigo-500/10 px-6 py-4 border-b border-white/10">
-                <div className="flex items-center gap-3">
-                  <div className="bg-blue-500/20 p-2 rounded-xl">
-                    <Shield size={18} className="text-blue-400" />
-                  </div>
-                  <h2 className="text-lg font-semibold text-white">
-                    Billing Rules
-                  </h2>
-                </div>
-              </div>
-
-              <div className="p-6 space-y-3">
-                {[
-                  "Expired medicines cannot be billed",
-                  "Stock validates automatically",
-                  "GST calculated automatically",
-                  "Inventory reduces after billing",
-                  "Bills are stored permanently",
-                ].map((rule, index) => (
-                  <div
-                    key={index}
-                    className="border border-white/10 rounded-xl p-4 flex items-center gap-3 hover:bg-white/5 transition-colors"
-                  >
-                    <div className="w-1.5 h-1.5 rounded-full bg-blue-400"></div>
-                    <p className="text-gray-300 text-sm">{rule}</p>
-                  </div>
-                ))}
               </div>
             </div>
           </div>

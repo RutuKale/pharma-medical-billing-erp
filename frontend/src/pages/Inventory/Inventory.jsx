@@ -1,5 +1,5 @@
-import React, { useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import React, { useEffect, useMemo, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import {
   Search,
   Plus,
@@ -21,82 +21,117 @@ import {
   Menu,
   X,
 } from "lucide-react";
-
-const medicinesData = [
-  {
-    id: 1,
-    name: "Paracetamol 500mg",
-    salt: "Acetaminophen",
-    brand: "Dolo",
-    category: "Tablet",
-    stock: 120,
-    minStock: 20,
-    price: 35,
-    expiry: "2026-02-12",
-    batch: "PCM101",
-    manufacturer: "Micro Labs",
-  },
-  {
-    id: 2,
-    name: "Azithromycin",
-    salt: "Azithromycin",
-    brand: "Azee",
-    category: "Antibiotic",
-    stock: 8,
-    minStock: 15,
-    price: 120,
-    expiry: "2025-06-15",
-    batch: "AZ220",
-    manufacturer: "Cipla",
-  },
-  {
-    id: 3,
-    name: "Vitamin D Syrup",
-    salt: "Vitamin D3",
-    brand: "Shelcal",
-    category: "Vitamin",
-    stock: 0,
-    minStock: 10,
-    price: 180,
-    expiry: "2025-05-20",
-    batch: "VD908",
-    manufacturer: "Torrent",
-  },
-  {
-    id: 4,
-    name: "Amoxicillin",
-    salt: "Amoxicillin",
-    brand: "Mox",
-    category: "Capsule",
-    stock: 45,
-    minStock: 10,
-    price: 95,
-    expiry: "2025-08-10",
-    batch: "AMX500",
-    manufacturer: "Sun Pharma",
-  },
-];
+const API_URL = "http://localhost:5000/api/medicines";
+import axios from "axios";
+import Swal from "sweetalert2";
 
 const Inventory = () => {
+  const [medicinesData, setMedicinesData] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedMedicine, setSelectedMedicine] = useState(null);
+
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("All");
   const [showFilters, setShowFilters] = useState(false);
-  const [sortBy, setSortBy] = useState("name");
+  const [sortBy, setSortBy] = useState("medicine_name");
   const [sortOrder, setSortOrder] = useState("asc");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const navigate = useNavigate();
 
   const categories = [
     "All",
-    "Tablet",
-    "Capsule",
-    "Antibiotic",
-    "Vitamin",
+    ...new Set(
+      medicinesData.map((medicine) => medicine.category).filter(Boolean),
+    ),
   ];
+
+  const fetchMedicines = async () => {
+    try {
+      setLoading(true);
+
+      const response = await axios.get(API_URL);
+
+      if (response.data.success) {
+        setMedicinesData(response.data.data);
+      }
+    } catch (error) {
+      console.error("Error fetching medicines:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchSingleMedicine = async (id) => {
+    try {
+      const response = await axios.get(`${API_URL}/${id}`);
+      if (response.data.success) {
+        setSelectedMedicine(response.data.data);
+      }
+    } catch (error) {
+      console.error("Error fetching single medicine:", error);
+    }
+  };
+
+  useEffect(() => {
+    fetchMedicines();
+  }, []);
+
+  const handleEdit = (medicine) => {
+    navigate("/inventory/add-medicine", {
+      state: {
+        editMode: true,
+        medicineData: medicine,
+      },
+    });
+  };
+
+ const handleDelete = async (medicineId) => {
+  const result = await Swal.fire({
+    title: "Are you sure?",
+    text: "You won't be able to recover this medicine!",
+    icon: "warning",
+    iconColor: "#ef4444", 
+    background: "#fff",
+    color: "#000",
+    showCancelButton: true,
+    confirmButtonColor: "#ef4444",
+    cancelButtonColor: "#64748b",
+    confirmButtonText: "Yes, Delete It!",
+    cancelButtonText: "Cancel",
+  });
+
+  if (!result.isConfirmed) return;
+
+  try {
+    const response = await axios.delete(`${API_URL}/${medicineId}`);
+    if (response.data.success) {
+      Swal.fire({
+        title: "Deleted!",
+        text: "Medicine deleted successfully.",
+        icon: "success",
+        iconColor: "#22c55e",
+        background: "#fff",
+        color: "#000",
+        confirmButtonColor: "#22c55e",
+      });
+      fetchMedicines();
+    }
+  } catch (error) {
+    Swal.fire({
+      title: "Error!",
+      text: "Failed to delete medicine.",
+      icon: "error",
+      iconColor: "#ef4444",
+      background: "linear-gradient(to right, #141e30, #243b55)",
+      color: "#ffffff",
+      confirmButtonColor: "#ef4444",
+    });
+  }
+};
 
   const getExpiryStatus = (expiryDate) => {
     const today = new Date();
     const expiry = new Date(expiryDate);
-
     const diffTime = expiry - today;
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
@@ -152,10 +187,10 @@ const Inventory = () => {
   const filteredMedicines = useMemo(() => {
     let filtered = medicinesData.filter((medicine) => {
       const matchesSearch =
-        medicine.name.toLowerCase().includes(search.toLowerCase()) ||
-        medicine.salt.toLowerCase().includes(search.toLowerCase()) ||
-        medicine.brand.toLowerCase().includes(search.toLowerCase()) ||
-        medicine.manufacturer.toLowerCase().includes(search.toLowerCase());
+        medicine.medicine_name?.toLowerCase().includes(search.toLowerCase()) ||
+        medicine.salt_name?.toLowerCase().includes(search.toLowerCase()) ||
+        medicine.brand_name?.toLowerCase().includes(search.toLowerCase()) ||
+        medicine.manufacturer?.toLowerCase().includes(search.toLowerCase());
 
       const matchesCategory =
         category === "All" || medicine.category === category;
@@ -163,46 +198,42 @@ const Inventory = () => {
       return matchesSearch && matchesCategory;
     });
 
-    // Sort
     filtered.sort((a, b) => {
       let aVal = a[sortBy];
       let bVal = b[sortBy];
 
-      if (sortBy === "price" || sortBy === "stock") {
+      if (sortBy === "selling_price" || sortBy === "quantity") {
         aVal = Number(aVal);
         bVal = Number(bVal);
       }
 
-      if (sortBy === "expiry") {
+      if (sortBy === "expiry_date") {
         aVal = new Date(aVal);
         bVal = new Date(bVal);
       }
 
       if (aVal < bVal) return sortOrder === "asc" ? -1 : 1;
       if (aVal > bVal) return sortOrder === "asc" ? 1 : -1;
+
       return 0;
     });
 
     return filtered;
-  }, [search, category, sortBy, sortOrder]);
+  }, [medicinesData, search, category, sortBy, sortOrder]);
 
   const stats = {
     total: medicinesData.length,
+
     lowStock: medicinesData.filter(
-      (m) => m.stock <= m.minStock && m.stock > 0
+      (m) => m.quantity <= m.min_stock && m.quantity > 0,
     ).length,
-    outOfStock: medicinesData.filter((m) => m.stock === 0).length,
-    expiringSoon: medicinesData.filter((m) => {
-      const expiry = new Date(m.expiry);
-      const today = new Date();
 
-      const diffDays = Math.ceil(
-        (expiry - today) / (1000 * 60 * 60 * 24)
-      );
+    outOfStock: medicinesData.filter((m) => m.quantity === 0).length,
 
-      return diffDays <= 30 && diffDays >= 0;
-    }).length,
-    totalValue: medicinesData.reduce((sum, m) => sum + m.price * m.stock, 0),
+    totalValue: medicinesData.reduce(
+      (sum, m) => sum + m.selling_price * m.quantity,
+      0,
+    ),
   };
 
   const handleSort = (column) => {
@@ -213,6 +244,10 @@ const Inventory = () => {
       setSortOrder("asc");
     }
   };
+
+  if (loading) {
+    return <div className="text-white p-10">Loading medicines...</div>;
+  }
 
   const SortIcon = ({ column }) => {
     if (sortBy !== column) return null;
@@ -302,7 +337,9 @@ const Inventory = () => {
           <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-xl p-4 sm:p-5 hover:bg-white/10 transition-all duration-300 group">
             <div className="flex justify-between items-start">
               <div>
-                <p className="text-gray-400 text-xs sm:text-sm">Total Medicines</p>
+                <p className="text-gray-400 text-xs sm:text-sm">
+                  Total Medicines
+                </p>
                 <h2 className="text-xl sm:text-2xl font-bold text-white mt-1">
                   {stats.total}
                 </h2>
@@ -353,7 +390,9 @@ const Inventory = () => {
           <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-xl p-4 sm:p-5 hover:bg-white/10 transition-all duration-300 group">
             <div className="flex justify-between items-start">
               <div>
-                <p className="text-gray-400 text-xs sm:text-sm">Expiring Soon</p>
+                <p className="text-gray-400 text-xs sm:text-sm">
+                  Expiring Soon
+                </p>
                 <h2 className="text-xl sm:text-2xl font-bold text-yellow-400 mt-1">
                   {stats.expiringSoon}
                 </h2>
@@ -370,7 +409,9 @@ const Inventory = () => {
           <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-xl p-4 sm:p-5 hover:bg-white/10 transition-all duration-300 group col-span-1 xs:col-span-2 lg:col-span-1">
             <div className="flex justify-between items-start">
               <div>
-                <p className="text-gray-400 text-xs sm:text-sm">Inventory Value</p>
+                <p className="text-gray-400 text-xs sm:text-sm">
+                  Inventory Value
+                </p>
                 <h2 className="text-xl sm:text-2xl font-bold text-indigo-400 mt-1">
                   ₹{stats.totalValue.toLocaleString()}
                 </h2>
@@ -391,10 +432,17 @@ const Inventory = () => {
             <Shield size={14} className="text-indigo-400" />
           </div>
           <div className="flex-1 min-w-[180px]">
-            <p className="text-white text-xs font-medium">Secure Inventory Data</p>
-            <p className="text-indigo-300/70 text-[10px] sm:text-xs">Real-time stock tracking • Batch management • GST compliant</p>
+            <p className="text-white text-xs font-medium">
+              Secure Inventory Data
+            </p>
+            <p className="text-indigo-300/70 text-[10px] sm:text-xs">
+              Real-time stock tracking • Batch management • GST compliant
+            </p>
           </div>
-          <Sparkles size={14} className="text-indigo-400 animate-pulse flex-shrink-0" />
+          <Sparkles
+            size={14}
+            className="text-indigo-400 animate-pulse flex-shrink-0"
+          />
         </div>
 
         {/* FILTERS SECTION */}
@@ -405,7 +453,9 @@ const Inventory = () => {
           >
             <div className="flex items-center gap-2">
               <Filter size={16} className="text-blue-400" />
-              <span className="text-gray-300 font-medium text-sm sm:text-base">Filters & Search</span>
+              <span className="text-gray-300 font-medium text-sm sm:text-base">
+                Filters & Search
+              </span>
               <span className="text-xs text-gray-500">
                 ({filteredMedicines.length} medicines)
               </span>
@@ -502,21 +552,24 @@ const Inventory = () => {
 
               <tbody>
                 {filteredMedicines.map((medicine) => {
-                  const expiryStatus = getExpiryStatus(medicine.expiry);
-                  const stockStatus = getStockStatus(medicine.stock, medicine.minStock);
+                  const expiryStatus = getExpiryStatus(medicine.expiry_date);
+                  const stockStatus = getStockStatus(
+                    medicine.quantity,
+                    medicine.min_stock,
+                  );
 
                   return (
                     <tr
-                      key={medicine.id}
+                      key={medicine.medicine_id}
                       className="border-b border-white/10 hover:bg-white/10 transition-all duration-200 group"
                     >
                       <td className="p-4">
                         <div>
                           <h3 className="font-semibold text-white">
-                            {medicine.name}
+                            {medicine.medicine_name}
                           </h3>
                           <p className="text-sm text-gray-400">
-                            {medicine.brand} • {medicine.salt}
+                            {medicine.brand_name} • {medicine.salt_name}
                           </p>
                           <p className="text-xs text-gray-500 mt-1">
                             {medicine.manufacturer}
@@ -533,28 +586,33 @@ const Inventory = () => {
                       <td className="p-4">
                         <div className="flex items-center gap-2">
                           {stockStatus.icon}
-                          <span className={`font-semibold ${stockStatus.color}`}>
-                            {medicine.stock}
+                          <span
+                            className={`font-semibold ${stockStatus.color}`}
+                          >
+                            {medicine.quantity}
                           </span>
-                          {medicine.stock <= medicine.minStock && medicine.stock > 0 && (
-                            <span className="text-xs text-gray-500">
-                              / {medicine.minStock}
-                            </span>
-                          )}
+                          {medicine.quantity <= medicine.min_stock &&
+                            medicine.quantity > 0 && (
+                              <span className="text-xs text-gray-500">
+                                / {medicine.min_stock}
+                              </span>
+                            )}
                         </div>
                       </td>
 
                       <td className="p-4">
                         <span className="text-white font-medium">
-                          ₹{medicine.price}
+                          ₹{medicine.selling_price}
                         </span>
                       </td>
 
-                      <td className="p-4 text-gray-300">{medicine.expiry}</td>
+                      <td className="p-4 text-gray-300">
+                        {medicine.expiry_date}
+                      </td>
 
                       <td className="p-4">
                         <span className="font-mono text-xs text-gray-400">
-                          {medicine.batch}
+                          {medicine.batch_number}
                         </span>
                       </td>
 
@@ -568,10 +626,16 @@ const Inventory = () => {
 
                       <td className="p-4">
                         <div className="flex gap-2">
-                          <button className="p-2 rounded-lg bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 transition-all duration-200 group-hover:scale-110">
+                          <button
+                            onClick={() => handleEdit(medicine)}
+                            className="p-2 rounded-lg bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 transition-all duration-200 group-hover:scale-110"
+                          >
                             <SquarePen size={16} />
                           </button>
-                          <button className="p-2 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-all duration-200 group-hover:scale-110">
+                          <button
+                            onClick={() => handleDelete(medicine.medicine_id)}
+                            className="p-2 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-all duration-200 group-hover:scale-110"
+                          >
                             <Trash2 size={16} />
                           </button>
                         </div>
@@ -588,7 +652,9 @@ const Inventory = () => {
               <div className="inline-flex items-center justify-center p-4 bg-white/10 rounded-full mb-4">
                 <Package size={32} className="text-gray-500" />
               </div>
-              <p className="text-gray-400">No medicines found matching your criteria</p>
+              <p className="text-gray-400">
+                No medicines found matching your criteria
+              </p>
               <button
                 onClick={() => {
                   setSearch("");
@@ -605,29 +671,38 @@ const Inventory = () => {
         {/* MOBILE & TABLET CARD VIEW (visible on smaller screens) */}
         <div className="lg:hidden space-y-4">
           {filteredMedicines.map((medicine) => {
-            const expiryStatus = getExpiryStatus(medicine.expiry);
-            const stockStatus = getStockStatus(medicine.stock, medicine.minStock);
-            
+            const expiryStatus = getExpiryStatus(medicine.expiry_date);
+            const stockStatus = getStockStatus(
+              medicine.quantity,
+              medicine.min_stock,
+            );
+
             return (
               <div
-                key={medicine.id}
+                key={medicine.medicine_id}
                 className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-xl p-4 hover:bg-white/10 transition-all duration-200"
               >
                 {/* Header with name and actions */}
                 <div className="flex justify-between items-start mb-3">
                   <div className="flex-1">
                     <h3 className="font-semibold text-white text-base sm:text-lg">
-                      {medicine.name}
+                      {medicine.medicine_name}
                     </h3>
                     <p className="text-xs sm:text-sm text-gray-400">
-                      {medicine.brand} • {medicine.salt}
+                      {medicine.brand_name} • {medicine.salt_name}
                     </p>
                   </div>
                   <div className="flex gap-2 ml-2">
-                    <button className="p-2 rounded-lg bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 transition-all duration-200">
+                    <button
+                      onClick={() => handleEdit(medicine)}
+                      className="p-2 rounded-lg bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 transition-all duration-200"
+                    >
                       <SquarePen size={16} />
                     </button>
-                    <button className="p-2 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-all duration-200">
+                    <button
+                      onClick={() => handleDelete(medicine.medicine_id)}
+                      className="p-2 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-all duration-200"
+                    >
                       <Trash2 size={16} />
                     </button>
                   </div>
@@ -644,7 +719,7 @@ const Inventory = () => {
                   <div>
                     <p className="text-gray-500 text-xs">Batch</p>
                     <p className="text-gray-300 text-xs sm:text-sm font-mono mt-1">
-                      {medicine.batch}
+                      {medicine.batch_number}
                     </p>
                   </div>
                   <div>
@@ -656,28 +731,31 @@ const Inventory = () => {
                   <div>
                     <p className="text-gray-500 text-xs">Price</p>
                     <p className="text-white font-medium text-sm sm:text-base mt-1">
-                      ₹{medicine.price}
+                      ₹{medicine.selling_price}
                     </p>
                   </div>
                   <div>
                     <p className="text-gray-500 text-xs">Stock Status</p>
                     <div className="flex items-center gap-2 mt-1">
                       {stockStatus.icon}
-                      <span className={`font-semibold text-sm ${stockStatus.color}`}>
-                        {medicine.stock} units
+                      <span
+                        className={`font-semibold text-sm ${stockStatus.color}`}
+                      >
+                        {medicine.quantity} units
                       </span>
-                      {medicine.stock <= medicine.minStock && medicine.stock > 0 && (
-                        <span className="text-xs text-gray-500">
-                          (Min: {medicine.minStock})
-                        </span>
-                      )}
+                      {medicine.quantity <= medicine.min_stock &&
+                        medicine.quantity > 0 && (
+                          <span className="text-xs text-gray-500">
+                            (Min: {medicine.min_stock})
+                          </span>
+                        )}
                     </div>
                   </div>
                   <div>
                     <p className="text-gray-500 text-xs">Expiry</p>
                     <div className="flex flex-col gap-1 mt-1">
                       <p className="text-gray-300 text-xs sm:text-sm">
-                        {medicine.expiry}
+                        {medicine.expiry_date}
                       </p>
                       <span
                         className={`inline-block w-fit px-2 py-0.5 rounded-full text-[10px] font-semibold border ${expiryStatus.color}`}
@@ -696,7 +774,9 @@ const Inventory = () => {
               <div className="inline-flex items-center justify-center p-4 bg-white/10 rounded-full mb-4">
                 <Package size={32} className="text-gray-500" />
               </div>
-              <p className="text-gray-400 text-sm">No medicines found matching your criteria</p>
+              <p className="text-gray-400 text-sm">
+                No medicines found matching your criteria
+              </p>
               <button
                 onClick={() => {
                   setSearch("");
