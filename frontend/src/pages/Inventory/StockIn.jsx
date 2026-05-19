@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   PackagePlus,
   Search,
@@ -21,35 +21,12 @@ import {
   Package,
 } from "lucide-react";
 import { Link } from "react-router-dom";
+import axios from "axios";
 
-const medicinesData = [
-  {
-    id: 1,
-    name: "Paracetamol 500mg",
-    batch: "PCM101",
-    currentStock: 120,
-    category: "Tablet",
-    unit: "Strip",
-  },
-  {
-    id: 2,
-    name: "Azithromycin 500mg",
-    batch: "AZ220",
-    currentStock: 8,
-    category: "Antibiotic",
-    unit: "Tablet",
-  },
-  {
-    id: 3,
-    name: "Vitamin D Capsules",
-    batch: "VD100",
-    currentStock: 40,
-    category: "Vitamin",
-    unit: "Capsule",
-  },
-];
+const API_URL = "http://localhost:5000/api/medicines";
 
 const StockIn = () => {
+  const [medicinesData, setMedicinesData] = useState([]);
   const [search, setSearch] = useState("");
   const [selectedMedicine, setSelectedMedicine] = useState(null);
   const [showResults, setShowResults] = useState(false);
@@ -69,6 +46,29 @@ const StockIn = () => {
 
   const [errors, setErrors] = useState({});
 
+  useEffect(() => {
+    const fetchMedicines = async () => {
+      try {
+        const response = await axios.get(API_URL);
+        if (response.data?.success) {
+          const mapped = response.data.data.map((medicine) => ({
+            id: medicine.medicine_id,
+            name: medicine.medicine_name,
+            batch: medicine.batch_number,
+            currentStock: Number(medicine.quantity),
+            category: medicine.category || medicine.medicine_category || "",
+            unit: medicine.unit || "Unit",
+          }));
+          setMedicinesData(mapped);
+        }
+      } catch (error) {
+        console.error("Error fetching medicines:", error);
+      }
+    };
+
+    fetchMedicines();
+  }, []);
+
   // FILTER MEDICINES
   const filteredMedicines = useMemo(() => {
     return medicinesData.filter((medicine) =>
@@ -78,16 +78,17 @@ const StockIn = () => {
 
   // HANDLE INPUT
   const handleChange = (e) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value,
-    });
+    const { name, value } = e.target;
+    setFormData((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
 
-    if (errors[e.target.name]) {
-      setErrors({
-        ...errors,
-        [e.target.name]: "",
-      });
+    if (errors[name]) {
+      setErrors((prev) => ({
+        ...prev,
+        [name]: "",
+      }));
     }
   };
 
@@ -151,21 +152,23 @@ const StockIn = () => {
 
     setIsSubmitting(true);
 
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1000));
-
     const stockInData = {
-      medicineId: selectedMedicine.id,
-      medicineName: selectedMedicine.name,
-      ...formData,
-      quantity: parseInt(formData.quantity),
-      purchasePrice: parseFloat(formData.purchasePrice),
+      medicine_id: selectedMedicine.id,
+      quantity: parseInt(formData.quantity, 10),
+      remarks: `${formData.supplierName} | Invoice: ${formData.invoiceNumber || "N/A"} | Batch: ${formData.batchNumber}`,
     };
 
-    console.log("Stock In Data:", stockInData);
-
-    // API CALL HERE
-    alert("Stock Added Successfully");
+    try {
+      const response = await axios.post("http://localhost:5000/api/inventory/stock-in", stockInData);
+      if (response.data?.success) {
+        alert("Stock added successfully");
+      } else {
+        alert(response.data?.message || "Unable to add stock");
+      }
+    } catch (error) {
+      console.error("Stock in error:", error);
+      alert(error.response?.data?.message || "Error adding stock");
+    }
 
     // RESET
     setSelectedMedicine(null);
@@ -231,7 +234,7 @@ const StockIn = () => {
           value={formData[name]}
           onChange={handleChange}
           placeholder={placeholder}
-          className={`w-full bg-white/10 border rounded-lg pl-${Icon ? '10' : '4'} pr-4 py-2.5 text-white placeholder-gray-400 outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all ${
+          className={`w-full bg-white/10 border rounded-lg ${Icon ? 'pl-10' : 'pl-4'} pr-4 py-2.5 text-white placeholder-gray-400 outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all ${
             errors[name]
               ? "border-red-500 focus:ring-red-500"
               : "border-white/20 hover:border-white/30"
@@ -264,7 +267,7 @@ const StockIn = () => {
           value={formData[name]}
           onChange={handleChange}
           placeholder={placeholder}
-          className={`w-full bg-white/10 border border-white/20 rounded-lg pl-${Icon ? '10' : '4'} pr-4 py-2.5 text-white placeholder-gray-400 outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all resize-none`}
+          className={`w-full bg-white/10 border border-white/20 rounded-lg ${Icon ? 'pl-10' : 'pl-4'} pr-4 py-2.5 text-white placeholder-gray-400 outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all resize-none`}
         />
       </div>
     </div>

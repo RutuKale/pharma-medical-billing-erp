@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import {
   Search,
   Receipt,
@@ -17,48 +17,9 @@ import {
   ChevronRight,
 } from "lucide-react";
 
-const billsData = [
-  {
-    id: 1,
-    billNumber: "BILL-1001",
-    patientName: "Rahul Patil",
-    mobile: "9876543210",
-    date: "2026-05-11",
-    amount: 850,
-    paymentMode: "UPI",
-    status: "Completed",
-  },
-  {
-    id: 2,
-    billNumber: "BILL-1002",
-    patientName: "Sneha Kale",
-    mobile: "9876501234",
-    date: "2026-05-10",
-    amount: 1240,
-    paymentMode: "Cash",
-    status: "Completed",
-  },
-  {
-    id: 3,
-    billNumber: "BILL-1003",
-    patientName: "Ajay Sharma",
-    mobile: "9988776655",
-    date: "2026-05-09",
-    amount: 560,
-    paymentMode: "Card",
-    status: "Cancelled",
-  },
-  {
-    id: 4,
-    billNumber: "BILL-1004",
-    patientName: "Priya Deshmukh",
-    mobile: "9090909090",
-    date: "2026-05-11",
-    amount: 2180,
-    paymentMode: "Insurance",
-    status: "Completed",
-  },
-];
+import axios from "axios";
+
+const API_BASE = "http://localhost:5000/api";
 
 const BillingHistory = () => {
   const [search, setSearch] = useState("");
@@ -67,8 +28,40 @@ const BillingHistory = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 5;
 
+  const [bills, setBills] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [viewingBill, setViewingBill] = useState(null);
+  const [viewingItems, setViewingItems] = useState([]);
+
+  const fetchBills = async () => {
+    setLoading(true);
+    try {
+      const res = await axios.get(`${API_BASE}/bills`);
+      if (res.data?.success) {
+        // map backend fields to front-end friendly shape if needed
+        const mapped = res.data.data.map((b) => ({
+          id: b.bill_id,
+          billNumber: b.bill_number,
+          patientName: b.patient_name || b.patientName || "-",
+          mobile: b.mobile_number || b.mobile || "-",
+          date: b.created_at ? new Date(b.created_at).toISOString().slice(0, 10) : b.date || "-",
+          amount: b.grand_total || b.amount || 0,
+          paymentMode: b.payment_mode || "-",
+          status: b.payment_status || "Completed",
+        }));
+        setBills(mapped);
+      }
+    } catch (error) {
+      console.error("Failed to load bills:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+  useEffect(() => {
+    fetchBills();
+  }, []);
   const filteredBills = useMemo(() => {
-    return billsData.filter((bill) => {
+    return bills.filter((bill) => {
       const matchesSearch =
         bill.billNumber.toLowerCase().includes(search.toLowerCase()) ||
         bill.patientName.toLowerCase().includes(search.toLowerCase()) ||
@@ -77,7 +70,7 @@ const BillingHistory = () => {
       const matchesDate = !dateFilter || bill.date === dateFilter;
       return matchesSearch && matchesStatus && matchesDate;
     });
-  }, [search, statusFilter, dateFilter]);
+  }, [bills, search, statusFilter, dateFilter]);
 
   // Pagination
   const totalPages = Math.ceil(filteredBills.length / itemsPerPage);
@@ -87,16 +80,27 @@ const BillingHistory = () => {
   );
 
   const stats = {
-    totalBills: billsData.length,
-    totalSales: billsData
+    totalBills: bills.length,
+    totalSales: bills
       .filter((bill) => bill.status === "Completed")
-      .reduce((acc, bill) => acc + bill.amount, 0),
-    cancelledBills: billsData.filter((bill) => bill.status === "Cancelled").length,
-    todayBills: billsData.filter((bill) => bill.date === "2026-05-11").length,
+      .reduce((acc, bill) => acc + Number(bill.amount || 0), 0),
+    cancelledBills: bills.filter((bill) => bill.status === "Cancelled").length,
+    todayBills: bills.filter((bill) => bill.date === new Date().toISOString().slice(0, 10)).length,
   };
 
-  const viewBill = (bill) => {
-    console.log("View Bill:", bill);
+  const viewBill = async (bill) => {
+    try {
+      const res = await axios.get(`${API_BASE}/bills/${bill.id}`);
+      if (res.data?.success) {
+        setViewingBill(res.data.bill || res.data.data || bill);
+        setViewingItems(res.data.items || []);
+      } else {
+        alert(res.data?.message || "Unable to fetch bill details");
+      }
+    } catch (error) {
+      console.error("Error fetching bill details:", error);
+      alert("Error fetching bill details");
+    }
   };
 
   const printBill = (bill) => {
@@ -107,11 +111,23 @@ const BillingHistory = () => {
     console.log("Download PDF:", bill);
   };
 
-  const cancelBill = (bill) => {
+  const cancelBill = async (bill) => {
     const reason = prompt("Enter cancellation reason:");
     if (!reason) return;
-    console.log({ bill, reason });
-    alert("Bill Cancelled Successfully");
+    try {
+      const res = await axios.delete(`${API_BASE}/bills/${bill.id}`, {
+        data: { reason },
+      });
+      if (res.data?.success) {
+        alert("Bill deleted successfully");
+        fetchBills();
+      } else {
+        alert(res.data?.message || "Unable to delete bill");
+      }
+    } catch (error) {
+      console.error("Error deleting bill:", error);
+      alert(error.response?.data?.message || "Error deleting bill");
+    }
   };
 
   return (
@@ -124,6 +140,69 @@ const BillingHistory = () => {
           <div className="h-full w-full bg-[linear-gradient(rgba(20,184,166,0.1)_1px,transparent_1px),linear-gradient(90deg,rgba(20,184,166,0.1)_1px,transparent_1px)] bg-[size:32px_32px]"></div>
         </div>
       </div>
+      {/* Bill Details Modal */}
+      {viewingBill && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+          <div className="bg-slate-900 w-[92%] md:w-3/4 lg:w-2/3 rounded-2xl border border-white/10 shadow-xl overflow-hidden">
+            <div className="p-4 border-b border-white/10 flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-white">Bill Details - {viewingBill.bill_number || viewingBill.billNumber}</h3>
+              <button onClick={() => { setViewingBill(null); setViewingItems([]); }} className="text-gray-400 hover:text-white">Close</button>
+            </div>
+            <div className="p-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                <div>
+                  <p className="text-xs text-gray-400">Patient</p>
+                  <p className="text-white font-medium">{viewingBill.patient_name || viewingBill.patientName || "-"}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-400">Mobile</p>
+                  <p className="text-white font-medium">{viewingBill.mobile_number || viewingBill.mobile || "-"}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-400">Date</p>
+                  <p className="text-white font-medium">{viewingBill.created_at ? new Date(viewingBill.created_at).toLocaleString() : viewingBill.date}</p>
+                </div>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[600px]">
+                  <thead className="bg-slate-800/50 border-b border-white/10">
+                    <tr>
+                      <th className="text-left p-3 text-sm text-gray-400">Medicine</th>
+                      <th className="text-left p-3 text-sm text-gray-400">Qty</th>
+                      <th className="text-left p-3 text-sm text-gray-400">Price</th>
+                      <th className="text-left p-3 text-sm text-gray-400">Total</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {viewingItems.length > 0 ? (
+                      viewingItems.map((it) => (
+                        <tr key={it.bill_item_id || it.id} className="border-b border-white/5">
+                          <td className="p-3 text-white">{it.medicine_name || it.name || it.medicine_id}</td>
+                          <td className="p-3 text-white">{it.quantity}</td>
+                          <td className="p-3 text-white">₹{it.price}</td>
+                          <td className="p-3 text-white">₹{it.total}</td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td className="p-3 text-gray-400" colSpan={4}>No items available</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="mt-4 flex items-center justify-end gap-3">
+                <div className="text-right">
+                  <p className="text-xs text-gray-400">Total</p>
+                  <p className="text-xl font-bold text-white">₹{viewingBill.grand_total || viewingBill.amount || 0}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="relative z-10 p-4 md:p-6">
         {/* Header */}

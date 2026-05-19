@@ -41,6 +41,10 @@ const Billing = () => {
   const [paymentMode, setPaymentMode] = useState("Cash");
   const [medicinesData, setMedicinesData] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [isEditOpen, setIsEditOpen] = useState(false);
+  const [editingItemId, setEditingItemId] = useState(null);
+  const [editQuantity, setEditQuantity] = useState(1);
+  const [editDiscount, setEditDiscount] = useState(0);
 
   const fetchPatients = async () => {
     try {
@@ -292,94 +296,71 @@ const Billing = () => {
   const editItem = (id) => {
     const itemToEdit = billItems.find((item) => item.id === id);
     if (!itemToEdit) return;
-    Swal.fire({
-      title: "Edit Medicine",
-      html: `
-      <label>Qunatity</label>
-      <input 
-        id="edit-quantity" 
-        type="number" 
-        class="swal2-input" 
-        placeholder="Quantity"
-        value="${itemToEdit.quantity}"
-      />
+    setEditingItemId(id);
+    setEditQuantity(itemToEdit.quantity || 1);
+    setEditDiscount(itemToEdit.discount || 0);
+    setIsEditOpen(true);
+  };
 
-      <label>Discount %</label>
-      <input 
-        id="edit-discount" 
-        type="number" 
-        class="swal2-input" 
-        placeholder="Discount %"
-        value="${itemToEdit.discount}"
-      />
-    `,
+  const closeEditModal = () => {
+    setIsEditOpen(false);
+    setEditingItemId(null);
+  };
+
+  const saveEdit = () => {
+    const quantity = Number(editQuantity) || 0;
+    const discount = Number(editDiscount) || 0;
+
+    if (quantity <= 0) {
+      return Swal.fire({
+        icon: "warning",
+        title: "Invalid Quantity",
+        text: "Quantity must be greater than 0",
+        background: "#1e293b",
+        color: "#fff",
+      });
+    }
+
+    if (discount < 0 || discount > 100) {
+      return Swal.fire({
+        icon: "warning",
+        title: "Invalid Discount",
+        text: "Discount must be between 0 and 100",
+        background: "#1e293b",
+        color: "#fff",
+      });
+    }
+
+    const updatedItems = billItems.map((item) => {
+      if (item.id !== editingItemId) return item;
+
+      const subtotal = item.price * quantity;
+      const discountAmount = (subtotal * discount) / 100;
+      const taxableAmount = subtotal - discountAmount;
+      const gstAmount = (taxableAmount * item.gst) / 100;
+      const total = taxableAmount + gstAmount;
+
+      return {
+        ...item,
+        quantity,
+        discount,
+        subtotal,
+        discountAmount,
+        gstAmount,
+        total,
+      };
+    });
+
+    setBillItems(updatedItems);
+    closeEditModal();
+
+    Swal.fire({
+      icon: "success",
+      title: "Medicine Updated",
+      text: "Medicine details updated successfully",
       background: "#1e293b",
       color: "#fff",
       confirmButtonColor: "#22c55e",
-      cancelButtonColor: "#ef4444",
-      showCancelButton: true,
-      confirmButtonText: "Update",
-
-      preConfirm: () => {
-        const quantity = Number(document.getElementById("edit-quantity").value);
-
-        const discount = Number(document.getElementById("edit-discount").value);
-
-        if (quantity <= 0) {
-          Swal.showValidationMessage("Quantity must be greater than 0");
-          return false;
-        }
-
-        if (discount < 0 || discount > 100) {
-          Swal.showValidationMessage("Discount must be between 0 and 100");
-
-          return false;
-        }
-
-        return {
-          quantity,
-          discount,
-        };
-      },
-    }).then((result) => {
-      if (!result.isConfirmed) return;
-
-      const { quantity, discount } = result.value;
-
-      const updatedItems = billItems.map((item) => {
-        if (item.id !== id) return item;
-
-        const subtotal = item.price * quantity;
-
-        const discountAmount = (subtotal * discount) / 100;
-
-        const taxableAmount = subtotal - discountAmount;
-
-        const gstAmount = (taxableAmount * item.gst) / 100;
-
-        const total = taxableAmount + gstAmount;
-
-        return {
-          ...item,
-          quantity,
-          discount,
-          subtotal,
-          discountAmount,
-          gstAmount,
-          total,
-        };
-      });
-
-      setBillItems(updatedItems);
-
-      Swal.fire({
-        icon: "success",
-        title: "Medicine Updated",
-        text: "Medicine details updated successfully",
-        background: "#1e293b",
-        color: "#fff",
-        confirmButtonColor: "#22c55e",
-      });
     });
   };
 
@@ -393,6 +374,57 @@ const Billing = () => {
           <div className="h-full w-full bg-[linear-gradient(rgba(20,184,166,0.1)_1px,transparent_1px),linear-gradient(90deg,rgba(20,184,166,0.1)_1px,transparent_1px)] bg-[size:32px_32px]"></div>
         </div>
       </div>
+
+      {isEditOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
+          <div
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm"
+            onClick={closeEditModal}
+          />
+
+          <div className="relative z-10 w-full max-w-md mx-auto">
+            <div className="bg-slate-800 border border-white/10 rounded-2xl p-6 text-white shadow-xl">
+              <h3 className="text-lg font-semibold mb-4">Edit Medicine</h3>
+
+              <label className="text-sm text-gray-300">Quantity</label>
+              <input
+                type="number"
+                min={1}
+                step={1}
+                value={editQuantity}
+                onChange={(e) => setEditQuantity(Number(e.target.value))}
+                className="w-full bg-slate-900/60 border border-white/10 rounded-xl px-3 py-2 text-white placeholder-gray-400 outline-none focus:ring-2 focus:ring-blue-500/40 mt-2 mb-4"
+              />
+
+              <label className="text-sm text-gray-300">Discount %</label>
+              <input
+                type="number"
+                min={0}
+                max={100}
+                step={0.01}
+                value={editDiscount}
+                onChange={(e) => setEditDiscount(Number(e.target.value))}
+                className="w-full bg-slate-900/60 border border-white/10 rounded-xl px-3 py-2 text-white placeholder-gray-400 outline-none focus:ring-2 focus:ring-purple-500/40 mt-2"
+              />
+
+              <div className="flex items-center justify-end gap-3 mt-6">
+                <button
+                  onClick={closeEditModal}
+                  className="px-4 py-2 rounded-xl bg-transparent border border-white/10 text-gray-300 hover:bg-white/5 transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={saveEdit}
+                  className="px-4 py-2 rounded-xl bg-gradient-to-r from-green-600 to-emerald-600 text-white hover:from-green-700 hover:to-emerald-700 transition"
+                >
+                  Update
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="relative z-10 p-4 md:p-6">
         {/* Header */}
@@ -425,9 +457,9 @@ const Billing = () => {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 relative z-0">
+       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 relative">
           {/* LEFT SECTION */}
-          <div className="xl:col-span-2 space-y-6 relative z-50">
+          <div className="xl:col-span-2 space-y-6 relative overflow-visible">
             {/* Patient Info Card */}
             <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl shadow-xl overflow-hidden relative z-0">
               <div className="bg-gradient-to-r from-blue-500/10 to-indigo-500/10 px-6 py-4 border-b border-white/10">
@@ -525,7 +557,7 @@ const Billing = () => {
             </div>
 
             {/* Add Medicine Card */}
-            <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl shadow-xl overflow-visible">
+           <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl shadow-xl overflow-visible relative z-50">
               <div className="bg-gradient-to-r from-purple-500/10 to-pink-500/10 px-6 py-4 border-b border-white/10">
                 <div className="flex items-center gap-3">
                   <div className="bg-purple-500/20 p-2 rounded-xl">
@@ -539,7 +571,7 @@ const Billing = () => {
 
               <div className="p-6">
                 {/* Search */}
-                <div className="relative mb-5 z-50">
+                <div className="relative mb-5">
                   <Search
                     size={18}
                     className="absolute left-3 top-3 text-gray-400"
@@ -553,7 +585,7 @@ const Billing = () => {
                   />
 
                   {search && (
-                    <div className="absolute left-0 right-0 top-full mt-2 z-[9999] bg-slate-800 border border-white/10 rounded-xl shadow-2xl w-full max-h-72 overflow-y-auto backdrop-blur-xl custom-scrollbar">
+                   <div className="absolute left-0 right-0 top-full mt-2 bg-slate-800 border border-white/10 rounded-xl shadow-2xl w-full max-h-72 overflow-y-auto backdrop-blur-xl custom-scrollbar z-[99999]">
                       {loading ? (
                         <div className="p-4 text-center text-gray-400">
                           Loading medicines...
@@ -664,7 +696,7 @@ const Billing = () => {
             </div>
 
             {/* Bill Table */}
-            <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl shadow-xl overflow-hidden">
+           <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl shadow-xl overflow-visible relative z-0">
               <div className="bg-gradient-to-r from-green-500/10 to-emerald-500/10 px-6 py-4 border-b border-white/10">
                 <h2 className="text-lg font-semibold text-white">Bill Items</h2>
               </div>

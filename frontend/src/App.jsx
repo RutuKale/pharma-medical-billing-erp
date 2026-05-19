@@ -9,6 +9,7 @@ import Inventory from "./pages/Inventory/Inventory";
 import AddMedicines from "./pages/Inventory/AddMedicines";
 import UploadExcel from "./pages/Inventory/UploadExcel";
 import StockIn from "./pages/Inventory/StockIn";
+import Stock from "./pages/Inventory/Stock";
 import ExpiryAlerts from "./pages/Inventory/ExpiryAlerts";
 import Billing from "./pages/Billing/Billing";
 import BillingHistory from "./pages/Billing/BillingHistory";
@@ -36,6 +37,7 @@ function App() {
                     <Route path="/" element={<Dashboard />} />
                     <Route path="/inventory" element={<Inventory />} />
                     <Route path="/inventory/add-medicine" element={<AddMedicines />} />
+                    <Route path="/inventory/stock" element={<Stock />} />
                     <Route path="/inventory/stock-in" element={<StockIn />} />
                     <Route path="/inventory/expiry-alerts" element={<ExpiryAlerts />} />
                     <Route path="/upload" element={<UploadExcel />} />

@@ -25,10 +25,18 @@ const API_URL = "http://localhost:5000/api/medicines";
 import axios from "axios";
 import Swal from "sweetalert2";
 
+const INVENTORY_API = "http://localhost:5000/api/inventory";
+
 const Inventory = () => {
   const [medicinesData, setMedicinesData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedMedicine, setSelectedMedicine] = useState(null);
+
+  const [isStockModalOpen, setIsStockModalOpen] = useState(false);
+  const [stockType, setStockType] = useState("IN"); // "IN" or "OUT"
+  const [stockQuantity, setStockQuantity] = useState(1);
+  const [stockRemarks, setStockRemarks] = useState("");
+  const [stockMedicineId, setStockMedicineId] = useState(null);
 
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("All");
@@ -83,6 +91,62 @@ const Inventory = () => {
         medicineData: medicine,
       },
     });
+  };
+
+  const openStockModal = (medicine, type) => {
+    setStockMedicineId(medicine.medicine_id);
+    setStockType(type === "in" ? "IN" : "OUT");
+    setStockQuantity(1);
+    setStockRemarks("");
+    setIsStockModalOpen(true);
+  };
+
+  const closeStockModal = () => {
+    setIsStockModalOpen(false);
+    setStockMedicineId(null);
+  };
+
+  const submitStockChange = async () => {
+    const quantity = Number(stockQuantity) || 0;
+    if (quantity <= 0) {
+      return Swal.fire({
+        icon: "warning",
+        title: "Invalid Quantity",
+        text: "Quantity must be greater than 0",
+        background: "#fff",
+        color: "#000",
+      });
+    }
+
+    try {
+      const endpoint = stockType === "IN" ? "stock-in" : "stock-out";
+      const response = await axios.post(`${INVENTORY_API}/${endpoint}`, {
+        medicine_id: stockMedicineId,
+        quantity,
+        remarks: stockRemarks,
+      });
+
+      if (response.data.success) {
+        Swal.fire({
+          icon: "success",
+          title: `Stock ${stockType === "IN" ? "Added" : "Removed"}`,
+          text: response.data.message || "Operation successful",
+          background: "#fff",
+          color: "#000",
+        });
+        closeStockModal();
+        fetchMedicines();
+      }
+    } catch (error) {
+      console.error("Stock change failed", error);
+      Swal.fire({
+        icon: "error",
+        title: "Operation Failed",
+        text: error.response?.data?.message || "Unable to update stock",
+        background: "#fff",
+        color: "#000",
+      });
+    }
   };
 
  const handleDelete = async (medicineId) => {
@@ -268,6 +332,54 @@ const Inventory = () => {
           <div className="h-full w-full bg-[linear-gradient(rgba(20,184,166,0.1)_1px,transparent_1px),linear-gradient(90deg,rgba(20,184,166,0.1)_1px,transparent_1px)] bg-[size:32px_32px]"></div>
         </div>
       </div>
+
+      {isStockModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
+          <div
+            className="fixed inset-0 bg-black/40"
+            onClick={closeStockModal}
+          />
+
+          <div className="relative z-10 w-full max-w-md mx-auto">
+            <div className="bg-white rounded-2xl p-6 shadow-xl">
+              <h3 className="text-lg font-semibold mb-3 text-slate-900">{stockType === "IN" ? "Stock In" : "Stock Out"}</h3>
+
+              <label className="text-sm text-slate-600">Quantity</label>
+              <input
+                type="number"
+                min={1}
+                step={1}
+                value={stockQuantity}
+                onChange={(e) => setStockQuantity(Number(e.target.value))}
+                className="w-full bg-white/90 border rounded-xl px-3 py-2 text-slate-900 outline-none focus:ring-2 focus:ring-blue-500 mt-2 mb-4"
+              />
+
+              <label className="text-sm text-slate-600">Remarks (optional)</label>
+              <input
+                type="text"
+                value={stockRemarks}
+                onChange={(e) => setStockRemarks(e.target.value)}
+                className="w-full bg-white/90 border rounded-xl px-3 py-2 text-slate-900 outline-none focus:ring-2 focus:ring-blue-500 mt-2"
+              />
+
+              <div className="flex items-center justify-end gap-3 mt-6">
+                <button
+                  onClick={closeStockModal}
+                  className="px-4 py-2 rounded-xl bg-gray-100 text-slate-700"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={submitStockChange}
+                  className="px-4 py-2 rounded-xl bg-gradient-to-r from-green-600 to-emerald-600 text-white"
+                >
+                  Confirm
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="relative z-10 p-4 sm:p-5 md:p-6 lg:p-8">
         {/* HEADER */}
@@ -632,6 +744,23 @@ const Inventory = () => {
                           >
                             <SquarePen size={16} />
                           </button>
+
+                          <button
+                            onClick={() => openStockModal(medicine, "in")}
+                            title="Stock In"
+                            className="p-2 rounded-lg bg-green-500/10 text-green-400 hover:bg-green-500/20 transition-all duration-200"
+                          >
+                            <TrendingUp size={16} />
+                          </button>
+
+                          <button
+                            onClick={() => openStockModal(medicine, "out")}
+                            title="Stock Out"
+                            className="p-2 rounded-lg bg-orange-500/10 text-orange-400 hover:bg-orange-500/20 transition-all duration-200"
+                          >
+                            <TrendingDown size={16} />
+                          </button>
+
                           <button
                             onClick={() => handleDelete(medicine.medicine_id)}
                             className="p-2 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-all duration-200 group-hover:scale-110"
@@ -699,6 +828,22 @@ const Inventory = () => {
                     >
                       <SquarePen size={16} />
                     </button>
+                    <button
+                      onClick={() => openStockModal(medicine, "in")}
+                      title="Stock In"
+                      className="p-2 rounded-lg bg-green-500/10 text-green-400 hover:bg-green-500/20 transition-all duration-200"
+                    >
+                      <TrendingUp size={16} />
+                    </button>
+
+                    <button
+                      onClick={() => openStockModal(medicine, "out")}
+                      title="Stock Out"
+                      className="p-2 rounded-lg bg-orange-500/10 text-orange-400 hover:bg-orange-500/20 transition-all duration-200"
+                    >
+                      <TrendingDown size={16} />
+                    </button>
+
                     <button
                       onClick={() => handleDelete(medicine.medicine_id)}
                       className="p-2 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-all duration-200"

@@ -71,6 +71,11 @@ const Sidebar = () => {
           icon: <PlusSquare size={18} />,
         },
         {
+          name: "Stock Overview",
+          path: "/inventory/stock",
+          icon: <BarChart3 size={18} />,
+        },
+        {
           name: "Stock In",
           path: "/inventory/stock-in",
           icon: <Boxes size={18} />,
@@ -146,7 +151,7 @@ const Sidebar = () => {
   return (
     <>
       {/* MOBILE TOPBAR */}
-      <div className="lg:hidden flex items-center justify-between bg-gradient-to-r from-slate-900 via-blue-950 to-slate-900 text-white px-4 py-3 sticky top-0 z-50 border-b border-white/10">
+     <div className="lg:hidden fixed top-0 left-0 right-0 flex items-center justify-between bg-gradient-to-r from-slate-900 via-blue-950 to-slate-900 text-white px-4 py-3 z-50 border-b border-white/10">
         <div className="flex items-center gap-3">
           <div className="relative group">
             <div className="absolute inset-0 bg-gradient-to-r from-blue-400 to-indigo-400 rounded-xl blur-lg opacity-75 group-hover:opacity-100 transition-opacity"></div>
@@ -179,7 +184,7 @@ const Sidebar = () => {
 
       {/* SIDEBAR */}
       <aside
-        className={`fixed lg:sticky top-0 left-0 z-50 h-screen sm:w-72 w-full bg-gradient-to-b from-slate-900 via-blue-950 to-slate-900 text-white flex flex-col transform transition-transform duration-300 border-r border-white/10
+        className={`fixed lg:sticky top-0 left-0 z-50 h-screen w-72 max-w-[85%] bg-gradient-to-b from-slate-900 via-blue-950 to-slate-900 text-white flex flex-col transform transition-transform duration-300 border-r border-white/10
         ${isOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}`}
       >
         {/* Animated Background Pattern */}
