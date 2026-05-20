@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
+import axios from "axios";
 import {
   IndianRupee,
   Package,
@@ -33,14 +34,30 @@ const Dashboard = () => {
   const [currentDate, setCurrentDate] = useState("");
   const [greeting, setGreeting] = useState("");
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [stats, setStats] = useState([]);
+  const [lowStockMedicines, setLowStockMedicines] = useState([]);
+  const [expiryMedicines, setExpiryMedicines] = useState([]);
+  const [reminders, setReminders] = useState([]);
+  const [recentBills, setRecentBills] = useState([]);
+
+  const [totalProducts, setTotalProducts] = useState(0);
+  const [activePatients, setActivePatients] = useState(0);
+  const [monthlyRevenue, setMonthlyRevenue] = useState(0);
+
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
   useEffect(() => {
     const updateDateTime = () => {
       const now = new Date();
       const hour = now.getHours();
-      
+
       setCurrentTime(
-        now.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: true })
+        now.toLocaleTimeString("en-US", {
+          hour: "2-digit",
+          minute: "2-digit",
+          hour12: true,
+        }),
       );
       setCurrentDate(
         now.toLocaleDateString("en-US", {
@@ -48,7 +65,7 @@ const Dashboard = () => {
           year: "numeric",
           month: "long",
           day: "numeric",
-        })
+        }),
       );
 
       if (hour < 12) setGreeting("Good Morning");
@@ -61,77 +78,249 @@ const Dashboard = () => {
     return () => clearInterval(interval);
   }, []);
 
+  useEffect(() => {
+    fetchDashboardData();
+  }, []);
+
+  const fetchDashboardData = async () => {
+    try {
+      setLoading(true);
+
+      const medicinesRes = await axios.get(
+        "http://localhost:5000/api/medicines",
+      );
+
+      const billsRes = await axios.get("http://localhost:5000/api/bills");
+
+      let patientsRes = { data: { data: [] } };
+      let remindersRes = { data: { data: [] } };
+
+      try {
+        patientsRes = await axios.get("http://localhost:5000/api/patients");
+      } catch (err) {
+        console.log("Patients API not found");
+      }
+
+      try {
+        remindersRes = await axios.get("http://localhost:5000/api/expiry/expired");
+      } catch (err) {
+        console.log("Reminders API not found");
+      }
+
+      const medicines = medicinesRes?.data?.data || [];
+
+      const bills = billsRes?.data?.data || [];
+
+      const patients = patientsRes?.data?.data || [];
+
+      const remindersData = remindersRes?.data?.data || [];
+
+      // TOTAL SALES
+      const todaySales = bills.reduce(
+        (sum, bill) => sum + (Number(bill.total_amount) || 0),
+        0,
+      );
+
+      // LOW STOCK
+      const lowStock = medicines
+        .filter((med) => med.stock_quantity <= 10)
+        .map((med, index) => ({
+          id: med._id || index,
+          name: med.medicine_name,
+          stock: med.stock_quantity,
+          minStock: 20,
+          category: med.category,
+        }));
+
+      setLowStockMedicines(lowStock);
+
+      // EXPIRY ALERTS
+      const expiry = medicines
+        .filter((med) => med.expiry_date)
+        .map((med, index) => {
+          const expiryDate = new Date(med.expiry_date);
+
+          const daysLeft = Math.ceil(
+            (expiryDate - new Date()) / (1000 * 60 * 60 * 24),
+          );
+
+          let status = "Safe";
+
+          if (daysLeft <= 0) {
+            status = "Expired";
+          } else if (daysLeft <= 30) {
+            status = "Critical";
+          } else if (daysLeft <= 60) {
+            status = "Warning";
+          }
+
+          return {
+            id: med._id || index,
+            name: med.medicine_name,
+            expiry: med.expiry_date,
+            status,
+            daysLeft,
+          };
+        });
+
+      setExpiryMedicines(expiry);
+
+      // RECENT BILLS
+      const formattedBills = bills.slice(0, 5).map((bill, index) => ({
+        id: bill.bill_number || index,
+        patient: bill.customer_name || "Walk-in Customer",
+        amount: `₹${bill.total_amount}`,
+        payment: bill.payment_method || "Cash",
+        date: bill.createdAt || "Today",
+        status: bill.payment_status || "completed",
+      }));
+
+      setRecentBills(formattedBills);
+
+      // REMINDERS
+      const formattedReminders = remindersData
+        .slice(0, 5)
+        .map((reminder, index) => ({
+          id: reminder._id || index,
+          patient: reminder.patient_name,
+          medicine: reminder.medicine_name,
+          dueDate: reminder.reminder_date,
+          phone: reminder.phone,
+        }));
+
+      setReminders(formattedReminders);
+
+      // QUICK STATS
+      setTotalProducts(medicines.length);
+      setActivePatients(patients.length);
+      setMonthlyRevenue(todaySales);
+
+      // DASHBOARD STATS
+      setStats([
+        {
+          title: "Today's Sales",
+          value: `₹${todaySales.toLocaleString()}`,
+          icon: <IndianRupee size={22} />,
+          color: "from-emerald-500 to-teal-500",
+          bgColor: "bg-emerald-500/10",
+          iconColor: "text-emerald-400",
+          growth: "+12%",
+          growthUp: true,
+          subtitle: "vs yesterday",
+        },
+        {
+          title: "Total Bills",
+          value: bills.length.toString(),
+          icon: <Receipt size={22} />,
+          color: "from-pink-500 to-red-500",
+          bgColor: "bg-pink-500/10",
+          iconColor: "text-pink-400",
+          growth: "+8%",
+          growthUp: true,
+          subtitle: "this month",
+        },
+        {
+          title: "Low Stock Items",
+          value: lowStock.length.toString(),
+          icon: <AlertTriangle size={22} />,
+          color: "from-orange-500 to-amber-500",
+          bgColor: "bg-orange-500/10",
+          iconColor: "text-orange-400",
+          growth: "Needs Attention",
+          growthUp: false,
+          subtitle: "critical items",
+        },
+        {
+          title: "Upcoming Reminders",
+          value: remindersData.length.toString(),
+          icon: <BellRing size={22} />,
+          color: "from-purple-500 to-pink-500",
+          bgColor: "bg-purple-500/10",
+          iconColor: "text-purple-400",
+          growth: "Next 7 Days",
+          growthUp: false,
+          subtitle: "patient follow-ups",
+        },
+      ]);
+    } catch (err) {
+      console.error(err);
+      setError("Failed to load dashboard");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // MOCK DATA
-  const stats = [
-    {
-      title: "Today's Sales",
-      value: "₹24,580",
-      icon: <IndianRupee size={22} />,
-      color: "from-emerald-500 to-teal-500",
-      bgColor: "bg-emerald-500/10",
-      iconColor: "text-emerald-400",
-      growth: "+12%",
-      growthUp: true,
-      subtitle: "vs yesterday",
-    },
-    {
-      title: "Total Bills",
-      value: "142",
-      icon: <Receipt size={22} />,
-      color: "from-pink-500 to-red-500",
-      bgColor: "bg-pink-500/10",
-      iconColor: "text-pink-400",
-      growth: "+8%",
-      growthUp: true,
-      subtitle: "this month",
-    },
-    {
-      title: "Low Stock Items",
-      value: "18",
-      icon: <AlertTriangle size={22} />,
-      color: "from-orange-500 to-amber-500",
-      bgColor: "bg-orange-500/10",
-      iconColor: "text-orange-400",
-      growth: "Needs Attention",
-      growthUp: false,
-      subtitle: "critical items",
-    },
-    {
-      title: "Upcoming Reminders",
-      value: "26",
-      icon: <BellRing size={22} />,
-      color: "from-purple-500 to-pink-500",
-      bgColor: "bg-purple-500/10",
-      iconColor: "text-purple-400",
-      growth: "Next 7 Days",
-      growthUp: false,
-      subtitle: "patient follow-ups",
-    },
-  ];
+  // const stats = [
+  //   {
+  //     title: "Today's Sales",
+  //     value: "₹24,580",
+  //     icon: <IndianRupee size={22} />,
+  //     color: "from-emerald-500 to-teal-500",
+  //     bgColor: "bg-emerald-500/10",
+  //     iconColor: "text-emerald-400",
+  //     growth: "+12%",
+  //     growthUp: true,
+  //     subtitle: "vs yesterday",
+  //   },
+  //   {
+  //     title: "Total Bills",
+  //     value: "142",
+  //     icon: <Receipt size={22} />,
+  //     color: "from-pink-500 to-red-500",
+  //     bgColor: "bg-pink-500/10",
+  //     iconColor: "text-pink-400",
+  //     growth: "+8%",
+  //     growthUp: true,
+  //     subtitle: "this month",
+  //   },
+  //   {
+  //     title: "Low Stock Items",
+  //     value: "18",
+  //     icon: <AlertTriangle size={22} />,
+  //     color: "from-orange-500 to-amber-500",
+  //     bgColor: "bg-orange-500/10",
+  //     iconColor: "text-orange-400",
+  //     growth: "Needs Attention",
+  //     growthUp: false,
+  //     subtitle: "critical items",
+  //   },
+  //   {
+  //     title: "Upcoming Reminders",
+  //     value: "26",
+  //     icon: <BellRing size={22} />,
+  //     color: "from-purple-500 to-pink-500",
+  //     bgColor: "bg-purple-500/10",
+  //     iconColor: "text-purple-400",
+  //     growth: "Next 7 Days",
+  //     growthUp: false,
+  //     subtitle: "patient follow-ups",
+  //   },
+  // ];
 
-  const lowStockMedicines = [
-    { id: 1, name: "Azithromycin 500mg", stock: 5, minStock: 20, category: "Antibiotic" },
-    { id: 2, name: "Vitamin D Capsules", stock: 2, minStock: 15, category: "Supplement" },
-    { id: 3, name: "Paracetamol Syrup", stock: 7, minStock: 25, category: "Pain Relief" },
-  ];
+  // const lowStockMedicines = [
+  //   { id: 1, name: "Azithromycin 500mg", stock: 5, minStock: 20, category: "Antibiotic" },
+  //   { id: 2, name: "Vitamin D Capsules", stock: 2, minStock: 15, category: "Supplement" },
+  //   { id: 3, name: "Paracetamol Syrup", stock: 7, minStock: 25, category: "Pain Relief" },
+  // ];
 
-  const expiryMedicines = [
-    { id: 1, name: "Dolo 650", expiry: "2025-06-12", status: "Critical", daysLeft: 30 },
-    { id: 2, name: "Amoxicillin", expiry: "2025-07-04", status: "Warning", daysLeft: 52 },
-    { id: 3, name: "Vitamin B12", expiry: "2025-05-28", status: "Expired", daysLeft: 0 },
-  ];
+  // const expiryMedicines = [
+  //   { id: 1, name: "Dolo 650", expiry: "2025-06-12", status: "Critical", daysLeft: 30 },
+  //   { id: 2, name: "Amoxicillin", expiry: "2025-07-04", status: "Warning", daysLeft: 52 },
+  //   { id: 3, name: "Vitamin B12", expiry: "2025-05-28", status: "Expired", daysLeft: 0 },
+  // ];
 
-  const reminders = [
-    { id: 1, patient: "Ramesh Sharma", medicine: "Metformin 500mg", dueDate: "Tomorrow", phone: "+91 98765 43210" },
-    { id: 2, patient: "Priya Patil", medicine: "BP Tablets", dueDate: "2 Days", phone: "+91 87654 32109" },
-    { id: 3, patient: "Amit Verma", medicine: "Antibiotics", dueDate: "Today", phone: "+91 76543 21098" },
-  ];
+  // const reminders = [
+  //   { id: 1, patient: "Ramesh Sharma", medicine: "Metformin 500mg", dueDate: "Tomorrow", phone: "+91 98765 43210" },
+  //   { id: 2, patient: "Priya Patil", medicine: "BP Tablets", dueDate: "2 Days", phone: "+91 87654 32109" },
+  //   { id: 3, patient: "Amit Verma", medicine: "Antibiotics", dueDate: "Today", phone: "+91 76543 21098" },
+  // ];
 
-  const recentBills = [
-    { id: "BILL-1001", patient: "Rahul Patil", amount: "₹850", payment: "UPI", date: "Today", status: "completed" },
-    { id: "BILL-1002", patient: "Sneha Kale", amount: "₹1,240", payment: "Cash", date: "Today", status: "completed" },
-    { id: "BILL-1003", patient: "Ajay Sharma", amount: "₹560", payment: "Card", date: "Today", status: "pending" },
-  ];
+  // const recentBills = [
+  //   { id: "BILL-1001", patient: "Rahul Patil", amount: "₹850", payment: "UPI", date: "Today", status: "completed" },
+  //   { id: "BILL-1002", patient: "Sneha Kale", amount: "₹1,240", payment: "Cash", date: "Today", status: "completed" },
+  //   { id: "BILL-1003", patient: "Ajay Sharma", amount: "₹560", payment: "Card", date: "Today", status: "pending" },
+  // ];
 
   const getStatusColor = (status) => {
     switch (status) {
@@ -149,6 +338,22 @@ const Dashboard = () => {
   const getStockPercentage = (stock, minStock) => {
     return (stock / minStock) * 100;
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-900 text-white">
+        Loading dashboard...
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-900 text-red-400">
+        {error}
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-950 to-slate-900">
@@ -177,7 +382,10 @@ const Dashboard = () => {
                 <span>{currentTime}</span>
               </div>
               <div className="flex items-center gap-1 sm:gap-1.5">
-                <CalendarClock size={10} className="text-blue-400 sm:w-3 sm:h-3" />
+                <CalendarClock
+                  size={10}
+                  className="text-blue-400 sm:w-3 sm:h-3"
+                />
                 <span>{currentDate}</span>
               </div>
             </div>
@@ -227,10 +435,14 @@ const Dashboard = () => {
                   <MoreVertical size={14} className="sm:w-4 sm:h-4" />
                 </button>
               </div>
-              
-              <p className="text-white/60 text-xs sm:text-sm mb-0.5 sm:mb-1">{item.title}</p>
-              <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-white mb-1.5 sm:mb-2">{item.value}</h2>
-              
+
+              <p className="text-white/60 text-xs sm:text-sm mb-0.5 sm:mb-1">
+                {item.title}
+              </p>
+              <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-white mb-1.5 sm:mb-2">
+                {item.value}
+              </h2>
+
               <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
                 {item.growthUp ? (
                   <div className="flex items-center gap-0.5 sm:gap-1 text-indigo-400 text-[10px] sm:text-xs">
@@ -238,11 +450,15 @@ const Dashboard = () => {
                     <span className="font-medium">{item.growth}</span>
                   </div>
                 ) : (
-                  <span className={`text-[10px] sm:text-xs px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full font-medium ${item.title === "Low Stock Items" ? "bg-orange-500/10 text-orange-400 border border-orange-500/20" : "bg-purple-500/10 text-purple-400 border border-purple-500/20"}`}>
+                  <span
+                    className={`text-[10px] sm:text-xs px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full font-medium ${item.title === "Low Stock Items" ? "bg-orange-500/10 text-orange-400 border border-orange-500/20" : "bg-purple-500/10 text-purple-400 border border-purple-500/20"}`}
+                  >
                     {item.growth}
                   </span>
                 )}
-                <span className="text-white/40 text-[9px] sm:text-xs">{item.subtitle}</span>
+                <span className="text-white/40 text-[9px] sm:text-xs">
+                  {item.subtitle}
+                </span>
               </div>
             </div>
           ))}
@@ -257,11 +473,18 @@ const Dashboard = () => {
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 sm:p-5 border-b border-white/10">
                 <div className="flex items-center gap-2 sm:gap-3">
                   <div className="bg-blue-500/10 p-1.5 sm:p-2 rounded-xl">
-                    <ShoppingCart size={16} className="text-blue-400 sm:w-[18px] sm:h-[18px]" />
+                    <ShoppingCart
+                      size={16}
+                      className="text-blue-400 sm:w-[18px] sm:h-[18px]"
+                    />
                   </div>
                   <div>
-                    <h2 className="text-base sm:text-lg font-semibold text-white">Recent Bills</h2>
-                    <p className="text-white/50 text-[10px] sm:text-xs">Latest pharmacy transactions</p>
+                    <h2 className="text-base sm:text-lg font-semibold text-white">
+                      Recent Bills
+                    </h2>
+                    <p className="text-white/50 text-[10px] sm:text-xs">
+                      Latest pharmacy transactions
+                    </p>
                   </div>
                 </div>
                 <div className="flex items-center justify-between sm:justify-end gap-2">
@@ -282,29 +505,53 @@ const Dashboard = () => {
                 <table className="w-full min-w-[500px] sm:min-w-[600px]">
                   <thead>
                     <tr className="border-b border-white/10">
-                      <th className="text-left p-3 sm:p-4 text-[10px] sm:text-xs font-semibold text-white/60 uppercase tracking-wider">Bill No</th>
-                      <th className="text-left p-3 sm:p-4 text-[10px] sm:text-xs font-semibold text-white/60 uppercase tracking-wider">Patient</th>
-                      <th className="text-left p-3 sm:p-4 text-[10px] sm:text-xs font-semibold text-white/60 uppercase tracking-wider">Amount</th>
-                      <th className="text-left p-3 sm:p-4 text-[10px] sm:text-xs font-semibold text-white/60 uppercase tracking-wider hidden sm:table-cell">Payment</th>
-                      <th className="text-left p-3 sm:p-4 text-[10px] sm:text-xs font-semibold text-white/60 uppercase tracking-wider">Status</th>
-                      <th className="text-left p-3 sm:p-4 text-[10px] sm:text-xs font-semibold text-white/60 uppercase tracking-wider">Action</th>
+                      <th className="text-left p-3 sm:p-4 text-[10px] sm:text-xs font-semibold text-white/60 uppercase tracking-wider">
+                        Bill No
+                      </th>
+                      <th className="text-left p-3 sm:p-4 text-[10px] sm:text-xs font-semibold text-white/60 uppercase tracking-wider">
+                        Patient
+                      </th>
+                      <th className="text-left p-3 sm:p-4 text-[10px] sm:text-xs font-semibold text-white/60 uppercase tracking-wider">
+                        Amount
+                      </th>
+                      <th className="text-left p-3 sm:p-4 text-[10px] sm:text-xs font-semibold text-white/60 uppercase tracking-wider hidden sm:table-cell">
+                        Payment
+                      </th>
+                      <th className="text-left p-3 sm:p-4 text-[10px] sm:text-xs font-semibold text-white/60 uppercase tracking-wider">
+                        Status
+                      </th>
+                      <th className="text-left p-3 sm:p-4 text-[10px] sm:text-xs font-semibold text-white/60 uppercase tracking-wider">
+                        Action
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
                     {recentBills.map((bill) => (
-                      <tr key={bill.id} className="border-b border-white/5 hover:bg-white/5 transition-colors">
+                      <tr
+                        key={bill.id}
+                        className="border-b border-white/5 hover:bg-white/5 transition-colors"
+                      >
                         <td className="p-3 sm:p-4">
-                          <span className="text-blue-400 font-medium text-xs sm:text-sm">{bill.id}</span>
+                          <span className="text-blue-400 font-medium text-xs sm:text-sm">
+                            {bill.id}
+                          </span>
                         </td>
                         <td className="p-3 sm:p-4">
                           <div className="flex items-center gap-1.5 sm:gap-2">
                             <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-gradient-to-br from-blue-400 to-indigo-500 flex items-center justify-center text-white text-[10px] sm:text-xs font-bold">
-                              {bill.patient.split(" ").map(n => n[0]).join("")}
+                              {bill.patient
+                                .split(" ")
+                                .map((n) => n[0])
+                                .join("")}
                             </div>
-                            <span className="text-white text-xs sm:text-sm truncate max-w-[80px] sm:max-w-none">{bill.patient}</span>
+                            <span className="text-white text-xs sm:text-sm truncate max-w-[80px] sm:max-w-none">
+                              {bill.patient}
+                            </span>
                           </div>
                         </td>
-                        <td className="p-3 sm:p-4 text-white font-semibold text-xs sm:text-sm">{bill.amount}</td>
+                        <td className="p-3 sm:p-4 text-white font-semibold text-xs sm:text-sm">
+                          {bill.amount}
+                        </td>
                         <td className="p-3 sm:p-4 hidden sm:table-cell">
                           <span className="bg-blue-500/10 text-blue-300 px-2 sm:px-3 py-0.5 sm:py-1 rounded-full text-[10px] sm:text-xs border border-blue-500/20">
                             {bill.payment}
@@ -313,8 +560,13 @@ const Dashboard = () => {
                         <td className="p-3 sm:p-4">
                           {bill.status === "completed" ? (
                             <span className="flex items-center gap-0.5 sm:gap-1 text-indigo-400 text-[10px] sm:text-xs">
-                              <CheckCircle2 size={10} className="sm:w-3 sm:h-3" />
-                              <span className="hidden xs:inline">Completed</span>
+                              <CheckCircle2
+                                size={10}
+                                className="sm:w-3 sm:h-3"
+                              />
+                              <span className="hidden xs:inline">
+                                Completed
+                              </span>
                             </span>
                           ) : (
                             <span className="flex items-center gap-0.5 sm:gap-1 text-yellow-400 text-[10px] sm:text-xs">
@@ -340,11 +592,18 @@ const Dashboard = () => {
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 sm:p-5 border-b border-white/10">
                 <div className="flex items-center gap-2 sm:gap-3">
                   <div className="bg-orange-500/10 p-1.5 sm:p-2 rounded-xl">
-                    <AlertTriangle size={16} className="text-orange-400 sm:w-[18px] sm:h-[18px]" />
+                    <AlertTriangle
+                      size={16}
+                      className="text-orange-400 sm:w-[18px] sm:h-[18px]"
+                    />
                   </div>
                   <div>
-                    <h2 className="text-base sm:text-lg font-semibold text-white">Low Stock Alerts</h2>
-                    <p className="text-white/50 text-[10px] sm:text-xs">Medicines requiring reorder</p>
+                    <h2 className="text-base sm:text-lg font-semibold text-white">
+                      Low Stock Alerts
+                    </h2>
+                    <p className="text-white/50 text-[10px] sm:text-xs">
+                      Medicines requiring reorder
+                    </p>
                   </div>
                 </div>
                 <Link
@@ -358,7 +617,10 @@ const Dashboard = () => {
 
               <div className="p-4 sm:p-5 space-y-3">
                 {lowStockMedicines.map((medicine) => {
-                  const percentage = getStockPercentage(medicine.stock, medicine.minStock);
+                  const percentage = getStockPercentage(
+                    medicine.stock,
+                    medicine.minStock,
+                  );
                   return (
                     <div
                       key={medicine.id}
@@ -366,8 +628,12 @@ const Dashboard = () => {
                     >
                       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-2 sm:mb-3">
                         <div>
-                          <h3 className="text-white font-semibold text-xs sm:text-sm">{medicine.name}</h3>
-                          <p className="text-white/50 text-[10px] sm:text-xs mt-0.5">{medicine.category}</p>
+                          <h3 className="text-white font-semibold text-xs sm:text-sm">
+                            {medicine.name}
+                          </h3>
+                          <p className="text-white/50 text-[10px] sm:text-xs mt-0.5">
+                            {medicine.category}
+                          </p>
                         </div>
                         <div className="bg-orange-500/10 border border-orange-500/20 text-orange-400 px-2 sm:px-3 py-1 rounded-xl text-xs sm:text-sm font-semibold self-start sm:self-auto">
                           {medicine.stock} Left
@@ -376,14 +642,18 @@ const Dashboard = () => {
                       <div className="space-y-1.5">
                         <div className="flex justify-between text-[10px] sm:text-xs">
                           <span className="text-white/60">Stock Level</span>
-                          <span className="text-white/80">{medicine.stock} / {medicine.minStock}</span>
+                          <span className="text-white/80">
+                            {medicine.stock} / {medicine.minStock}
+                          </span>
                         </div>
                         <div className="w-full bg-white/10 rounded-full h-1.5 sm:h-2">
                           <div
                             className={`h-1.5 sm:h-2 rounded-full transition-all duration-500 ${
-                              percentage < 25 ? "bg-gradient-to-r from-red-500 to-orange-500" :
-                              percentage < 50 ? "bg-gradient-to-r from-orange-500 to-yellow-500" :
-                              "bg-gradient-to-r from-blue-500 to-indigo-500"
+                              percentage < 25
+                                ? "bg-gradient-to-r from-red-500 to-orange-500"
+                                : percentage < 50
+                                  ? "bg-gradient-to-r from-orange-500 to-yellow-500"
+                                  : "bg-gradient-to-r from-blue-500 to-indigo-500"
                             }`}
                             style={{ width: `${Math.min(percentage, 100)}%` }}
                           ></div>
@@ -403,11 +673,18 @@ const Dashboard = () => {
               <div className="flex items-center justify-between p-4 sm:p-5 border-b border-white/10">
                 <div className="flex items-center gap-2 sm:gap-3">
                   <div className="bg-red-500/10 p-1.5 sm:p-2 rounded-xl">
-                    <CalendarClock size={16} className="text-red-400 sm:w-[18px] sm:h-[18px]" />
+                    <CalendarClock
+                      size={16}
+                      className="text-red-400 sm:w-[18px] sm:h-[18px]"
+                    />
                   </div>
                   <div>
-                    <h2 className="text-base sm:text-lg font-semibold text-white">Expiry Alerts</h2>
-                    <p className="text-white/50 text-[10px] sm:text-xs">Medicines nearing expiry</p>
+                    <h2 className="text-base sm:text-lg font-semibold text-white">
+                      Expiry Alerts
+                    </h2>
+                    <p className="text-white/50 text-[10px] sm:text-xs">
+                      Medicines nearing expiry
+                    </p>
                   </div>
                 </div>
                 <button className="p-1.5 sm:p-2 rounded-lg hover:bg-white/10 text-white/60 hover:text-white transition-colors">
@@ -422,15 +699,23 @@ const Dashboard = () => {
                     className="bg-white/5 border border-white/10 rounded-xl p-3 sm:p-4 hover:bg-white/10 transition-all duration-300"
                   >
                     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-2">
-                      <h3 className="text-white font-semibold text-xs sm:text-sm">{medicine.name}</h3>
-                      <span className={`text-[10px] sm:text-xs px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-full font-medium border ${getStatusColor(medicine.status)} self-start sm:self-auto`}>
+                      <h3 className="text-white font-semibold text-xs sm:text-sm">
+                        {medicine.name}
+                      </h3>
+                      <span
+                        className={`text-[10px] sm:text-xs px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-full font-medium border ${getStatusColor(medicine.status)} self-start sm:self-auto`}
+                      >
                         {medicine.status}
                       </span>
                     </div>
                     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1">
-                      <p className="text-white/60 text-[10px] sm:text-xs">Expiry: {medicine.expiry}</p>
+                      <p className="text-white/60 text-[10px] sm:text-xs">
+                        Expiry: {medicine.expiry}
+                      </p>
                       {medicine.daysLeft > 0 && (
-                        <p className="text-white/40 text-[10px] sm:text-xs">{medicine.daysLeft} days left</p>
+                        <p className="text-white/40 text-[10px] sm:text-xs">
+                          {medicine.daysLeft} days left
+                        </p>
                       )}
                     </div>
                     {medicine.status === "Expired" && (
@@ -449,11 +734,18 @@ const Dashboard = () => {
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 sm:p-5 border-b border-white/10">
                 <div className="flex items-center gap-2 sm:gap-3">
                   <div className="bg-purple-500/10 p-1.5 sm:p-2 rounded-xl">
-                    <BellRing size={16} className="text-purple-400 sm:w-[18px] sm:h-[18px]" />
+                    <BellRing
+                      size={16}
+                      className="text-purple-400 sm:w-[18px] sm:h-[18px]"
+                    />
                   </div>
                   <div>
-                    <h2 className="text-base sm:text-lg font-semibold text-white">Upcoming Reminders</h2>
-                    <p className="text-white/50 text-[10px] sm:text-xs">WhatsApp refill reminders</p>
+                    <h2 className="text-base sm:text-lg font-semibold text-white">
+                      Upcoming Reminders
+                    </h2>
+                    <p className="text-white/50 text-[10px] sm:text-xs">
+                      WhatsApp refill reminders
+                    </p>
                   </div>
                 </div>
                 <Link
@@ -473,23 +765,36 @@ const Dashboard = () => {
                   >
                     <div className="flex items-center gap-2 sm:gap-3 mb-2 sm:mb-3">
                       <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-gradient-to-br from-purple-400 to-pink-500 flex items-center justify-center text-white font-bold text-xs sm:text-sm">
-                        {reminder.patient.split(" ").map(n => n[0]).join("")}
+                        {reminder.patient
+                          .split(" ")
+                          .map((n) => n[0])
+                          .join("")}
                       </div>
                       <div>
-                        <h3 className="text-white font-semibold text-xs sm:text-sm">{reminder.patient}</h3>
-                        <p className="text-white/50 text-[10px] sm:text-xs">{reminder.phone}</p>
+                        <h3 className="text-white font-semibold text-xs sm:text-sm">
+                          {reminder.patient}
+                        </h3>
+                        <p className="text-white/50 text-[10px] sm:text-xs">
+                          {reminder.phone}
+                        </p>
                       </div>
                     </div>
                     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                       <div>
-                        <p className="text-white/80 text-xs sm:text-sm">{reminder.medicine}</p>
-                        <p className="text-white/50 text-[10px] sm:text-xs mt-0.5">Refill Reminder</p>
+                        <p className="text-white/80 text-xs sm:text-sm">
+                          {reminder.medicine}
+                        </p>
+                        <p className="text-white/50 text-[10px] sm:text-xs mt-0.5">
+                          Refill Reminder
+                        </p>
                       </div>
-                      <span className={`text-[10px] sm:text-xs px-2 sm:px-3 py-0.5 sm:py-1 rounded-full font-medium border self-start sm:self-auto ${
-                        reminder.dueDate === "Today" 
-                          ? "bg-red-500/10 text-red-400 border-red-500/20"
-                          : "bg-purple-500/10 text-purple-400 border-purple-500/20"
-                      }`}>
+                      <span
+                        className={`text-[10px] sm:text-xs px-2 sm:px-3 py-0.5 sm:py-1 rounded-full font-medium border self-start sm:self-auto ${
+                          reminder.dueDate === "Today"
+                            ? "bg-red-500/10 text-red-400 border-red-500/20"
+                            : "bg-purple-500/10 text-purple-400 border-purple-500/20"
+                        }`}
+                      >
                         Due {reminder.dueDate}
                       </span>
                     </div>
@@ -502,34 +807,62 @@ const Dashboard = () => {
             <div className="bg-white/5 backdrop-blur-md border border-white/10 rounded-xl sm:rounded-2xl p-4 sm:p-5">
               <div className="flex items-center gap-2 sm:gap-3 mb-3 sm:mb-4">
                 <div className="bg-cyan-500/10 p-1.5 sm:p-2 rounded-xl">
-                  <Activity size={16} className="text-cyan-400 sm:w-[18px] sm:h-[18px]" />
+                  <Activity
+                    size={16}
+                    className="text-cyan-400 sm:w-[18px] sm:h-[18px]"
+                  />
                 </div>
                 <div>
-                  <h2 className="text-base sm:text-lg font-semibold text-white">Quick Stats</h2>
-                  <p className="text-white/50 text-[10px] sm:text-xs">System overview</p>
+                  <h2 className="text-base sm:text-lg font-semibold text-white">
+                    Quick Stats
+                  </h2>
+                  <p className="text-white/50 text-[10px] sm:text-xs">
+                    System overview
+                  </p>
                 </div>
               </div>
               <div className="space-y-2 sm:space-y-3">
                 <div className="flex items-center justify-between py-1.5 sm:py-2 border-b border-white/5">
                   <div className="flex items-center gap-1.5 sm:gap-2">
-                    <Package size={12} className="text-blue-400 sm:w-3.5 sm:h-3.5" />
-                    <span className="text-white/80 text-xs sm:text-sm">Total Products</span>
+                    <Package
+                      size={12}
+                      className="text-blue-400 sm:w-3.5 sm:h-3.5"
+                    />
+                    <span className="text-white/80 text-xs sm:text-sm">
+                      Total Products
+                    </span>
                   </div>
-                  <span className="text-white font-semibold text-xs sm:text-sm">2,847</span>
+                  <span className="text-white font-semibold text-xs sm:text-sm">
+                    {totalProducts}
+                  </span>
                 </div>
                 <div className="flex items-center justify-between py-1.5 sm:py-2 border-b border-white/5">
                   <div className="flex items-center gap-1.5 sm:gap-2">
-                    <Users size={12} className="text-blue-400 sm:w-3.5 sm:h-3.5" />
-                    <span className="text-white/80 text-xs sm:text-sm">Active Patients</span>
+                    <Users
+                      size={12}
+                      className="text-blue-400 sm:w-3.5 sm:h-3.5"
+                    />
+                    <span className="text-white/80 text-xs sm:text-sm">
+                      Active Patients
+                    </span>
                   </div>
-                  <span className="text-white font-semibold text-xs sm:text-sm">1,234</span>
+                  <span className="text-white font-semibold text-xs sm:text-sm">
+                    {activePatients}
+                  </span>
                 </div>
                 <div className="flex items-center justify-between py-1.5 sm:py-2">
                   <div className="flex items-center gap-1.5 sm:gap-2">
-                    <Receipt size={12} className="text-blue-400 sm:w-3.5 sm:h-3.5" />
-                    <span className="text-white/80 text-xs sm:text-sm">Monthly Revenue</span>
+                    <Receipt
+                      size={12}
+                      className="text-blue-400 sm:w-3.5 sm:h-3.5"
+                    />
+                    <span className="text-white/80 text-xs sm:text-sm">
+                      Monthly Revenue
+                    </span>
                   </div>
-                  <span className="text-white font-semibold text-xs sm:text-sm">₹7.2L</span>
+                  <span className="text-white font-semibold text-xs sm:text-sm">
+                    ₹{monthlyRevenue.toLocaleString()}
+                  </span>
                 </div>
               </div>
             </div>
@@ -537,7 +870,7 @@ const Dashboard = () => {
         </div>
       </div>
 
-      <style jsx>{`
+      <style>{`
         @keyframes blob {
           0%, 100% { transform: translate(0px, 0px) scale(1); }
           33% { transform: translate(30px, -50px) scale(1.1); }

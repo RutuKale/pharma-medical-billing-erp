@@ -1,4 +1,5 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
+import axios from "axios";
 import {
   AlertTriangle,
   Search,
@@ -22,70 +23,49 @@ import {
 } from "lucide-react";
 import { Link } from "react-router-dom";
 
-const medicinesData = [
-  {
-    id: 1,
-    name: "Paracetamol 500mg",
-    batch: "PCM101",
-    stock: 120,
-    expiryDate: "2026-01-15",
-    manufacturer: "Micro Labs",
-    category: "Tablet",
-    purchasePrice: 25,
-    sellingPrice: 35,
-  },
-  {
-    id: 2,
-    name: "Azithromycin",
-    batch: "AZ220",
-    stock: 25,
-    expiryDate: "2025-06-10",
-    manufacturer: "Cipla",
-    category: "Antibiotic",
-    purchasePrice: 85,
-    sellingPrice: 120,
-  },
-  {
-    id: 3,
-    name: "Vitamin D Capsules",
-    batch: "VD100",
-    stock: 12,
-    expiryDate: "2025-05-18",
-    manufacturer: "Torrent",
-    category: "Vitamin",
-    purchasePrice: 140,
-    sellingPrice: 180,
-  },
-  {
-    id: 4,
-    name: "Amoxicillin",
-    batch: "AMX500",
-    stock: 8,
-    expiryDate: "2025-08-22",
-    manufacturer: "Sun Pharma",
-    category: "Antibiotic",
-    purchasePrice: 70,
-    sellingPrice: 95,
-  },
-  {
-    id: 5,
-    name: "Cough Syrup",
-    batch: "CS101",
-    stock: 30,
-    expiryDate: "2025-05-01",
-    manufacturer: "Mankind",
-    category: "Syrup",
-    purchasePrice: 85,
-    sellingPrice: 110,
-  },
-];
-
 const ExpiryAlerts = () => {
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("All");
   const [showFilters, setShowFilters] = useState(false);
   const [selectedMedicine, setSelectedMedicine] = useState(null);
   const [showModal, setShowModal] = useState(false);
+  const [medicinesData, setMedicinesData] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    fetchMedicines();
+  }, []);
+
+  const fetchMedicines = async () => {
+    try {
+      setLoading(true);
+
+      const response = await axios.get("http://localhost:5000/api/medicines");
+
+      // map backend data according to UI structure
+      const medicines = response?.data?.data || [];
+
+      const formattedData = medicines.map((medicine) => ({
+        id: medicine._id,
+        name: medicine.medicine_name,
+        batch: medicine.batch_number,
+        stock: medicine.stock_quantity,
+        expiryDate: medicine.expiry_date,
+        manufacturer: medicine.manufacturer,
+        category: medicine.category,
+        purchasePrice: Number(medicine.purchase_price),
+        sellingPrice: Number(medicine.selling_price),
+      }));
+
+      setMedicinesData(formattedData);
+    } catch (err) {
+      console.error(err);
+      setError("Failed to fetch medicines");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // CALCULATE STATUS
   const getMedicineStatus = (expiryDate) => {
@@ -148,9 +128,9 @@ const ExpiryAlerts = () => {
         const status = getMedicineStatus(medicine.expiryDate);
 
         const matchesSearch =
-          medicine.name.toLowerCase().includes(search.toLowerCase()) ||
-          medicine.batch.toLowerCase().includes(search.toLowerCase()) ||
-          medicine.manufacturer.toLowerCase().includes(search.toLowerCase());
+          medicine.name?.toLowerCase().includes(search.toLowerCase()) ||
+          medicine.batch?.toLowerCase().includes(search.toLowerCase()) ||
+          medicine.manufacturer?.toLowerCase().includes(search.toLowerCase());
 
         const matchesFilter = filter === "All" || status.label === filter;
 
@@ -161,20 +141,35 @@ const ExpiryAlerts = () => {
         const daysB = getDaysRemaining(b.expiryDate);
         return daysA - daysB;
       });
-  }, [search, filter]);
+  }, [medicinesData, search, filter]);
 
   // STATS
   const stats = {
     total: medicinesData.length,
-    expired: medicinesData.filter((m) => getMedicineStatus(m.expiryDate).label === "Expired").length,
-    critical: medicinesData.filter((m) => getMedicineStatus(m.expiryDate).label === "Critical").length,
-    warning: medicinesData.filter((m) => getMedicineStatus(m.expiryDate).label === "Warning").length,
-    safe: medicinesData.filter((m) => getMedicineStatus(m.expiryDate).label === "Safe").length,
-    totalValue: medicinesData.reduce((sum, m) => sum + m.stock * m.purchasePrice, 0),
+    expired: medicinesData.filter(
+      (m) => getMedicineStatus(m.expiryDate).label === "Expired",
+    ).length,
+    critical: medicinesData.filter(
+      (m) => getMedicineStatus(m.expiryDate).label === "Critical",
+    ).length,
+    warning: medicinesData.filter(
+      (m) => getMedicineStatus(m.expiryDate).label === "Warning",
+    ).length,
+    safe: medicinesData.filter(
+      (m) => getMedicineStatus(m.expiryDate).label === "Safe",
+    ).length,
+    totalValue: medicinesData.reduce(
+      (sum, m) => sum + m.stock * m.purchasePrice,
+      0,
+    ),
     atRiskValue: medicinesData
       .filter((m) => {
         const status = getMedicineStatus(m.expiryDate);
-        return status.label === "Critical" || status.label === "Warning" || status.label === "Expired";
+        return (
+          status.label === "Critical" ||
+          status.label === "Warning" ||
+          status.label === "Expired"
+        );
       })
       .reduce((sum, m) => sum + m.stock * m.purchasePrice, 0),
   };
@@ -195,7 +190,9 @@ const ExpiryAlerts = () => {
   };
 
   const StatusBadge = ({ status }) => (
-    <span className={`px-3 py-1 rounded-full text-xs font-semibold border ${status.color}`}>
+    <span
+      className={`px-3 py-1 rounded-full text-xs font-semibold border ${status.color}`}
+    >
       {status.label}
     </span>
   );
@@ -207,6 +204,22 @@ const ExpiryAlerts = () => {
     { value: "Warning", label: "Warning (31-90 days)", color: "yellow" },
     { value: "Safe", label: "Safe (>90 days)", color: "green" },
   ];
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-900 text-white">
+        Loading medicines...
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-900 text-red-400">
+        {error}
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
@@ -255,10 +268,17 @@ const ExpiryAlerts = () => {
             <Calendar size={14} className="text-amber-400" />
           </div>
           <div>
-            <p className="text-white text-xs font-medium">Expiry Management System</p>
-            <p className="text-amber-300/70 text-xs">Real-time tracking • Automatic alerts • Compliance ready</p>
+            <p className="text-white text-xs font-medium">
+              Expiry Management System
+            </p>
+            <p className="text-amber-300/70 text-xs">
+              Real-time tracking • Automatic alerts • Compliance ready
+            </p>
           </div>
-          <Sparkles size={14} className="text-amber-400 ml-auto animate-pulse" />
+          <Sparkles
+            size={14}
+            className="text-amber-400 ml-auto animate-pulse"
+          />
         </div>
 
         {/* STATS CARDS */}
@@ -267,7 +287,9 @@ const ExpiryAlerts = () => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-gray-400 text-xs">Total Products</p>
-                <h2 className="text-2xl font-bold text-white mt-1">{stats.total}</h2>
+                <h2 className="text-2xl font-bold text-white mt-1">
+                  {stats.total}
+                </h2>
               </div>
               <div className="p-2 rounded-lg bg-white/10">
                 <Package size={18} className="text-gray-400" />
@@ -279,7 +301,9 @@ const ExpiryAlerts = () => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-gray-400 text-xs">Expired</p>
-                <h2 className="text-2xl font-bold text-red-400 mt-1">{stats.expired}</h2>
+                <h2 className="text-2xl font-bold text-red-400 mt-1">
+                  {stats.expired}
+                </h2>
               </div>
               <div className="p-2 rounded-lg bg-red-500/20">
                 <XCircle size={18} className="text-red-400" />
@@ -291,7 +315,9 @@ const ExpiryAlerts = () => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-gray-400 text-xs">Critical (≤30d)</p>
-                <h2 className="text-2xl font-bold text-orange-400 mt-1">{stats.critical}</h2>
+                <h2 className="text-2xl font-bold text-orange-400 mt-1">
+                  {stats.critical}
+                </h2>
               </div>
               <div className="p-2 rounded-lg bg-orange-500/20">
                 <AlertTriangle size={18} className="text-orange-400" />
@@ -303,7 +329,9 @@ const ExpiryAlerts = () => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-gray-400 text-xs">Warning (31-90d)</p>
-                <h2 className="text-2xl font-bold text-yellow-400 mt-1">{stats.warning}</h2>
+                <h2 className="text-2xl font-bold text-yellow-400 mt-1">
+                  {stats.warning}
+                </h2>
               </div>
               <div className="p-2 rounded-lg bg-yellow-500/20">
                 <CalendarClock size={18} className="text-yellow-400" />
@@ -315,7 +343,9 @@ const ExpiryAlerts = () => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-gray-400 text-xs">Safe (&gt;90d)</p>
-                <h2 className="text-2xl font-bold text-green-400 mt-1">{stats.safe}</h2>
+                <h2 className="text-2xl font-bold text-green-400 mt-1">
+                  {stats.safe}
+                </h2>
               </div>
               <div className="p-2 rounded-lg bg-green-500/20">
                 <ShieldCheck size={18} className="text-green-400" />
@@ -346,7 +376,9 @@ const ExpiryAlerts = () => {
           >
             <div className="flex items-center gap-2">
               <Filter size={16} className="text-orange-400" />
-              <span className="text-gray-300 font-medium">Filters & Search</span>
+              <span className="text-gray-300 font-medium">
+                Filters & Search
+              </span>
               <span className="text-xs text-gray-500">
                 ({filteredMedicines.length} medicines)
               </span>
@@ -360,12 +392,17 @@ const ExpiryAlerts = () => {
 
           <div
             className={`transition-all duration-300 ${
-              showFilters ? "p-5 pt-0 border-t border-white/10" : "max-h-0 hidden"
+              showFilters
+                ? "p-5 pt-0 border-t border-white/10"
+                : "max-h-0 hidden"
             }`}
           >
             <div className="flex flex-col lg:flex-row gap-4">
               <div className="relative flex-1">
-                <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
+                <Search
+                  size={18}
+                  className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500"
+                />
                 <input
                   type="text"
                   placeholder="Search medicine, batch or manufacturer..."
@@ -400,14 +437,30 @@ const ExpiryAlerts = () => {
             <table className="w-full min-w-[1000px]">
               <thead className="bg-white/10 border-b border-white/10">
                 <tr>
-                  <th className="text-left p-4 text-sm font-semibold text-gray-300">Medicine</th>
-                  <th className="text-left p-4 text-sm font-semibold text-gray-300">Manufacturer</th>
-                  <th className="text-left p-4 text-sm font-semibold text-gray-300">Batch</th>
-                  <th className="text-left p-4 text-sm font-semibold text-gray-300">Stock</th>
-                  <th className="text-left p-4 text-sm font-semibold text-gray-300">Expiry Date</th>
-                  <th className="text-left p-4 text-sm font-semibold text-gray-300">Days Left</th>
-                  <th className="text-left p-4 text-sm font-semibold text-gray-300">Status</th>
-                  <th className="text-left p-4 text-sm font-semibold text-gray-300">Actions</th>
+                  <th className="text-left p-4 text-sm font-semibold text-gray-300">
+                    Medicine
+                  </th>
+                  <th className="text-left p-4 text-sm font-semibold text-gray-300">
+                    Manufacturer
+                  </th>
+                  <th className="text-left p-4 text-sm font-semibold text-gray-300">
+                    Batch
+                  </th>
+                  <th className="text-left p-4 text-sm font-semibold text-gray-300">
+                    Stock
+                  </th>
+                  <th className="text-left p-4 text-sm font-semibold text-gray-300">
+                    Expiry Date
+                  </th>
+                  <th className="text-left p-4 text-sm font-semibold text-gray-300">
+                    Days Left
+                  </th>
+                  <th className="text-left p-4 text-sm font-semibold text-gray-300">
+                    Status
+                  </th>
+                  <th className="text-left p-4 text-sm font-semibold text-gray-300">
+                    Actions
+                  </th>
                 </tr>
               </thead>
 
@@ -417,32 +470,49 @@ const ExpiryAlerts = () => {
                   const daysRemaining = getDaysRemaining(medicine.expiryDate);
 
                   return (
-                    <tr key={medicine.id} className={`border-b border-white/10 hover:bg-white/10 transition-all duration-200 ${status.row}`}>
+                    <tr
+                      key={medicine.id}
+                      className={`border-b border-white/10 hover:bg-white/10 transition-all duration-200 ${status.row}`}
+                    >
                       <td className="p-4">
                         <div>
-                          <h3 className="font-semibold text-white">{medicine.name}</h3>
-                          <p className="text-xs text-gray-500 mt-0.5">{medicine.category}</p>
+                          <h3 className="font-semibold text-white">
+                            {medicine.name}
+                          </h3>
+                          <p className="text-xs text-gray-500 mt-0.5">
+                            {medicine.category}
+                          </p>
                         </div>
                       </td>
-                      <td className="p-4 text-gray-300">{medicine.manufacturer}</td>
-                      <td className="p-4 font-mono text-sm text-gray-400">{medicine.batch}</td>
-                      <td className="p-4">
-                        <span className="font-semibold text-white">{medicine.stock}</span>
+                      <td className="p-4 text-gray-300">
+                        {medicine.manufacturer}
                       </td>
-                      <td className="p-4 text-gray-300">{medicine.expiryDate}</td>
+                      <td className="p-4 font-mono text-sm text-gray-400">
+                        {medicine.batch}
+                      </td>
+                      <td className="p-4">
+                        <span className="font-semibold text-white">
+                          {medicine.stock}
+                        </span>
+                      </td>
+                      <td className="p-4 text-gray-300">
+                        {medicine.expiryDate}
+                      </td>
                       <td className="p-4">
                         <span
                           className={`font-medium ${
                             daysRemaining < 0
                               ? "text-red-400"
                               : daysRemaining <= 30
-                              ? "text-orange-400"
-                              : daysRemaining <= 90
-                              ? "text-yellow-400"
-                              : "text-green-400"
+                                ? "text-orange-400"
+                                : daysRemaining <= 90
+                                  ? "text-yellow-400"
+                                  : "text-green-400"
                           }`}
                         >
-                          {daysRemaining < 0 ? "Expired" : `${daysRemaining} days`}
+                          {daysRemaining < 0
+                            ? "Expired"
+                            : `${daysRemaining} days`}
                         </span>
                       </td>
                       <td className="p-4">
@@ -489,7 +559,9 @@ const ExpiryAlerts = () => {
               <div className="inline-flex items-center justify-center p-4 bg-white/10 rounded-full mb-4">
                 <ShieldCheck size={32} className="text-gray-500" />
               </div>
-              <p className="text-gray-400">No medicines found matching your criteria</p>
+              <p className="text-gray-400">
+                No medicines found matching your criteria
+              </p>
               <button
                 onClick={() => {
                   setSearch("");
@@ -514,27 +586,35 @@ const ExpiryAlerts = () => {
             <div className="border border-red-500/20 rounded-xl p-4 bg-red-500/5">
               <div className="flex items-center gap-2 mb-3">
                 <div className="w-2 h-2 bg-red-400 rounded-full"></div>
-                <span className="text-red-400 font-medium text-sm">Expired</span>
+                <span className="text-red-400 font-medium text-sm">
+                  Expired
+                </span>
               </div>
               <p className="text-sm text-gray-400">
-                Already past expiry date. Automatically blocked from sale and billing.
+                Already past expiry date. Automatically blocked from sale and
+                billing.
               </p>
             </div>
 
             <div className="border border-orange-500/20 rounded-xl p-4 bg-orange-500/5">
               <div className="flex items-center gap-2 mb-3">
                 <div className="w-2 h-2 bg-orange-400 rounded-full"></div>
-                <span className="text-orange-400 font-medium text-sm">Critical (≤30 days)</span>
+                <span className="text-orange-400 font-medium text-sm">
+                  Critical (≤30 days)
+                </span>
               </div>
               <p className="text-sm text-gray-400">
-                Expiring within next 30 days. Priority for returns or promotions.
+                Expiring within next 30 days. Priority for returns or
+                promotions.
               </p>
             </div>
 
             <div className="border border-yellow-500/20 rounded-xl p-4 bg-yellow-500/5">
               <div className="flex items-center gap-2 mb-3">
                 <div className="w-2 h-2 bg-yellow-400 rounded-full"></div>
-                <span className="text-yellow-400 font-medium text-sm">Warning (31-90 days)</span>
+                <span className="text-yellow-400 font-medium text-sm">
+                  Warning (31-90 days)
+                </span>
               </div>
               <p className="text-sm text-gray-400">
                 Expiring within 31-90 days. Monitor and plan for stock movement.
@@ -544,10 +624,13 @@ const ExpiryAlerts = () => {
             <div className="border border-green-500/20 rounded-xl p-4 bg-green-500/5">
               <div className="flex items-center gap-2 mb-3">
                 <div className="w-2 h-2 bg-green-400 rounded-full"></div>
-                <span className="text-green-400 font-medium text-sm">Safe (&gt;90 days)</span>
+                <span className="text-green-400 font-medium text-sm">
+                  Safe (&gt;90 days)
+                </span>
               </div>
               <p className="text-sm text-gray-400">
-                More than 90 days remaining. Regular stock with no immediate concern.
+                More than 90 days remaining. Regular stock with no immediate
+                concern.
               </p>
             </div>
           </div>
@@ -556,11 +639,22 @@ const ExpiryAlerts = () => {
 
       {/* DETAIL MODAL */}
       {showModal && selectedMedicine && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm" onClick={() => setShowModal(false)}>
-          <div className="bg-slate-800 rounded-2xl max-w-md w-full border border-white/20 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm"
+          onClick={() => setShowModal(false)}
+        >
+          <div
+            className="bg-slate-800 rounded-2xl max-w-md w-full border border-white/20 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="border-b border-white/10 p-5 flex justify-between items-center">
-              <h3 className="text-lg font-semibold text-white">Medicine Details</h3>
-              <button onClick={() => setShowModal(false)} className="p-1 rounded-lg hover:bg-white/10">
+              <h3 className="text-lg font-semibold text-white">
+                Medicine Details
+              </h3>
+              <button
+                onClick={() => setShowModal(false)}
+                className="p-1 rounded-lg hover:bg-white/10"
+              >
                 <XCircle size={18} className="text-gray-400" />
               </button>
             </div>
@@ -568,7 +662,9 @@ const ExpiryAlerts = () => {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <p className="text-xs text-gray-400">Medicine Name</p>
-                  <p className="text-white font-medium mt-1">{selectedMedicine.name}</p>
+                  <p className="text-white font-medium mt-1">
+                    {selectedMedicine.name}
+                  </p>
                 </div>
                 <div>
                   <p className="text-xs text-gray-400">Category</p>
@@ -576,34 +672,52 @@ const ExpiryAlerts = () => {
                 </div>
                 <div>
                   <p className="text-xs text-gray-400">Batch Number</p>
-                  <p className="text-white font-mono text-sm mt-1">{selectedMedicine.batch}</p>
+                  <p className="text-white font-mono text-sm mt-1">
+                    {selectedMedicine.batch}
+                  </p>
                 </div>
                 <div>
                   <p className="text-xs text-gray-400">Manufacturer</p>
-                  <p className="text-white mt-1">{selectedMedicine.manufacturer}</p>
+                  <p className="text-white mt-1">
+                    {selectedMedicine.manufacturer}
+                  </p>
                 </div>
                 <div>
                   <p className="text-xs text-gray-400">Current Stock</p>
-                  <p className="text-white font-semibold mt-1">{selectedMedicine.stock} units</p>
+                  <p className="text-white font-semibold mt-1">
+                    {selectedMedicine.stock} units
+                  </p>
                 </div>
                 <div>
                   <p className="text-xs text-gray-400">Expiry Date</p>
-                  <p className="text-white mt-1">{selectedMedicine.expiryDate}</p>
+                  <p className="text-white mt-1">
+                    {selectedMedicine.expiryDate}
+                  </p>
                 </div>
                 <div>
                   <p className="text-xs text-gray-400">Purchase Price</p>
-                  <p className="text-white mt-1">₹{selectedMedicine.purchasePrice}</p>
+                  <p className="text-white mt-1">
+                    ₹{selectedMedicine.purchasePrice}
+                  </p>
                 </div>
                 <div>
                   <p className="text-xs text-gray-400">Selling Price</p>
-                  <p className="text-white mt-1">₹{selectedMedicine.sellingPrice}</p>
+                  <p className="text-white mt-1">
+                    ₹{selectedMedicine.sellingPrice}
+                  </p>
                 </div>
               </div>
               <div className="pt-4 border-t border-white/10 flex gap-3">
-                <button onClick={() => handleReturn(selectedMedicine)} className="flex-1 bg-blue-500/20 text-blue-400 py-2 rounded-lg hover:bg-blue-500/30 transition-colors">
+                <button
+                  onClick={() => handleReturn(selectedMedicine)}
+                  className="flex-1 bg-blue-500/20 text-blue-400 py-2 rounded-lg hover:bg-blue-500/30 transition-colors"
+                >
                   Return Stock
                 </button>
-                <button onClick={() => handleWriteOff(selectedMedicine)} className="flex-1 bg-red-500/20 text-red-400 py-2 rounded-lg hover:bg-red-500/30 transition-colors">
+                <button
+                  onClick={() => handleWriteOff(selectedMedicine)}
+                  className="flex-1 bg-red-500/20 text-red-400 py-2 rounded-lg hover:bg-red-500/30 transition-colors"
+                >
                   Write Off
                 </button>
               </div>

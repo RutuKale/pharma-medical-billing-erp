@@ -1,4 +1,5 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
+import axios from "axios";
 import {
   BarChart3,
   IndianRupee,
@@ -31,66 +32,129 @@ import {
   Line,
 } from "recharts";
 
-const salesData = [
-  { day: "Mon", sales: 12000 },
-  { day: "Tue", sales: 18500 },
-  { day: "Wed", sales: 15000 },
-  { day: "Thu", sales: 21000 },
-  { day: "Fri", sales: 24500 },
-  { day: "Sat", sales: 28000 },
-  { day: "Sun", sales: 19500 },
-];
-
-const categorySales = [
-  { name: "Tablets", value: 45 },
-  { name: "Syrups", value: 20 },
-  { name: "Capsules", value: 18 },
-  { name: "Injection", value: 10 },
-  { name: "Others", value: 7 },
-];
-
-const topMedicines = [
-  { id: 1, medicine: "Paracetamol 500mg", sold: 420, revenue: 14700 },
-  { id: 2, medicine: "Azithromycin", sold: 180, revenue: 21600 },
-  { id: 3, medicine: "Vitamin D Capsules", sold: 125, revenue: 22500 },
-  { id: 4, medicine: "BP Tablets", sold: 300, revenue: 18000 },
-];
-
-const lowStockData = [
-  { id: 1, medicine: "Amoxicillin", stock: 5 },
-  { id: 2, medicine: "Vitamin C Syrup", stock: 3 },
-  { id: 3, medicine: "Insulin Injection", stock: 2 },
-];
-
-const expiryData = [
-  { id: 1, medicine: "Dolo 650", expiry: "2026-06-15" },
-  { id: 2, medicine: "Cough Syrup", expiry: "2026-06-20" },
-  { id: 3, medicine: "Vitamin B12", expiry: "2026-07-01" },
-];
-
 const COLORS = ["#2563eb", "#16a34a", "#ca8a04", "#9333ea", "#dc2626"];
 
 const Reports = () => {
   const [search, setSearch] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 5;
+  const [salesData, setSalesData] = useState([]);
+  const [categorySales, setCategorySales] = useState([]);
+  const [topMedicines, setTopMedicines] = useState([]);
+  const [lowStockData, setLowStockData] = useState([]);
+  const [expiryData, setExpiryData] = useState([]);
+
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    fetchReportsData();
+  }, []);
+
+  const fetchReportsData = async () => {
+    try {
+      setLoading(true);
+
+      const [medicinesRes, billsRes] = await Promise.all([
+        axios.get("http://localhost:5000/api/medicines"),
+        axios.get("http://localhost:5000/api/bills"),
+      ]);
+
+      const medicines = medicinesRes?.data?.data || [];
+
+      const bills = billsRes?.data?.data || [];
+
+      // Weekly Sales Data
+      const weeklySales = [
+        { day: "Mon", sales: 12000 },
+        { day: "Tue", sales: 18500 },
+        { day: "Wed", sales: 15000 },
+        { day: "Thu", sales: 21000 },
+        { day: "Fri", sales: 24500 },
+        { day: "Sat", sales: 28000 },
+        { day: "Sun", sales: 19500 },
+      ];
+
+      setSalesData(weeklySales);
+
+      // Category Sales
+      const categoryMap = {};
+
+      medicines.forEach((med) => {
+        const category = med.category || "Others";
+
+        if (!categoryMap[category]) {
+          categoryMap[category] = 0;
+        }
+
+        categoryMap[category] += 1;
+      });
+
+      const categoryArray = Object.keys(categoryMap).map((key) => ({
+        name: key,
+        value: categoryMap[key],
+      }));
+
+      setCategorySales(categoryArray);
+
+      // Top Medicines
+      const topMeds = medicines.slice(0, 10).map((med) => ({
+        id: med._id,
+        medicine: med.medicine_name,
+        sold: med.stock_quantity || 0,
+        revenue: (med.stock_quantity || 0) * (Number(med.selling_price) || 0),
+      }));
+
+      setTopMedicines(topMeds);
+
+      // Low Stock
+      const lowStock = medicines
+        .filter((med) => med.stock_quantity <= 10)
+        .map((med) => ({
+          id: med._id,
+          medicine: med.medicine_name,
+          stock: med.stock_quantity,
+        }));
+
+      setLowStockData(lowStock);
+
+      // Expiry Alerts
+      const expiry = medicines
+        .filter((med) => med.expiry_date)
+        .map((med) => ({
+          id: med._id,
+          medicine: med.medicine_name,
+          expiry: med.expiry_date,
+        }));
+
+      setExpiryData(expiry);
+    } catch (err) {
+      console.error(err);
+      setError("Failed to fetch reports data");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const filteredMedicines = useMemo(() => {
     return topMedicines.filter((item) =>
-      item.medicine.toLowerCase().includes(search.toLowerCase())
+      item.medicine.toLowerCase().includes(search.toLowerCase()),
     );
-  }, [search]);
+  }, [topMedicines, search]);
 
   // Pagination
   const totalPages = Math.ceil(filteredMedicines.length / itemsPerPage);
   const paginatedMedicines = filteredMedicines.slice(
     (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage
+    currentPage * itemsPerPage,
   );
 
   const stats = {
-    totalSales: 138500,
-    totalBills: 284,
+    totalSales: salesData.reduce(
+      (sum, item) => sum + (Number(item.sales) || 0),
+      0,
+    ),
+    totalBills: topMedicines.length,
     lowStock: lowStockData.length,
     expiringSoon: expiryData.length,
   };
@@ -109,6 +173,22 @@ const Reports = () => {
     }
     return null;
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-900 text-white">
+        Loading reports...
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-900 text-red-400">
+        {error}
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-950 to-slate-900">
@@ -230,8 +310,8 @@ const Reports = () => {
               </div>
             </div>
             <div className="p-6">
-              <div className="h-[320px]">
-                <ResponsiveContainer width="100%" height="100%">
+              <div className="w-full min-w-0 h-[320px]">
+                <ResponsiveContainer width="99%" height={320}>
                   <BarChart data={salesData}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
                     <XAxis dataKey="day" stroke="#94a3b8" />
@@ -243,7 +323,13 @@ const Reports = () => {
                       fill="url(#barGradient)"
                     />
                     <defs>
-                      <linearGradient id="barGradient" x1="0" y1="0" x2="0" y2="1">
+                      <linearGradient
+                        id="barGradient"
+                        x1="0"
+                        y1="0"
+                        x2="0"
+                        y2="1"
+                      >
                         <stop offset="0%" stopColor="#10b981" />
                         <stop offset="100%" stopColor="#059669" />
                       </linearGradient>
@@ -267,22 +353,22 @@ const Reports = () => {
               </div>
             </div>
             <div className="p-6">
-              <div className="h-[320px]">
-                <ResponsiveContainer width="100%" height="100%">
+              <div className="w-full min-w-0 h-[320px]">
+                <ResponsiveContainer width="99%" height={320}>
                   <PieChart>
                     <Pie
                       data={categorySales}
                       dataKey="value"
                       nameKey="name"
                       outerRadius={110}
-                      label={({ name, percent }) => 
+                      label={({ name, percent }) =>
                         `${name} ${(percent * 100).toFixed(0)}%`
                       }
                       labelLine={false}
                     >
                       {categorySales.map((entry, index) => (
                         <Cell
-                          key={index}
+                          key={`${entry.name}-${index}`}
                           fill={COLORS[index % COLORS.length]}
                           className="cursor-pointer hover:opacity-80 transition-opacity"
                         />
@@ -310,14 +396,12 @@ const Reports = () => {
               <div className="bg-blue-500/20 p-2 rounded-xl">
                 <Calendar size={20} className="text-blue-400" />
               </div>
-              <h2 className="text-lg font-semibold text-white">
-                Sales Trend
-              </h2>
+              <h2 className="text-lg font-semibold text-white">Sales Trend</h2>
             </div>
           </div>
           <div className="p-6">
-            <div className="h-[320px]">
-              <ResponsiveContainer width="100%" height="100%">
+            <div className="w-full min-w-0 h-[320px]">
+              <ResponsiveContainer width="99%" height={320}>
                 <LineChart data={salesData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
                   <XAxis dataKey="day" stroke="#94a3b8" />
@@ -352,7 +436,10 @@ const Reports = () => {
                   </p>
                 </div>
                 <div className="relative w-full lg:w-72">
-                  <Search size={18} className="absolute left-3 top-3 text-gray-400" />
+                  <Search
+                    size={18}
+                    className="absolute left-3 top-3 text-gray-400"
+                  />
                   <input
                     type="text"
                     placeholder="Search medicine..."
@@ -385,7 +472,7 @@ const Reports = () => {
                 <tbody>
                   {paginatedMedicines.map((item) => (
                     <tr
-                      key={item.id}
+                      key={`${item.id}-${item.medicine}`}
                       className="border-b border-white/5 hover:bg-white/5 transition-colors"
                     >
                       <td className="p-4 font-medium text-white">
@@ -394,7 +481,7 @@ const Reports = () => {
                       <td className="p-4 text-gray-300">{item.sold}</td>
                       <td className="p-4 font-semibold text-green-400">
                         ₹{item.revenue.toLocaleString()}
-                       </td>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -413,12 +500,17 @@ const Reports = () => {
               <div className="border-t border-white/10 px-6 py-4 flex items-center justify-between">
                 <p className="text-sm text-gray-400">
                   Showing {(currentPage - 1) * itemsPerPage + 1} to{" "}
-                  {Math.min(currentPage * itemsPerPage, filteredMedicines.length)} of{" "}
-                  {filteredMedicines.length} entries
+                  {Math.min(
+                    currentPage * itemsPerPage,
+                    filteredMedicines.length,
+                  )}{" "}
+                  of {filteredMedicines.length} entries
                 </p>
                 <div className="flex gap-2">
                   <button
-                    onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+                    onClick={() =>
+                      setCurrentPage((prev) => Math.max(prev - 1, 1))
+                    }
                     disabled={currentPage === 1}
                     className="p-2 rounded-lg bg-slate-800/50 border border-white/10 text-white hover:bg-white/5 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                   >
@@ -459,7 +551,7 @@ const Reports = () => {
                 <div className="space-y-4">
                   {lowStockData.map((item) => (
                     <div
-                      key={item.id}
+                      key={`${item.id}-${item.medicine}`}
                       className="border border-white/10 rounded-xl p-4 hover:bg-white/5 transition-colors group"
                     >
                       <h3 className="font-semibold text-white group-hover:text-orange-400 transition-colors">
@@ -498,11 +590,12 @@ const Reports = () => {
                 <div className="space-y-4">
                   {expiryData.map((item) => {
                     const daysUntilExpiry = Math.ceil(
-                      (new Date(item.expiry) - new Date()) / (1000 * 60 * 60 * 24)
+                      (new Date(item.expiry) - new Date()) /
+                        (1000 * 60 * 60 * 24),
                     );
                     return (
                       <div
-                        key={item.id}
+                        key={`${item.id}-${item.medicine}`}
                         className="border border-white/10 rounded-xl p-4 hover:bg-white/5 transition-colors group"
                       >
                         <h3 className="font-semibold text-white group-hover:text-red-400 transition-colors">
