@@ -1,3 +1,6 @@
+import dotenv from "dotenv";
+dotenv.config();
+
 const app = require("./app");
 
 const pool = require("./config/db");
