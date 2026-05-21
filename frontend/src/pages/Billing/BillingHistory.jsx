@@ -16,10 +16,7 @@ import {
   ChevronLeft,
   ChevronRight,
 } from "lucide-react";
-
-import axios from "axios";
-
-const API_BASE = "http://localhost:5000/api";
+import API from "../../utils/api";
 
 const BillingHistory = () => {
   const [search, setSearch] = useState("");
@@ -36,7 +33,7 @@ const BillingHistory = () => {
   const fetchBills = async () => {
     setLoading(true);
     try {
-      const res = await axios.get(`${API_BASE}/bills`);
+      const res = await API.get(`/bills`);
       if (res.data?.success) {
         // map backend fields to front-end friendly shape if needed
         const mapped = res.data.data.map((b) => ({
@@ -90,7 +87,7 @@ const BillingHistory = () => {
 
   const viewBill = async (bill) => {
     try {
-      const res = await axios.get(`${API_BASE}/bills/${bill.id}`);
+      const res = await API.get(`/bills/${bill.id}`);
       if (res.data?.success) {
         setViewingBill(res.data.bill || res.data.data || bill);
         setViewingItems(res.data.items || []);
@@ -115,7 +112,7 @@ const BillingHistory = () => {
     const reason = prompt("Enter cancellation reason:");
     if (!reason) return;
     try {
-      const res = await axios.delete(`${API_BASE}/bills/${bill.id}`, {
+      const res = await API.delete(`/bills/${bill.id}`, {
         data: { reason },
       });
       if (res.data?.success) {

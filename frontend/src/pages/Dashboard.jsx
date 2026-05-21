@@ -28,6 +28,7 @@ import {
   Menu,
 } from "lucide-react";
 import { Link } from "react-router-dom";
+import API from "../utils/api";
 
 const Dashboard = () => {
   const [currentTime, setCurrentTime] = useState("");
@@ -86,23 +87,21 @@ const Dashboard = () => {
     try {
       setLoading(true);
 
-      const medicinesRes = await axios.get(
-        "http://localhost:5000/api/medicines",
-      );
+      const medicinesRes = await API.get("/api/medicines");
 
-      const billsRes = await axios.get("http://localhost:5000/api/bills");
+      const billsRes = await API.get("/api/bills");
 
       let patientsRes = { data: { data: [] } };
       let remindersRes = { data: { data: [] } };
 
       try {
-        patientsRes = await axios.get("http://localhost:5000/api/patients");
+        patientsRes = await API.get("/api/patients");
       } catch (err) {
         console.log("Patients API not found");
       }
 
       try {
-        remindersRes = await axios.get("http://localhost:5000/api/expiry/expired");
+        remindersRes = await API.get("/api/bills");
       } catch (err) {
         console.log("Reminders API not found");
       }

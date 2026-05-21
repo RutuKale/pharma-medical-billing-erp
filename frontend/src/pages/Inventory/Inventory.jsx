@@ -21,11 +21,8 @@ import {
   Menu,
   X,
 } from "lucide-react";
-const API_URL = "http://localhost:5000/api/medicines";
-import axios from "axios";
 import Swal from "sweetalert2";
-
-const INVENTORY_API = "http://localhost:5000/api/inventory";
+import API from "../../utils/api";
 
 const Inventory = () => {
   const [medicinesData, setMedicinesData] = useState([]);
@@ -57,7 +54,7 @@ const Inventory = () => {
     try {
       setLoading(true);
 
-      const response = await axios.get(API_URL);
+      const response = await API.get("/api/medicines");
 
       if (response.data.success) {
         setMedicinesData(response.data.data);
@@ -71,7 +68,7 @@ const Inventory = () => {
 
   const fetchSingleMedicine = async (id) => {
     try {
-      const response = await axios.get(`${API_URL}/${id}`);
+      const response = await API.get(`/api/medicines/${id}`);
       if (response.data.success) {
         setSelectedMedicine(response.data.data);
       }
@@ -120,7 +117,7 @@ const Inventory = () => {
 
     try {
       const endpoint = stockType === "IN" ? "stock-in" : "stock-out";
-      const response = await axios.post(`${INVENTORY_API}/${endpoint}`, {
+      const response = await axios.post(`/api/inventory/${endpoint}`, {
         medicine_id: stockMedicineId,
         quantity,
         remarks: stockRemarks,
@@ -167,7 +164,7 @@ const Inventory = () => {
   if (!result.isConfirmed) return;
 
   try {
-    const response = await axios.delete(`${API_URL}/${medicineId}`);
+    const response = await API.delete(`/api/medicines/${medicineId}`);
     if (response.data.success) {
       Swal.fire({
         title: "Deleted!",

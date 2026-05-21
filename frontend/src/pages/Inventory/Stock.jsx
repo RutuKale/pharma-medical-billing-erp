@@ -1,6 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import axios from "axios";
 import {
   Package,
   Search,
@@ -17,9 +16,7 @@ import {
   Box,
   BarChart3,
 } from "lucide-react";
-
-const MEDICINES_API = "http://localhost:5000/api/medicines";
-const INVENTORY_LOG_API = "http://localhost:5000/api/inventory";
+import API from "../../utils/api";
 
 const Stock = () => {
   const [medicines, setMedicines] = useState([]);
@@ -33,8 +30,8 @@ const Stock = () => {
       setLoading(true);
       try {
         const [medicinesRes, logsRes] = await Promise.all([
-          axios.get(MEDICINES_API),
-          axios.get(INVENTORY_LOG_API),
+          API.get("/api/medicines"),
+          API.get("/api/inventory"),
         ]);
 
         if (medicinesRes.data?.success) {

@@ -1,5 +1,4 @@
 import React, { useEffect, useMemo, useState } from "react";
-import axios from "axios";
 import {
   BarChart3,
   IndianRupee,
@@ -31,6 +30,7 @@ import {
   LineChart,
   Line,
 } from "recharts";
+import API from "../../utils/api";
 
 const COLORS = ["#2563eb", "#16a34a", "#ca8a04", "#9333ea", "#dc2626"];
 
@@ -56,8 +56,8 @@ const Reports = () => {
       setLoading(true);
 
       const [medicinesRes, billsRes] = await Promise.all([
-        axios.get("http://localhost:5000/api/medicines"),
-        axios.get("http://localhost:5000/api/bills"),
+        API.get("/api/medicines"),
+        API.get("/api/bills"),
       ]);
 
       const medicines = medicinesRes?.data?.data || [];

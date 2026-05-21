@@ -21,9 +21,8 @@ import {
   X,
 } from "lucide-react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import axios from "axios";
 import Swal from "sweetalert2";
-const API_URL = "http://localhost:5000/api/medicines";
+import API from "../../utils/api";
 
 const InputField = ({
   label,
@@ -312,8 +311,8 @@ const AddMedicines = () => {
 
       // EDIT MODE → PUT
       if (editMode) {
-        response = await axios.put(
-          `http://localhost:5000/api/medicines/${medicineData.medicine_id}`,
+        response = await API.put(
+          `/api/medicines/${medicineData.medicine_id}`,
           medicinePayload,
         );
 
@@ -330,10 +329,7 @@ const AddMedicines = () => {
 
       // CREATE MODE → POST
       else {
-        response = await axios.post(
-          "http://localhost:5000/api/medicines",
-          medicinePayload,
-        );
+        response = await API.post("/api/medicines", medicinePayload);
 
         await Swal.fire({
           icon: "success",

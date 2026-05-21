@@ -21,9 +21,9 @@ import {
   ChevronRight,
   Locate,
 } from "lucide-react";
-import axios from "axios";
-const API_URL = "http://localhost:5000/api/patients";
+const API_URL = "/api/patients";
 import Swal from "sweetalert2";
+import API from "../../utils/api";
 
 const Patients = () => {
   const [formData, setFormData] = useState({
@@ -51,7 +51,7 @@ const Patients = () => {
   const fetchPatients = async () => {
     try {
       setLoading(true);
-      const response = await axios.get(API_URL);
+      const response = await API.get(API_URL);
       if (response.data.success) {
         setPatientsData(response.data.data);
       }
@@ -128,7 +128,7 @@ const Patients = () => {
       // EDIT → PUT
       // =========================
       if (editMode) {
-        response = await axios.put(
+        response = await API.put(
           `${API_URL}/${selectedPatient.patient_id}`,
           patientPayload,
         );
@@ -148,7 +148,7 @@ const Patients = () => {
       // CREATE → POST
       // =========================
       else {
-        response = await axios.post(API_URL, patientPayload);
+        response = await API.post(API_URL, patientPayload);
 
         await Swal.fire({
           title: "Success!",
@@ -252,7 +252,7 @@ const Patients = () => {
     if (!result.isConfirmed) return;
 
     try {
-      const response = await axios.delete(`${API_URL}/${patient.patient_id}`);
+      const response = await API.delete(`${API_URL}/${patient.patient_id}`);
 
       if (response.data.success) {
         await Swal.fire({

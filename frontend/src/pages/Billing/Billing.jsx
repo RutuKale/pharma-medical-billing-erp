@@ -17,9 +17,9 @@ import {
   Clock,
   TrendingUp,
 } from "lucide-react";
-import axios from "axios";
 import Swal from "sweetalert2";
 import { printBill, downloadBillPDF } from "../../utils/billUtils";
+import API from "../../utils/api";
 
 const Billing = () => {
   const [patient, setPatient] = useState({
@@ -48,7 +48,7 @@ const Billing = () => {
 
   const fetchPatients = async () => {
     try {
-      const response = await axios.get("http://localhost:5000/api/patients");
+      const response = await API.get("/api/patients");
       setPatients(response.data.data || []);
     } catch (error) {
       console.error(error);
@@ -66,7 +66,7 @@ const Billing = () => {
   const fetchMedicines = async () => {
     try {
       setLoading(true);
-      const response = await axios.get("http://localhost:5000/api/medicines");
+      const response = await API.get("/api/medicines");
       const formattedMedicines = response.data.data.map((medicine) => ({
         id: medicine.medicine_id,
         name: medicine.medicine_name,

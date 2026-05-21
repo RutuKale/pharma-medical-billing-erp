@@ -1,5 +1,4 @@
 import React, { useEffect, useMemo, useState } from "react";
-import axios from "axios";
 import {
   AlertTriangle,
   Search,
@@ -22,6 +21,7 @@ import {
   Info,
 } from "lucide-react";
 import { Link } from "react-router-dom";
+import API from "../../utils/api";
 
 const ExpiryAlerts = () => {
   const [search, setSearch] = useState("");
@@ -41,7 +41,7 @@ const ExpiryAlerts = () => {
     try {
       setLoading(true);
 
-      const response = await axios.get("http://localhost:5000/api/medicines");
+      const response = await API.get("/api/medicines");
 
       // map backend data according to UI structure
       const medicines = response?.data?.data || [];

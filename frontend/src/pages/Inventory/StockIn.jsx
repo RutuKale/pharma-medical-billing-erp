@@ -21,9 +21,7 @@ import {
   Package,
 } from "lucide-react";
 import { Link } from "react-router-dom";
-import axios from "axios";
-
-const API_URL = "http://localhost:5000/api/medicines";
+import API from "../../utils/api";
 
 const StockIn = () => {
   const [medicinesData, setMedicinesData] = useState([]);
@@ -49,7 +47,7 @@ const StockIn = () => {
   useEffect(() => {
     const fetchMedicines = async () => {
       try {
-        const response = await axios.get(API_URL);
+        const response = await API.get("/api/medicines");
         if (response.data?.success) {
           const mapped = response.data.data.map((medicine) => ({
             id: medicine.medicine_id,
@@ -159,7 +157,7 @@ const StockIn = () => {
     };
 
     try {
-      const response = await axios.post("http://localhost:5000/api/inventory/stock-in", stockInData);
+      const response = await API.post("/api/inventory/stock-in", stockInData);
       if (response.data?.success) {
         alert("Stock added successfully");
       } else {
