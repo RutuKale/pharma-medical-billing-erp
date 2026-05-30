@@ -15,6 +15,7 @@ router.get("/:id", medicineController.getMedicine);
 
 // CREATE
 router.post("/", medicineController.createMedicine);
+router.post("/bulk", medicineController.bulkCreateMedicines);
 
 
 // UPDATE

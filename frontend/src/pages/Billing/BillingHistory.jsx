@@ -16,7 +16,8 @@ import {
   ChevronLeft,
   ChevronRight,
 } from "lucide-react";
-import API from "../../utils/api";
+import apiClient from "../../utils/apiClient";
+import { printBill as utilityPrintBill, downloadBillPDF as utilityDownloadBillPDF } from "../../utils/billUtils";
 
 const BillingHistory = () => {
   const [search, setSearch] = useState("");
@@ -33,7 +34,7 @@ const BillingHistory = () => {
   const fetchBills = async () => {
     setLoading(true);
     try {
-      const res = await API.get(`/bills`);
+      const res = await apiClient.get(`/bills`);
       if (res.data?.success) {
         // map backend fields to front-end friendly shape if needed
         const mapped = res.data.data.map((b) => ({
@@ -87,7 +88,7 @@ const BillingHistory = () => {
 
   const viewBill = async (bill) => {
     try {
-      const res = await API.get(`/bills/${bill.id}`);
+      const res = await apiClient.get(`/bills/${bill.id}`);
       if (res.data?.success) {
         setViewingBill(res.data.bill || res.data.data || bill);
         setViewingItems(res.data.items || []);
@@ -100,19 +101,72 @@ const BillingHistory = () => {
     }
   };
 
-  const printBill = (bill) => {
-    console.log("Print Bill:", bill);
+  const fetchBillDetails = async (billId) => {
+    try {
+      const res = await apiClient.get(`/bills/${billId}`);
+      if (res.data?.success) {
+        const fullBill = res.data.bill || res.data.data;
+        const items = res.data.items || [];
+        
+        return {
+          invoiceNo: fullBill.bill_number,
+          date: fullBill.created_at ? new Date(fullBill.created_at).toLocaleString() : fullBill.date || "-",
+          patient: {
+            name: fullBill.patient_name || "-",
+            mobile: fullBill.mobile_number || "-",
+            doctorName: fullBill.doctor_name || "-",
+            prescriptionNumber: fullBill.prescription_number || "-",
+            age: fullBill.age || "-",
+            gender: fullBill.gender || "-",
+            patientId: fullBill.patient_id || ""
+          },
+          medicines: items.map(it => ({
+            name: it.medicine_name || it.name || it.medicine_id,
+            batch: it.batch_number || "-",
+            quantity: Number(it.quantity),
+            price: Number(it.price),
+            gst: Number(it.gst || 0),
+            discount: Number(it.discount || 0),
+            total: Number(it.total)
+          })),
+          paymentMode: fullBill.payment_mode || "-",
+          totals: {
+            subtotal: Number(fullBill.subtotal || 0),
+            discountTotal: Number(fullBill.total_discount || 0),
+            gstTotal: Number(fullBill.total_gst || 0),
+            grandTotal: Number(fullBill.grand_total || 0)
+          }
+        };
+      }
+    } catch (error) {
+      console.error("Error fetching bill details:", error);
+    }
+    return null;
   };
 
-  const downloadBill = (bill) => {
-    console.log("Download PDF:", bill);
+  const printBill = async (bill) => {
+    const billData = await fetchBillDetails(bill.id);
+    if (billData) {
+      utilityPrintBill(billData);
+    } else {
+      alert("Failed to retrieve bill details for printing");
+    }
+  };
+
+  const downloadBill = async (bill) => {
+    const billData = await fetchBillDetails(bill.id);
+    if (billData) {
+      utilityDownloadBillPDF(billData);
+    } else {
+      alert("Failed to retrieve bill details for download");
+    }
   };
 
   const cancelBill = async (bill) => {
     const reason = prompt("Enter cancellation reason:");
     if (!reason) return;
     try {
-      const res = await API.delete(`/bills/${bill.id}`, {
+      const res = await apiClient.delete(`/bills/${bill.id}`, {
         data: { reason },
       });
       if (res.data?.success) {

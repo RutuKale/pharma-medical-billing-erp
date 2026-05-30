@@ -1,4 +1,6 @@
 import React, { useState, useCallback } from "react";
+import apiClient from "../../utils/apiClient";
+import Swal from "sweetalert2";
 import * as XLSX from "xlsx";
 import {
   UploadCloud,
@@ -17,6 +19,8 @@ import {
   Database,
 } from "lucide-react";
 
+const API_URL = "/medicines/bulk";
+
 const UploadExcel = () => {
   const [excelData, setExcelData] = useState([]);
   const [fileName, setFileName] = useState("");
@@ -26,6 +30,7 @@ const UploadExcel = () => {
   const [isUploading, setIsUploading] = useState(false);
   const [dragActive, setDragActive] = useState(false);
   const [showPreview, setShowPreview] = useState(true);
+  const [rowCount, setRowCount] = useState(0);
 
   // REQUIRED HEADERS
   const requiredHeaders = [
@@ -38,7 +43,7 @@ const UploadExcel = () => {
     "sellingPrice",
     "batchNumber",
     "expiryDate",
-    "quantity",
+    "quantity"
   ];
 
   const optionalHeaders = [
@@ -47,8 +52,96 @@ const UploadExcel = () => {
     "gst",
     "manufactureDate",
     "rackLocation",
-    "minStock",
+    "minStock"
   ];
+
+
+  // Header normalization map: map common variants to canonical keys
+  const headerAliases = {
+    medicineName: ["medicine name", "medicine", "name", "medicine_name"],
+    saltName: ["salt name", "salt", "salt_name"],
+    brandName: ["brand name", "brand", "brand_name"],
+    manufacturer: ["manufacturer", "mfg", "maker"],
+    category: ["category", "cat"],
+    packSize: ["pack size", "packsize", "pack_size"],
+    unit: ["unit"],
+    purchasePrice: ["purchase price", "purchase_price", "cost", "purchaseprice"],
+    sellingPrice: ["selling price", "selling_price", "price", "mrp", "sellingprice"],
+    gst: ["gst"],
+    batchNumber: ["batch number", "batch", "batch_number", "batchno", "batch_no"],
+    manufactureDate: ["manufacture date", "manufacture_date", "mfg_date", "manufacturedate"],
+    expiryDate: ["expiry date", "expiry", "expiry_date", "exp_date", "expdate"],
+    quantity: ["quantity", "qty", "qnty"],
+    rackLocation: ["rack location", "rack", "rack_location"],
+    minStock: ["min stock", "min_stock", "minstock"]
+  };
+
+  const downloadTemplate = () => {
+    const headers = [...requiredHeaders, ...optionalHeaders];
+    const sampleData = [
+      {
+        medicineName: "Paracetamol 500mg",
+        saltName: "Paracetamol",
+        brandName: "Calpol",
+        manufacturer: "GSK",
+        category: "Tablet",
+        purchasePrice: 10.00,
+        sellingPrice: 15.00,
+        batchNumber: "BAT123",
+        expiryDate: "2027-12-31",
+        quantity: 100,
+        packSize: "10s",
+        unit: "Strip",
+        gst: 12,
+        manufactureDate: "2026-05-01",
+        rackLocation: "Rack A-1",
+        minStock: 20
+      }
+    ];
+
+    const worksheet = XLSX.utils.json_to_sheet(sampleData, { header: headers });
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Template");
+    XLSX.writeFile(workbook, "Medicine_Bulk_Upload_Template.xlsx");
+  };
+
+  const normalizeKey = (key) => {
+    if (!key || typeof key !== "string") return null;
+    const k = key.trim().toLowerCase();
+    for (const canonical in headerAliases) {
+      const variants = headerAliases[canonical];
+      for (const v of variants) {
+        if (k === v) return canonical;
+      }
+      if (k === canonical.toLowerCase()) return canonical;
+    }
+    const compact = k.replace(/[_\s]/g, "");
+    for (const canonical in headerAliases) {
+      if (compact === canonical.toLowerCase()) return canonical;
+    }
+    return null;
+  };
+
+  const normalizeParsedData = (rows) => {
+    if (!Array.isArray(rows) || rows.length === 0) return [];
+
+    const first = rows[0] || {};
+    const originalKeys = Object.keys(first);
+    const map = {};
+    originalKeys.forEach((orig) => {
+      const canonical = normalizeKey(orig);
+      if (canonical) map[orig] = canonical;
+    });
+
+    return rows.map((row) => {
+      const newRow = {};
+      Object.keys(row).forEach((orig) => {
+        const canonical = map[orig] || normalizeKey(orig) || orig;
+        newRow[canonical] = row[orig];
+      });
+      return newRow;
+    });
+  };
 
   // HANDLE DRAG & DROP
   const handleDrag = useCallback((e) => {
@@ -65,7 +158,7 @@ const UploadExcel = () => {
     e.preventDefault();
     e.stopPropagation();
     setDragActive(false);
-    
+
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
       const file = e.dataTransfer.files[0];
       if (file.name.match(/\.(xlsx|xls)$/)) {
@@ -83,6 +176,7 @@ const UploadExcel = () => {
     setWarnings([]);
     setSuccessMessage("");
     setExcelData([]);
+    setRowCount(0);
 
     const reader = new FileReader();
     reader.readAsBinaryString(file);
@@ -94,7 +188,8 @@ const UploadExcel = () => {
         const sheetName = workbook.SheetNames[0];
         const sheet = workbook.Sheets[sheetName];
         const parsedData = XLSX.utils.sheet_to_json(sheet);
-        validateExcelData(parsedData);
+        const normalized = normalizeParsedData(parsedData);
+        validateExcelData(normalized);
       } catch (error) {
         setErrors(["Failed to parse Excel file. Please check the file format."]);
       }
@@ -117,6 +212,8 @@ const UploadExcel = () => {
     let validationErrors = [];
     let validationWarnings = [];
 
+    setRowCount(data.length);
+
     if (data.length === 0) {
       validationErrors.push("Excel file is empty. Please add data to the file.");
       setErrors(validationErrors);
@@ -130,7 +227,7 @@ const UploadExcel = () => {
     // CHECK HEADERS
     const headers = Object.keys(data[0] || {});
     const missingHeaders = requiredHeaders.filter(header => !headers.includes(header));
-    
+
     if (missingHeaders.length > 0) {
       missingHeaders.forEach(header => {
         validationErrors.push(`Missing required column: "${header}"`);
@@ -145,7 +242,7 @@ const UploadExcel = () => {
 
     data.forEach((row, index) => {
       const rowNum = index + 2;
-      
+
       if (!row.medicineName || !row.batchNumber) {
         emptyRows++;
       }
@@ -158,7 +255,11 @@ const UploadExcel = () => {
         validationErrors.push(`Row ${rowNum}: Batch number is required`);
       }
 
-      if (!row.quantity) {
+      if (
+        row.quantity === undefined ||
+        row.quantity === null ||
+        row.quantity === ""
+      ) {
         validationErrors.push(`Row ${rowNum}: Quantity is required`);
       } else if (isNaN(row.quantity) || row.quantity <= 0) {
         validationErrors.push(`Row ${rowNum}: Quantity must be a positive number`);
@@ -168,12 +269,26 @@ const UploadExcel = () => {
         validationErrors.push(`Row ${rowNum}: Expiry date is required`);
       } else {
         const expiryDate = new Date(row.expiryDate);
+
         if (isNaN(expiryDate.getTime())) {
           validationErrors.push(`Row ${rowNum}: Invalid expiry date format`);
-        } else if (expiryDate <= today) {
-          validationErrors.push(`Row ${rowNum}: Expiry date must be a future date`);
-        } else if (expiryDate <= new Date(today.setMonth(today.getMonth() + 3))) {
-          futureExpiryCount++;
+        } else {
+          // Remove time portion for accurate comparison
+          expiryDate.setHours(0, 0, 0, 0);
+
+          const todayDate = new Date();
+          todayDate.setHours(0, 0, 0, 0);
+
+          const threeMonthsLater = new Date(todayDate);
+          threeMonthsLater.setMonth(threeMonthsLater.getMonth() + 3);
+
+          if (expiryDate <= todayDate) {
+            validationErrors.push(
+              `Row ${rowNum}: Expiry date must be a future date`
+            );
+          } else if (expiryDate <= threeMonthsLater) {
+            futureExpiryCount++;
+          }
         }
       }
 
@@ -217,6 +332,7 @@ const UploadExcel = () => {
     setWarnings([]);
     setFileName("");
     setSuccessMessage("");
+    setRowCount(0);
   };
 
   // SUBMIT
@@ -227,21 +343,29 @@ const UploadExcel = () => {
     }
 
     setIsUploading(true);
-    
+    setErrors([]);
+
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      console.log("Uploading data:", excelData);
-      
-      // API CALL HERE
-      // await axios.post("http://localhost:5000/api/upload-excel", excelData);
-      
-      alert(`Successfully uploaded ${excelData.length} medicines to inventory!`);
-      removeFile();
+      const response = await apiClient.post(
+        API_URL,
+        excelData
+      );
+
+      if (response.data?.success) {
+        Swal.fire({
+          icon: "success",
+          title: "Upload Successful",
+          text: `Successfully uploaded ${response.data.data.insertedRows || excelData.length} medicines to inventory!`,
+          background: "#1e293b",
+          color: "#fff"
+        });
+        removeFile();
+      } else {
+        setErrors([response.data?.message || "Upload failed. Please try again."]);
+      }
     } catch (error) {
       console.error(error);
-      setErrors(["Upload failed. Please try again or contact support."]);
+      setErrors([error.response?.data?.message || "Upload failed. Please try again or contact support."]);
     } finally {
       setIsUploading(false);
     }
@@ -314,7 +438,10 @@ const UploadExcel = () => {
                 </p>
               </div>
 
-              <button className="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white px-4 py-2.5 rounded-xl flex items-center gap-2 transition-all duration-200 shadow-lg shadow-blue-500/20 w-fit">
+              <button
+                onClick={downloadTemplate}
+                className="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white px-4 py-2.5 rounded-xl flex items-center gap-2 transition-all duration-200 shadow-lg shadow-blue-500/20 w-fit"
+              >
                 <Download size={18} />
                 Download Sample Template
               </button>
@@ -345,11 +472,10 @@ const UploadExcel = () => {
           <div className="p-6">
             {/* DROPZONE */}
             <div
-              className={`border-2 border-dashed rounded-2xl p-10 flex flex-col items-center justify-center text-center cursor-pointer transition-all duration-200 ${
-                dragActive
-                  ? "border-blue-400 bg-blue-500/10"
-                  : "border-white/20 hover:border-blue-400/50 hover:bg-white/5"
-              }`}
+              className={`border-2 border-dashed rounded-2xl p-10 flex flex-col items-center justify-center text-center cursor-pointer transition-all duration-200 ${dragActive
+                ? "border-blue-400 bg-blue-500/10"
+                : "border-white/20 hover:border-blue-400/50 hover:bg-white/5"
+                }`}
               onDragEnter={handleDrag}
               onDragLeave={handleDrag}
               onDragOver={handleDrag}
@@ -387,7 +513,7 @@ const UploadExcel = () => {
                   <div>
                     <h3 className="font-semibold text-white">{fileName}</h3>
                     <p className="text-sm text-gray-400">
-                      {excelData.length} records • Ready for import
+                      {rowCount} records • {errors.length > 0 ? "Contains errors" : "Ready for import"}
                     </p>
                   </div>
                 </div>

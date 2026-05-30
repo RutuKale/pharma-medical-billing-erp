@@ -21,8 +21,12 @@ import {
   Menu,
   X,
 } from "lucide-react";
+
 import Swal from "sweetalert2";
-import API from "../../utils/api";
+import apiClient from "../../utils/apiClient";
+
+const API_URL = "/medicines";
+const INVENTORY_API = "/inventory";
 
 const Inventory = () => {
   const [medicinesData, setMedicinesData] = useState([]);
@@ -41,6 +45,9 @@ const Inventory = () => {
   const [sortBy, setSortBy] = useState("medicine_name");
   const [sortOrder, setSortOrder] = useState("asc");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [selectedIds, setSelectedIds] = useState([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
   const navigate = useNavigate();
 
   const categories = [
@@ -51,10 +58,12 @@ const Inventory = () => {
   ];
 
   const fetchMedicines = async () => {
+    // Reset selections when refetching
+    setSelectedIds([]);
     try {
       setLoading(true);
 
-      const response = await API.get("/api/medicines");
+      const response = await apiClient.get(API_URL);
 
       if (response.data.success) {
         setMedicinesData(response.data.data);
@@ -68,7 +77,8 @@ const Inventory = () => {
 
   const fetchSingleMedicine = async (id) => {
     try {
-      const response = await API.get(`/api/medicines/${id}`);
+      const response = await apiClient.get(`${API_URL}/${id}`);
+
       if (response.data.success) {
         setSelectedMedicine(response.data.data);
       }
@@ -117,7 +127,8 @@ const Inventory = () => {
 
     try {
       const endpoint = stockType === "IN" ? "stock-in" : "stock-out";
-      const response = await axios.post(`/api/inventory/${endpoint}`, {
+
+      const response = await apiClient.post(`${INVENTORY_API}/${endpoint}`, {
         medicine_id: stockMedicineId,
         quantity,
         remarks: stockRemarks,
@@ -164,7 +175,8 @@ const Inventory = () => {
   if (!result.isConfirmed) return;
 
   try {
-    const response = await API.delete(`/api/medicines/${medicineId}`);
+    const response = await apiClient.delete(`${API_URL}/${medicineId}`);
+
     if (response.data.success) {
       Swal.fire({
         title: "Deleted!",
@@ -189,6 +201,47 @@ const Inventory = () => {
     });
   }
 };
+
+  const handleDeleteAll = async () => {
+    const result = await Swal.fire({
+      title: "Are you sure you want to delete ALL medicines?",
+      text: "This action cannot be undone.",
+      icon: "warning",
+      iconColor: "#ef4444",
+      background: "#fff",
+      color: "#000",
+      showCancelButton: true,
+      confirmButtonColor: "#ef4444",
+      cancelButtonColor: "#64748b",
+      confirmButtonText: "Yes, Delete All!",
+      cancelButtonText: "Cancel",
+    });
+    if (!result.isConfirmed) return;
+    try {
+      await Promise.all(medicinesData.map(m => apiClient.delete(`${API_URL}/${m.medicine_id}`)));
+      Swal.fire({
+        title: "Deleted!",
+        text: "All medicines deleted successfully.",
+        icon: "success",
+        iconColor: "#22c55e",
+        background: "#fff",
+        color: "#000",
+        confirmButtonColor: "#22c55e",
+      });
+      fetchMedicines();
+    } catch (error) {
+      Swal.fire({
+        title: "Error!",
+        text: "Failed to delete all medicines.",
+        icon: "error",
+        iconColor: "#ef4444",
+        background: "#fff",
+        color: "#000",
+        confirmButtonColor: "#ef4444",
+      });
+    }
+  };
+
 
   const getExpiryStatus = (expiryDate) => {
     const today = new Date();
@@ -281,6 +334,14 @@ const Inventory = () => {
 
     return filtered;
   }, [medicinesData, search, category, sortBy, sortOrder]);
+
+  const totalPages = itemsPerPage === "All" ? 1 : Math.ceil(filteredMedicines.length / itemsPerPage);
+
+  const paginatedMedicines = useMemo(() => {
+    if (itemsPerPage === "All") return filteredMedicines;
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    return filteredMedicines.slice(startIndex, startIndex + itemsPerPage);
+  }, [filteredMedicines, currentPage, itemsPerPage]);
 
   const stats = {
     total: medicinesData.length,
@@ -591,14 +652,20 @@ const Inventory = () => {
                   type="text"
                   placeholder="Search medicine, salt, brand or manufacturer..."
                   value={search}
-                  onChange={(e) => setSearch(e.target.value)}
+                  onChange={(e) => {
+                    setSearch(e.target.value);
+                    setCurrentPage(1);
+                  }}
                   className="w-full bg-white/10 border border-white/20 rounded-lg pl-10 pr-4 py-2.5 text-white placeholder-gray-400 outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-sm sm:text-base"
                 />
               </div>
 
               <select
                 value={category}
-                onChange={(e) => setCategory(e.target.value)}
+                onChange={(e) => {
+                  setCategory(e.target.value);
+                  setCurrentPage(1);
+                }}
                 className="bg-white/10 border border-white/20 rounded-lg px-4 py-2.5 text-white outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer text-sm sm:text-base"
               >
                 {categories.map((cat, index) => (
@@ -607,8 +674,66 @@ const Inventory = () => {
                   </option>
                 ))}
               </select>
+
+              <select
+                value={itemsPerPage}
+                onChange={(e) => {
+                  setItemsPerPage(e.target.value === "All" ? "All" : Number(e.target.value));
+                  setCurrentPage(1);
+                }}
+                className="bg-white/10 border border-white/20 rounded-lg px-4 py-2.5 text-white outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer text-sm sm:text-base"
+              >
+                <option value={10} className="bg-slate-800">10 per page</option>
+                <option value={20} className="bg-slate-800">20 per page</option>
+                <option value={50} className="bg-slate-800">50 per page</option>
+                <option value={100} className="bg-slate-800">100 per page</option>
+                <option value="All" className="bg-slate-800">All</option>
+              </select>
             </div>
           </div>
+        </div>
+
+        {/* Delete Selected button */}
+        {selectedIds.length > 0 && (
+          <div className="mb-4 flex items-center">
+            <button
+              onClick={async () => {
+                try {
+                  await Promise.all(selectedIds.map(id => apiClient.delete(`${API_URL}/${id}`)));
+                  Swal.fire({
+                    icon: "success",
+                    title: "Deleted",
+                    text: `${selectedIds.length} medicines deleted successfully`,
+                    background: "#fff",
+                    color: "#000",
+                  });
+                } catch (error) {
+                  console.error(error);
+                  Swal.fire({
+                    icon: "error",
+                    title: "Error",
+                    text: "Failed to delete selected medicines",
+                    background: "#fff",
+                    color: "#000",
+                  });
+                }
+                fetchMedicines();
+              }}
+              className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded"
+            >
+              Delete Selected ({selectedIds.length})
+            </button>
+          </div>
+        )}
+
+        {/* Delete All button */}
+        <div className="mb-4 flex items-center">
+          <button
+            onClick={handleDeleteAll}
+            className="px-4 py-2 bg-red-800 hover:bg-red-900 text-white rounded"
+          >
+            Delete All
+          </button>
         </div>
 
         {/* DESKTOP TABLE VIEW (hidden on mobile) */}
@@ -617,11 +742,21 @@ const Inventory = () => {
             <table className="w-full min-w-[800px]">
               <thead className="bg-white/10 border-b border-white/10">
                 <tr>
+                  <th className="p-4">
+                    <input type="checkbox" checked={selectedIds.length === filteredMedicines.length && filteredMedicines.length > 0} onChange={(e) => {
+                      const checked = e.target.checked;
+                      if (checked) {
+                        setSelectedIds(filteredMedicines.map(m => m.medicine_id));
+                      } else {
+                        setSelectedIds([]);
+                      }
+                    }} />
+                  </th>
                   <th
                     className="text-left p-4 text-sm font-semibold text-gray-300 cursor-pointer hover:text-blue-400 transition-colors"
-                    onClick={() => handleSort("name")}
+                    onClick={() => handleSort("medicine_name")}
                   >
-                    Medicine <SortIcon column="name" />
+                    Medicine <SortIcon column="medicine_name" />
                   </th>
                   <th
                     className="text-left p-4 text-sm font-semibold text-gray-300 cursor-pointer hover:text-blue-400 transition-colors"
@@ -631,21 +766,21 @@ const Inventory = () => {
                   </th>
                   <th
                     className="text-left p-4 text-sm font-semibold text-gray-300 cursor-pointer hover:text-blue-400 transition-colors"
-                    onClick={() => handleSort("stock")}
+                    onClick={() => handleSort("quantity")}
                   >
-                    Stock <SortIcon column="stock" />
+                    Stock <SortIcon column="quantity" />
                   </th>
                   <th
                     className="text-left p-4 text-sm font-semibold text-gray-300 cursor-pointer hover:text-blue-400 transition-colors"
-                    onClick={() => handleSort("price")}
+                    onClick={() => handleSort("selling_price")}
                   >
-                    Price <SortIcon column="price" />
+                    Price <SortIcon column="selling_price" />
                   </th>
                   <th
                     className="text-left p-4 text-sm font-semibold text-gray-300 cursor-pointer hover:text-blue-400 transition-colors"
-                    onClick={() => handleSort("expiry")}
+                    onClick={() => handleSort("expiry_date")}
                   >
-                    Expiry <SortIcon column="expiry" />
+                    Expiry <SortIcon column="expiry_date" />
                   </th>
                   <th className="text-left p-4 text-sm font-semibold text-gray-300">
                     Batch
@@ -660,7 +795,7 @@ const Inventory = () => {
               </thead>
 
               <tbody>
-                {filteredMedicines.map((medicine) => {
+                {paginatedMedicines.map((medicine) => {
                   const expiryStatus = getExpiryStatus(medicine.expiry_date);
                   const stockStatus = getStockStatus(
                     medicine.quantity,
@@ -672,6 +807,15 @@ const Inventory = () => {
                       key={medicine.medicine_id}
                       className="border-b border-white/10 hover:bg-white/10 transition-all duration-200 group"
                     >
+                      <td className="p-4">
+                        <input type="checkbox" checked={selectedIds.includes(medicine.medicine_id)} onChange={(e) => {
+                          const checked = e.target.checked;
+                          setSelectedIds(prev => {
+                            if (checked) return [...prev, medicine.medicine_id];
+                            return prev.filter(id => id !== medicine.medicine_id);
+                          });
+                        }} />
+                      </td>
                       <td className="p-4">
                         <div>
                           <h3 className="font-semibold text-white">
@@ -796,7 +940,7 @@ const Inventory = () => {
 
         {/* MOBILE & TABLET CARD VIEW (visible on smaller screens) */}
         <div className="lg:hidden space-y-4">
-          {filteredMedicines.map((medicine) => {
+          {paginatedMedicines.map((medicine) => {
             const expiryStatus = getExpiryStatus(medicine.expiry_date);
             const stockStatus = getStockStatus(
               medicine.quantity,
@@ -931,6 +1075,65 @@ const Inventory = () => {
             </div>
           )}
         </div>
+
+        {/* Pagination Controls */}
+        {totalPages > 1 && (
+          <div className="mt-6 flex flex-col sm:flex-row items-center justify-between gap-4 bg-white/5 border border-white/10 p-4 rounded-xl backdrop-blur-sm">
+            <span className="text-gray-400 text-sm">
+              Showing {(currentPage - 1) * itemsPerPage + 1} to {Math.min(currentPage * itemsPerPage, filteredMedicines.length)} of {filteredMedicines.length} medicines
+            </span>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+                className="px-3 py-1.5 rounded-lg border border-white/10 bg-white/5 text-gray-300 hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed transition-all text-sm"
+              >
+                Previous
+              </button>
+              
+              <div className="flex flex-wrap items-center gap-1">
+                {[...Array(totalPages)].map((_, idx) => {
+                  const pageNumber = idx + 1;
+                  // Show current page, first, last, and neighbors
+                  if (
+                    pageNumber === 1 ||
+                    pageNumber === totalPages ||
+                    (pageNumber >= currentPage - 1 && pageNumber <= currentPage + 1)
+                  ) {
+                    return (
+                      <button
+                        key={pageNumber}
+                        onClick={() => setCurrentPage(pageNumber)}
+                        className={`w-8 h-8 rounded-lg flex items-center justify-center text-sm transition-all ${
+                          currentPage === pageNumber
+                            ? "bg-blue-500 text-white font-medium"
+                            : "border border-white/10 bg-white/5 text-gray-400 hover:bg-white/10 hover:text-white"
+                        }`}
+                      >
+                        {pageNumber}
+                      </button>
+                    );
+                  } else if (
+                    pageNumber === currentPage - 2 ||
+                    pageNumber === currentPage + 2
+                  ) {
+                    return <span key={pageNumber} className="text-gray-500 px-1">...</span>;
+                  }
+                  return null;
+                })}
+              </div>
+
+              <button
+                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                disabled={currentPage === totalPages}
+                className="px-3 py-1.5 rounded-lg border border-white/10 bg-white/5 text-gray-300 hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed transition-all text-sm"
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        )}
+
       </div>
     </div>
   );

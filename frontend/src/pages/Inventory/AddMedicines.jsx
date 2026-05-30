@@ -22,7 +22,7 @@ import {
 } from "lucide-react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import Swal from "sweetalert2";
-import API from "../../utils/api";
+import apiClient from "../../utils/apiClient";
 
 const InputField = ({
   label,
@@ -311,8 +311,8 @@ const AddMedicines = () => {
 
       // EDIT MODE → PUT
       if (editMode) {
-        response = await API.put(
-          `/api/medicines/${medicineData.medicine_id}`,
+        response = await apiClient.put(
+          `/medicines/${medicineData.medicine_id}`,
           medicinePayload,
         );
 
@@ -329,7 +329,7 @@ const AddMedicines = () => {
 
       // CREATE MODE → POST
       else {
-        response = await API.post("/api/medicines", medicinePayload);
+        response = await apiClient.post("/medicines", medicinePayload);
 
         await Swal.fire({
           icon: "success",

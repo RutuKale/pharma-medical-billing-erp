@@ -28,18 +28,18 @@ import {
   Menu,
 } from "lucide-react";
 import { Link } from "react-router-dom";
-import API from "../utils/api";
+
+
+
+import apiClient from "../utils/apiClient";
+
 
 const Dashboard = () => {
   const [currentTime, setCurrentTime] = useState("");
   const [currentDate, setCurrentDate] = useState("");
   const [greeting, setGreeting] = useState("");
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [stats, setStats] = useState([]);
-  const [lowStockMedicines, setLowStockMedicines] = useState([]);
-  const [expiryMedicines, setExpiryMedicines] = useState([]);
-  const [reminders, setReminders] = useState([]);
-  const [recentBills, setRecentBills] = useState([]);
+
 
   const [totalProducts, setTotalProducts] = useState(0);
   const [activePatients, setActivePatients] = useState(0);
@@ -47,6 +47,100 @@ const Dashboard = () => {
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+
+  // Dynamic data states
+  const [stats, setStats] = useState([]);
+  const [lowStockMedicines, setLowStockMedicines] = useState([]);
+  const [expiryMedicines, setExpiryMedicines] = useState([]);
+  const [reminders, setReminders] = useState([]); // placeholder if endpoint added later
+  const [recentBills, setRecentBills] = useState([]);
+
+  // Fetch dynamic data from backend
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const [salesRes, billsRes, lowStockRes, expiryRes] = await Promise.all([
+          // Assuming reports/daily-sales returns { totalSales: number, totalBills: number, lowStockCount: number, remindersCount: number }
+          // Adjust the endpoint paths as needed based on your backend configuration
+          // Here we fetch separate reports for clarity
+          // Daily sales
+          apiClient.get('/reports/daily-sales'),
+          // All bills
+          apiClient.get('/bills'),
+          // Low stock report
+          apiClient.get('/reports/low-stock'),
+          // Expiry report
+          apiClient.get('/reports/expiry'),
+        ]);
+
+        // Build stats array based on responses
+        // Extract values from API responses
+        const dailySales = salesRes?.data?.data?.[0]?.total_sales ?? 0;
+        const totalBills = billsRes?.data?.count ?? 0;
+        const lowStockCount = lowStockRes?.data?.count ?? 0;
+        const expiryCount = expiryRes?.data?.count ?? 0;
+
+        const statsData = [
+          {
+            title: "Today's Sales",
+            value: `₹${dailySales}`,
+            icon: <IndianRupee size={22} />, // keep same icon
+            color: "from-emerald-500 to-teal-500",
+            bgColor: "bg-emerald-500/10",
+            iconColor: "text-emerald-400",
+            growth: "+12%", // placeholder growth
+            growthUp: true,
+            subtitle: "vs yesterday",
+          },
+          {
+            title: "Total Bills",
+            value: `${totalBills}`,
+            icon: <Receipt size={22} />, // keep same icon
+            color: "from-pink-500 to-red-500",
+            bgColor: "bg-pink-500/10",
+            iconColor: "text-pink-400",
+            growth: "+8%",
+            growthUp: true,
+            subtitle: "this month",
+          },
+          {
+            title: "Low Stock Items",
+            value: `${lowStockCount}`,
+            icon: <AlertTriangle size={22} />, // keep same icon
+            color: "from-orange-500 to-amber-500",
+            bgColor: "bg-orange-500/10",
+            iconColor: "text-orange-400",
+            growth: "Needs Attention",
+            growthUp: false,
+            subtitle: "critical items",
+          },
+          {
+            title: "Upcoming Reminders",
+            value: `${reminders.length}`,
+            icon: <BellRing size={22} />, // keep same icon
+            color: "from-purple-500 to-pink-500",
+            bgColor: "bg-purple-500/10",
+            iconColor: "text-purple-400",
+            growth: "Next 7 Days",
+            growthUp: false,
+            subtitle: "patient follow-ups",
+          },
+        ];
+        setStats(statsData);
+
+        // Set other dynamic lists
+        setLowStockMedicines(lowStockRes?.data?.data ?? []);
+        setExpiryMedicines(expiryRes?.data?.data ?? []);
+        // For recent bills, take the most recent three entries
+        setRecentBills(billsRes?.data?.data?.slice(0, 3) ?? []);
+        // Reminders could be fetched from a future endpoint; keep empty for now
+      } catch (error) {
+        console.error("Error fetching dashboard data:", error);
+      }
+    };
+    fetchData();
+  }, []);
+
 
   useEffect(() => {
     const updateDateTime = () => {
@@ -79,29 +173,25 @@ const Dashboard = () => {
     return () => clearInterval(interval);
   }, []);
 
-  useEffect(() => {
-    fetchDashboardData();
-  }, []);
-
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
 
-      const medicinesRes = await API.get("/api/medicines");
+      const medicinesRes = await apiClient.get("/api/medicines");
 
-      const billsRes = await API.get("/api/bills");
+      const billsRes = await apiClient.get("/api/bills");
 
       let patientsRes = { data: { data: [] } };
       let remindersRes = { data: { data: [] } };
 
       try {
-        patientsRes = await API.get("/api/patients");
+        patientsRes = await apiClient.get("/api/patients");
       } catch (err) {
         console.log("Patients API not found");
       }
 
       try {
-        remindersRes = await API.get("/api/bills");
+        remindersRes = await apiClient.get("/api/bills");
       } catch (err) {
         console.log("Reminders API not found");
       }
@@ -320,6 +410,7 @@ const Dashboard = () => {
   //   { id: "BILL-1002", patient: "Sneha Kale", amount: "₹1,240", payment: "Cash", date: "Today", status: "completed" },
   //   { id: "BILL-1003", patient: "Ajay Sharma", amount: "₹560", payment: "Card", date: "Today", status: "pending" },
   // ];
+
 
   const getStatusColor = (status) => {
     switch (status) {
@@ -868,6 +959,7 @@ const Dashboard = () => {
           </div>
         </div>
       </div>
+
 
       <style>{`
         @keyframes blob {

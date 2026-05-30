@@ -70,7 +70,11 @@ exports.getBillById = async (id) => {
         SELECT
             bills.*,
             patients.patient_name,
-            patients.mobile_number
+            patients.mobile_number,
+            patients.age,
+            patients.gender,
+            patients.doctor_name,
+            patients.prescription_number
         FROM bills
         LEFT JOIN patients
         ON bills.patient_id = patients.patient_id

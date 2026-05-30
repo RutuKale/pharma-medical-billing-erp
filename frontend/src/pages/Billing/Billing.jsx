@@ -19,7 +19,7 @@ import {
 } from "lucide-react";
 import Swal from "sweetalert2";
 import { printBill, downloadBillPDF } from "../../utils/billUtils";
-import API from "../../utils/api";
+import apiClient from "../../utils/apiClient";
 
 const Billing = () => {
   const [patient, setPatient] = useState({
@@ -48,7 +48,7 @@ const Billing = () => {
 
   const fetchPatients = async () => {
     try {
-      const response = await API.get("/api/patients");
+      const response = await apiClient.get("/patients");
       setPatients(response.data.data || []);
     } catch (error) {
       console.error(error);
@@ -66,7 +66,7 @@ const Billing = () => {
   const fetchMedicines = async () => {
     try {
       setLoading(true);
-      const response = await API.get("/api/medicines");
+      const response = await apiClient.get("/medicines");
       const formattedMedicines = response.data.data.map((medicine) => ({
         id: medicine.medicine_id,
         name: medicine.medicine_name,
@@ -280,17 +280,72 @@ const Billing = () => {
     downloadBillPDF(billData);
   };
 
-  const generateBill = () => {
+  const generateBill = async () => {
     const billData = generateBillData();
     if (!billData) return;
-    Swal.fire({
-      icon: "success",
-      title: "Bill Generated",
-      text: "Bill generated successfully",
-      background: "#1e293b",
-      color: "#fff",
-      confirmButtonColor: "#22c55e",
-    });
+
+    try {
+      const payload = {
+        bill: {
+          patient_id: billData.patient.patientId,
+          bill_number: billData.invoiceNo,
+          subtotal: billData.totals.subtotal,
+          total_discount: billData.totals.discountTotal,
+          total_gst: billData.totals.gstTotal,
+          grand_total: billData.totals.grandTotal,
+          payment_mode: billData.paymentMode,
+          payment_status: "Completed",
+          notes: ""
+        },
+        items: billData.medicines.map(m => ({
+          medicine_id: m.medicine_id || m.id,
+          quantity: m.quantity,
+          price: m.price,
+          gst: m.gst,
+          discount: m.discount,
+          total: m.total
+        }))
+      };
+
+      const res = await apiClient.post("/bills", payload);
+      
+      if (res.data.success) {
+        Swal.fire({
+          icon: "success",
+          title: "Bill Generated",
+          text: "Bill generated and saved successfully",
+          background: "#1e293b",
+          color: "#fff",
+          confirmButtonColor: "#22c55e",
+        });
+        
+        // Optionally print automatically or just clear form
+        setBillItems([]);
+        setPatient({
+          patientId: "",
+          name: "",
+          mobile: "",
+          age: "",
+          gender: "",
+          doctorName: "",
+          prescriptionNumber: "",
+        });
+        setSelectedPatientId("");
+        
+        // Refresh medicines to get updated stock
+        fetchMedicines();
+      }
+    } catch (error) {
+      console.error(error);
+      Swal.fire({
+        icon: "error",
+        title: "Error Generating Bill",
+        text: error.response?.data?.message || "Failed to save bill to database",
+        background: "#1e293b",
+        color: "#fff",
+        confirmButtonColor: "#ef4444",
+      });
+    }
   };
 
   const editItem = (id) => {

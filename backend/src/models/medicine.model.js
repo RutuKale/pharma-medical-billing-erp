@@ -88,6 +88,50 @@ exports.createMedicine = async (data) => {
 };
 
 
+// BULK CREATE MEDICINES
+exports.bulkCreateMedicines = async (dataArray) => {
+    if (!Array.isArray(dataArray) || dataArray.length === 0) {
+        return { affectedRows: 0 };
+    }
+
+    const columns = [
+        "medicine_name",
+        "salt_name",
+        "brand_name",
+        "manufacturer",
+        "category",
+        "pack_size",
+        "unit",
+        "purchase_price",
+        "selling_price",
+        "gst",
+        "batch_number",
+        "manufacture_date",
+        "expiry_date",
+        "quantity",
+        "rack_location",
+        "min_stock"
+    ];
+
+    const values = dataArray.map((row) =>
+        columns.map((column) =>
+            Object.prototype.hasOwnProperty.call(row, column)
+                ? row[column]
+                : null
+        )
+    );
+
+    const [result] = await pool.query(`
+        INSERT INTO medicines (
+            ${columns.join(",\n            ")}
+        )
+        VALUES ?
+    `, [values]);
+
+    return result;
+};
+
+
 // UPDATE MEDICINE
 exports.updateMedicine = async (id, data) => {
 
