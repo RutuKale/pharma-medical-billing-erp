@@ -173,7 +173,12 @@ const Login = () => {
         setError(data.message);
         return;
       }
-      localStorage.setItem("token", data.token);
+
+      localStorage.setItem(
+        "user",
+        JSON.stringify(data.user)
+      );
+
       window.location.href = "/";
     } catch (err) {
       setError("OTP verification failed");
@@ -283,9 +288,8 @@ const Login = () => {
               {stats.map((stat, index) => (
                 <div
                   key={index}
-                  className={`text-center transition-all duration-500 ${
-                    index === activeStat ? "scale-110" : "opacity-60"
-                  }`}
+                  className={`text-center transition-all duration-500 ${index === activeStat ? "scale-110" : "opacity-60"
+                    }`}
                 >
                   <stat.icon
                     size={20}
@@ -419,35 +423,25 @@ const Login = () => {
                 </div>
               )}
 
-              <button
-                type="button"
-                disabled={!email || loading}
-                onClick={sendOtp}
-                className="w-full bg-gradient-to-r from-teal-500 to-indigo-500 hover:from-teal-600 hover:to-indigo-600 text-white py-2.5 rounded-xl text-sm font-medium transition-all duration-300 flex items-center justify-center gap-1.5 group disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Send OTP
-              </button>
-
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full bg-gradient-to-r from-teal-500 to-indigo-500 hover:from-teal-600 hover:to-indigo-600 text-white py-2.5 rounded-xl text-sm font-medium transition-all duration-300 flex items-center justify-center gap-1.5 group disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {/* {loading ? (
-                  <ButtonLoader
-                    text={isLogin ? "Signing In..." : "Creating Account..."}
-                  />
-                ) : (
-                  <>
-                    {isLogin ? "Sign In" : "Create Account"}
-                    <ArrowRight
-                      size={16}
-                      className="group-hover:translate-x-1 transition-transform"
-                    />
-                  </>
-                )} */}
-                Verify OTP
-              </button>
+             {!otpSent && (
+                <button
+                  type="button"
+                  disabled={!email || loading}
+                  onClick={sendOtp}
+                  className="w-full bg-gradient-to-r from-teal-500 to-indigo-500 hover:from-teal-600 hover:to-indigo-600 text-white py-2.5 rounded-xl text-sm font-medium"
+                >
+                  {loading ? "Sending..." : "Send OTP"}
+                </button>
+              )}
+              {otpSent && (
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="w-full bg-gradient-to-r from-teal-500 to-indigo-500 text-white py-2.5 rounded-xl"
+                >
+                  Verify OTP
+                </button>
+              )}
             </form>
 
             {/* Divider */}

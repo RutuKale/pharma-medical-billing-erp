@@ -1,77 +1,109 @@
 const nodemailer = require("nodemailer");
-const jwt = require("jsonwebtoken");
 
-const otpStore = {};
+const OTPModel = require("../models/otp.model");
+const UserModel = require("../models/user.model");
 
 exports.sendOtp = async (req, res) => {
-  const { email } = req.body;
+  try {
+    const { email } = req.body;
 
-  const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const otp = Math.floor(
+      100000 + Math.random() * 900000
+    ).toString();
 
-  otpStore[email] = {
-    otp,
-    expires: Date.now() + 5 * 60 * 1000,
-  };
+    const expiresAt = new Date(
+      Date.now() + 5 * 60 * 1000
+    );
 
-  const transporter = nodemailer.createTransport({
-    service: "gmail",
-    auth: {
-      user: process.env.EMAIL_USER,
-      pass: process.env.EMAIL_PASS,
-    },
-  });
+    await OTPModel.deleteExisting(email);
 
-  await transporter.sendMail({
-    from: process.env.EMAIL_USER,
-    to: email,
-    subject: "Login OTP",
-    html: `
-      <h2>PharmaMed ERP Login OTP</h2>
-      <h1>${otp}</h1>
-      <p>This OTP expires in 5 minutes.</p>
-    `,
-  });
+    await OTPModel.create(
+      email,
+      otp,
+      expiresAt
+    );
 
-  res.json({
-    success: true,
-    message: "OTP sent successfully",
-  });
+    const transporter =
+      nodemailer.createTransport({
+        service: "gmail",
+        auth: {
+          user: "shaikh.umar.iqra@gmail.com",
+          pass: "dfnb cysm bnse iufg",
+        },
+      });
+
+    await transporter.sendMail({
+      from: process.env.EMAIL_USER,
+      to: email,
+      subject: "PharmaMed ERP OTP",
+      html: `
+        <h2>PharmaMed ERP Login</h2>
+        <h1>${otp}</h1>
+        <p>OTP expires in 5 minutes.</p>
+      `,
+    });
+
+    res.json({
+      success: true,
+      message: "OTP Sent Successfully",
+    });
+  } catch (error) {
+    console.error(error);
+
+    res.status(500).json({
+      success: false,
+      message: "Failed to send OTP",
+    });
+  }
 };
 
 exports.verifyOtp = async (req, res) => {
-  const { email, otp } = req.body;
+  try {
+    const { email, otp } = req.body;
 
-  const stored = otpStore[email];
+    const otpData =
+      await OTPModel.findOTP(email, otp);
 
-  if (!stored) {
-    return res.json({
+    if (!otpData) {
+      return res.json({
+        success: false,
+        message: "Invalid OTP",
+      });
+    }
+
+    if (
+      new Date() >
+      new Date(otpData.expires_at)
+    ) {
+      return res.json({
+        success: false,
+        message: "OTP Expired",
+      });
+    }
+
+    await OTPModel.markUsed(otpData.id);
+
+    let user =
+      await UserModel.findByEmail(email);
+
+    if (!user) {
+      await UserModel.create(email);
+
+      user =
+        await UserModel.findByEmail(email);
+    }
+
+    res.json({
+      success: true,
+      message: "Login Successful",
+      user,
+    });
+  } catch (error) {
+    console.error(error);
+
+    res.status(500).json({
       success: false,
-      message: "OTP not found",
+      message: "OTP Verification Failed",
     });
   }
-
-  if (stored.expires < Date.now()) {
-    return res.json({
-      success: false,
-      message: "OTP expired",
-    });
-  }
-
-  if (stored.otp !== otp) {
-    return res.json({
-      success: false,
-      message: "Invalid OTP",
-    });
-  }
-
-  delete otpStore[email];
-
-  const token = jwt.sign({ email }, process.env.JWT_SECRET, {
-    expiresIn: "7d",
-  });
-
-  res.json({
-    success: true,
-    token,
-  });
 };

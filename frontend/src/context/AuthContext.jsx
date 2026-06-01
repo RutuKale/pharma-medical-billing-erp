@@ -88,7 +88,11 @@ export const AuthProvider = ({ children }) => {
 
   const logout = async () => {
     try {
-      await signOut(auth);
+      localStorage.removeItem("user");
+
+      if (auth.currentUser) {
+        await signOut(auth);
+      }
 
       setUser(null);
     } catch (error) {
@@ -97,10 +101,18 @@ export const AuthProvider = ({ children }) => {
   };
 
   // SESSION
-
   useEffect(() => {
+    const localUser = localStorage.getItem("user");
+
+    if (localUser) {
+      setUser(JSON.parse(localUser));
+      setLoading(false);
+    }
+
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      setUser(currentUser);
+      if (currentUser) {
+        setUser(currentUser);
+      }
 
       setLoading(false);
     });
@@ -112,6 +124,7 @@ export const AuthProvider = ({ children }) => {
     <AuthContext.Provider
       value={{
         user,
+        setUser,
         loading,
         loginWithGoogle,
         loginWithEmail,

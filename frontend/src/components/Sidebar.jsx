@@ -39,31 +39,31 @@ const Sidebar = () => {
   const location = useLocation();
 
   useEffect(() => {
-  const pathname = location.pathname;
+    const pathname = location.pathname;
 
-  if (
-    pathname.startsWith("/inventory") ||
-    pathname.startsWith("/upload")
-  ) {
-    toggleSection("INVENTORY");
-  } else if (
-    pathname.startsWith("/billing") ||
-    pathname === "/billing-history"
-  ) {
-    toggleSection("BILLING");
-  } else if (
-    pathname.startsWith("/patients") ||
-    pathname.startsWith("/reminders")
-  ) {
-    toggleSection("PATIENTS");
-  } else if (pathname.startsWith("/reports")) {
-    toggleSection("ANALYTICS");
-  } else if (pathname.startsWith("/settings")) {
-    toggleSection("SETTINGS");
-  } else {
-    toggleSection("MAIN");
-  }
-}, [location.pathname]);
+    if (
+      pathname.startsWith("/inventory") ||
+      pathname.startsWith("/upload")
+    ) {
+      toggleSection("INVENTORY");
+    } else if (
+      pathname.startsWith("/billing") ||
+      pathname === "/billing-history"
+    ) {
+      toggleSection("BILLING");
+    } else if (
+      pathname.startsWith("/patients") ||
+      pathname.startsWith("/reminders")
+    ) {
+      toggleSection("PATIENTS");
+    } else if (pathname.startsWith("/reports")) {
+      toggleSection("ANALYTICS");
+    } else if (pathname.startsWith("/settings")) {
+      toggleSection("SETTINGS");
+    } else {
+      toggleSection("MAIN");
+    }
+  }, [location.pathname]);
 
   const toggleSection = (section) => {
     setExpandedSections({
@@ -285,19 +285,17 @@ const Sidebar = () => {
                 </div>
                 <ChevronRight
                   size={14}
-                  className={`text-blue-400/50 transition-transform duration-200 ${
-                    expandedSections[section.section] ? "rotate-90" : ""
-                  }`}
+                  className={`text-blue-400/50 transition-transform duration-200 ${expandedSections[section.section] ? "rotate-90" : ""
+                    }`}
                 />
               </button>
 
               {/* LINKS */}
               <div
-                className={`space-y-1 mt-1 overflow-hidden transition-all duration-300 ${
-                  expandedSections[section.section]
-                    ? "max-h-96 opacity-100"
-                    : "max-h-0 opacity-0"
-                }`}
+                className={`space-y-1 mt-1 overflow-hidden transition-all duration-300 ${expandedSections[section.section]
+                  ? "max-h-96 opacity-100"
+                  : "max-h-0 opacity-0"
+                  }`}
               >
                 {section.items.map((item, index) => (
                   <NavLink
@@ -306,10 +304,9 @@ const Sidebar = () => {
                     onClick={() => setIsOpen(false)}
                     className={({ isActive }) =>
                       `flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-200 group relative overflow-hidden
-                      ${
-                        isActive
-                          ? "bg-gradient-to-r from-blue-500/20 to-indigo-500/20 text-white border border-blue-500/30 shadow-lg"
-                          : "hover:bg-white/5 text-gray-400 hover:text-white border border-transparent"
+                      ${isActive
+                        ? "bg-gradient-to-r from-blue-500/20 to-indigo-500/20 text-white border border-blue-500/30 shadow-lg"
+                        : "hover:bg-white/5 text-gray-400 hover:text-white border border-transparent"
                       }`
                     }
                   >
@@ -319,9 +316,8 @@ const Sidebar = () => {
                           <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-gradient-to-b from-blue-400 to-indigo-400 rounded-r-full"></div>
                         )}
                         <span
-                          className={`transition-transform group-hover:scale-110 ${
-                            isActive ? "text-blue-400" : ""
-                          }`}
+                          className={`transition-transform group-hover:scale-110 ${isActive ? "text-blue-400" : ""
+                            }`}
                         >
                           {item.icon}
                         </span>
@@ -343,7 +339,10 @@ const Sidebar = () => {
               <img
                 src={
                   user?.photoURL ||
-                  `https://ui-avatars.com/api/?name=${user?.displayName}&background=14b8a6&color=fff`
+                  `https://ui-avatars.com/api/?name=${user?.displayName ||
+                  user?.email?.split("@")[0] ||
+                  "User"
+                  }&background=14b8a6&color=fff`
                 }
                 alt="user"
                 className="w-10 h-10 rounded-xl ring-2 ring-blue-500/30"
@@ -352,7 +351,11 @@ const Sidebar = () => {
             </div>
             <div className="flex-1 min-w-0">
               <h3 className="text-sm font-semibold text-white truncate">
-                {user?.displayName || "User"}
+                {
+                  user?.displayName ||
+                  user?.email?.split("@")[0] ||
+                  "User"
+                }
               </h3>
               <p className="text-xs text-blue-300/70 truncate">
                 {user?.email || "user@example.com"}
