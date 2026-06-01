@@ -224,15 +224,15 @@ const getHtmlTemplate = (billData) => `
               <div class="info-title">Patient Details</div>
               <div class="info-row">
                 <span class="info-label">Name:</span>
-                <span class="info-value"><b>${billData.patient.name || 'Walk-in'}</b></span>
+                <span class="info-value"><b>${billData.patient.name || "Walk-in"}</b></span>
               </div>
               <div class="info-row">
                 <span class="info-label">Mobile:</span>
-                <span class="info-value">${billData.patient.mobile || '-'}</span>
+                <span class="info-value">${billData.patient.mobile || "-"}</span>
               </div>
               <div class="info-row">
                 <span class="info-label">Doctor:</span>
-                <span class="info-value">${billData.patient.doctorName || 'Self / OTC'}</span>
+                <span class="info-value">${billData.patient.doctorName || "Self / OTC"}</span>
               </div>
             </div>
             
@@ -267,7 +267,9 @@ const getHtmlTemplate = (billData) => `
               </tr>
             </thead>
             <tbody>
-              ${billData.medicines.map((item, index) => `
+              ${billData.medicines
+                .map(
+                  (item, index) => `
                 <tr>
                   <td class="text-center">${index + 1}</td>
                   <td class="text-left">
@@ -280,7 +282,9 @@ const getHtmlTemplate = (billData) => `
                   <td>${item.gst}%</td>
                   <td><b>₹${item.total.toFixed(2)}</b></td>
                 </tr>
-              `).join('')}
+              `,
+                )
+                .join("")}
             </tbody>
           </table>
           
@@ -335,7 +339,9 @@ export const printBill = (billData) => {
   if (!billData) return;
 
   const printWindow = window.open("", "_blank");
-  const htmlContent = getHtmlTemplate(billData) + `
+  const htmlContent =
+    getHtmlTemplate(billData) +
+    `
     <script>
       window.onload = function() {
         setTimeout(function() {
@@ -351,7 +357,7 @@ export const printBill = (billData) => {
 
 export const downloadBillPDF = (billData) => {
   if (!billData) return;
-  
+
   // We'll create a temporary div to hold the HTML
   const tempDiv = document.createElement("div");
   tempDiv.innerHTML = getHtmlTemplate(billData);
@@ -360,26 +366,30 @@ export const downloadBillPDF = (billData) => {
   tempDiv.style.left = "-9999px";
   tempDiv.style.top = "-9999px";
   document.body.appendChild(tempDiv);
-  
+
   // Configure html2pdf
   const opt = {
     margin: 10,
     filename: `${billData.invoiceNo}.pdf`,
-    image: { type: 'jpeg', quality: 0.98 },
+    image: { type: "jpeg", quality: 0.98 },
     html2canvas: { scale: 2 },
-    jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+    jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
   };
-  
+
   // Generate and save
-  html2pdf().set(opt).from(tempDiv.firstElementChild).save().then(() => {
-    document.body.removeChild(tempDiv);
-    Swal.fire({
-      icon: "success",
-      title: "PDF Downloaded",
-      text: "Bill PDF downloaded successfully",
-      background: "#1e293b",
-      color: "#fff",
-      confirmButtonColor: "#22c55e",
+  html2pdf()
+    .set(opt)
+    .from(tempDiv.firstElementChild)
+    .save()
+    .then(() => {
+      document.body.removeChild(tempDiv);
+      Swal.fire({
+        icon: "success",
+        title: "PDF Downloaded",
+        text: "Bill PDF downloaded successfully",
+        background: "#1e293b",
+        color: "#fff",
+        confirmButtonColor: "#22c55e",
+      });
     });
-  });
 };

@@ -31,6 +31,7 @@ import {
   Line,
 } from "recharts";
 import apiClient from "../../utils/apiClient";
+import DashboardSkeleton from "../../components/DashboardSkeleton";
 
 const COLORS = ["#2563eb", "#16a34a", "#ca8a04", "#9333ea", "#dc2626"];
 
@@ -99,7 +100,7 @@ const Reports = () => {
 
       // Top Medicines
       const topMeds = medicines.slice(0, 10).map((med) => ({
-        id: med._id,
+        id: med._id || med.medicine_id,
         medicine: med.medicine_name,
         sold: med.stock_quantity || 0,
         revenue: (med.stock_quantity || 0) * (Number(med.selling_price) || 0),
@@ -111,7 +112,7 @@ const Reports = () => {
       const lowStock = medicines
         .filter((med) => med.stock_quantity <= 10)
         .map((med) => ({
-          id: med._id,
+          id: med._id || med.medicine_id,
           medicine: med.medicine_name,
           stock: med.stock_quantity,
         }));
@@ -122,7 +123,7 @@ const Reports = () => {
       const expiry = medicines
         .filter((med) => med.expiry_date)
         .map((med) => ({
-          id: med._id,
+          id: med._id || med.medicine_id,
           medicine: med.medicine_name,
           expiry: med.expiry_date,
         }));
@@ -175,11 +176,7 @@ const Reports = () => {
   };
 
   if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-900 text-white">
-        Loading reports...
-      </div>
-    );
+    return <DashboardSkeleton />;
   }
 
   if (error) {

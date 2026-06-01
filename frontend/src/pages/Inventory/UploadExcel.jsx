@@ -18,6 +18,7 @@ import {
   TrendingUp,
   Database,
 } from "lucide-react";
+import ButtonLoader from "../../components/ButtonLoader";
 
 const API_URL = "/medicines/bulk";
 
@@ -43,7 +44,7 @@ const UploadExcel = () => {
     "sellingPrice",
     "batchNumber",
     "expiryDate",
-    "quantity"
+    "quantity",
   ];
 
   const optionalHeaders = [
@@ -52,9 +53,8 @@ const UploadExcel = () => {
     "gst",
     "manufactureDate",
     "rackLocation",
-    "minStock"
+    "minStock",
   ];
-
 
   // Header normalization map: map common variants to canonical keys
   const headerAliases = {
@@ -65,15 +65,37 @@ const UploadExcel = () => {
     category: ["category", "cat"],
     packSize: ["pack size", "packsize", "pack_size"],
     unit: ["unit"],
-    purchasePrice: ["purchase price", "purchase_price", "cost", "purchaseprice"],
-    sellingPrice: ["selling price", "selling_price", "price", "mrp", "sellingprice"],
+    purchasePrice: [
+      "purchase price",
+      "purchase_price",
+      "cost",
+      "purchaseprice",
+    ],
+    sellingPrice: [
+      "selling price",
+      "selling_price",
+      "price",
+      "mrp",
+      "sellingprice",
+    ],
     gst: ["gst"],
-    batchNumber: ["batch number", "batch", "batch_number", "batchno", "batch_no"],
-    manufactureDate: ["manufacture date", "manufacture_date", "mfg_date", "manufacturedate"],
+    batchNumber: [
+      "batch number",
+      "batch",
+      "batch_number",
+      "batchno",
+      "batch_no",
+    ],
+    manufactureDate: [
+      "manufacture date",
+      "manufacture_date",
+      "mfg_date",
+      "manufacturedate",
+    ],
     expiryDate: ["expiry date", "expiry", "expiry_date", "exp_date", "expdate"],
     quantity: ["quantity", "qty", "qnty"],
     rackLocation: ["rack location", "rack", "rack_location"],
-    minStock: ["min stock", "min_stock", "minstock"]
+    minStock: ["min stock", "min_stock", "minstock"],
   };
 
   const downloadTemplate = () => {
@@ -85,8 +107,8 @@ const UploadExcel = () => {
         brandName: "Calpol",
         manufacturer: "GSK",
         category: "Tablet",
-        purchasePrice: 10.00,
-        sellingPrice: 15.00,
+        purchasePrice: 10.0,
+        sellingPrice: 15.0,
         batchNumber: "BAT123",
         expiryDate: "2027-12-31",
         quantity: 100,
@@ -95,8 +117,8 @@ const UploadExcel = () => {
         gst: 12,
         manufactureDate: "2026-05-01",
         rackLocation: "Rack A-1",
-        minStock: 20
-      }
+        minStock: 20,
+      },
     ];
 
     const worksheet = XLSX.utils.json_to_sheet(sampleData, { header: headers });
@@ -191,7 +213,9 @@ const UploadExcel = () => {
         const normalized = normalizeParsedData(parsedData);
         validateExcelData(normalized);
       } catch (error) {
-        setErrors(["Failed to parse Excel file. Please check the file format."]);
+        setErrors([
+          "Failed to parse Excel file. Please check the file format.",
+        ]);
       }
     };
 
@@ -215,21 +239,27 @@ const UploadExcel = () => {
     setRowCount(data.length);
 
     if (data.length === 0) {
-      validationErrors.push("Excel file is empty. Please add data to the file.");
+      validationErrors.push(
+        "Excel file is empty. Please add data to the file.",
+      );
       setErrors(validationErrors);
       return;
     }
 
     if (data.length > 1000) {
-      validationWarnings.push(`Large file detected (${data.length} rows). Upload may take some time.`);
+      validationWarnings.push(
+        `Large file detected (${data.length} rows). Upload may take some time.`,
+      );
     }
 
     // CHECK HEADERS
     const headers = Object.keys(data[0] || {});
-    const missingHeaders = requiredHeaders.filter(header => !headers.includes(header));
+    const missingHeaders = requiredHeaders.filter(
+      (header) => !headers.includes(header),
+    );
 
     if (missingHeaders.length > 0) {
-      missingHeaders.forEach(header => {
+      missingHeaders.forEach((header) => {
         validationErrors.push(`Missing required column: "${header}"`);
       });
     }
@@ -262,7 +292,9 @@ const UploadExcel = () => {
       ) {
         validationErrors.push(`Row ${rowNum}: Quantity is required`);
       } else if (isNaN(row.quantity) || row.quantity <= 0) {
-        validationErrors.push(`Row ${rowNum}: Quantity must be a positive number`);
+        validationErrors.push(
+          `Row ${rowNum}: Quantity must be a positive number`,
+        );
       }
 
       if (!row.expiryDate) {
@@ -284,7 +316,7 @@ const UploadExcel = () => {
 
           if (expiryDate <= todayDate) {
             validationErrors.push(
-              `Row ${rowNum}: Expiry date must be a future date`
+              `Row ${rowNum}: Expiry date must be a future date`,
             );
           } else if (expiryDate <= threeMonthsLater) {
             futureExpiryCount++;
@@ -292,25 +324,45 @@ const UploadExcel = () => {
         }
       }
 
-      if (row.purchasePrice && (isNaN(row.purchasePrice) || row.purchasePrice < 0)) {
-        validationErrors.push(`Row ${rowNum}: Purchase price must be a valid number`);
+      if (
+        row.purchasePrice &&
+        (isNaN(row.purchasePrice) || row.purchasePrice < 0)
+      ) {
+        validationErrors.push(
+          `Row ${rowNum}: Purchase price must be a valid number`,
+        );
       }
 
-      if (row.sellingPrice && (isNaN(row.sellingPrice) || row.sellingPrice < 0)) {
-        validationErrors.push(`Row ${rowNum}: Selling price must be a valid number`);
+      if (
+        row.sellingPrice &&
+        (isNaN(row.sellingPrice) || row.sellingPrice < 0)
+      ) {
+        validationErrors.push(
+          `Row ${rowNum}: Selling price must be a valid number`,
+        );
       }
 
-      if (row.purchasePrice && row.sellingPrice && row.sellingPrice <= row.purchasePrice) {
-        validationWarnings.push(`Row ${rowNum}: Selling price is less than or equal to purchase price`);
+      if (
+        row.purchasePrice &&
+        row.sellingPrice &&
+        row.sellingPrice <= row.purchasePrice
+      ) {
+        validationWarnings.push(
+          `Row ${rowNum}: Selling price is less than or equal to purchase price`,
+        );
       }
     });
 
     if (emptyRows > 0) {
-      validationWarnings.push(`${emptyRows} rows appear to have missing critical data.`);
+      validationWarnings.push(
+        `${emptyRows} rows appear to have missing critical data.`,
+      );
     }
 
     if (futureExpiryCount > 0) {
-      validationWarnings.push(`${futureExpiryCount} products are expiring within 90 days.`);
+      validationWarnings.push(
+        `${futureExpiryCount} products are expiring within 90 days.`,
+      );
     }
 
     setErrors(validationErrors);
@@ -318,7 +370,9 @@ const UploadExcel = () => {
 
     if (validationErrors.length === 0) {
       setExcelData(data);
-      setSuccessMessage(`Successfully loaded ${data.length} medicine records. Please review the preview below before uploading.`);
+      setSuccessMessage(
+        `Successfully loaded ${data.length} medicine records. Please review the preview below before uploading.`,
+      );
     } else {
       setExcelData([]);
       setSuccessMessage("");
@@ -346,10 +400,7 @@ const UploadExcel = () => {
     setErrors([]);
 
     try {
-      const response = await apiClient.post(
-        API_URL,
-        excelData
-      );
+      const response = await apiClient.post(API_URL, excelData);
 
       if (response.data?.success) {
         Swal.fire({
@@ -357,24 +408,39 @@ const UploadExcel = () => {
           title: "Upload Successful",
           text: `Successfully uploaded ${response.data.data.insertedRows || excelData.length} medicines to inventory!`,
           background: "#1e293b",
-          color: "#fff"
+          color: "#fff",
         });
         removeFile();
       } else {
-        setErrors([response.data?.message || "Upload failed. Please try again."]);
+        setErrors([
+          response.data?.message || "Upload failed. Please try again.",
+        ]);
       }
     } catch (error) {
       console.error(error);
-      setErrors([error.response?.data?.message || "Upload failed. Please try again or contact support."]);
+      setErrors([
+        error.response?.data?.message ||
+          "Upload failed. Please try again or contact support.",
+      ]);
     } finally {
       setIsUploading(false);
     }
   };
 
   const getPreviewStats = () => {
-    const totalQuantity = excelData.reduce((sum, row) => sum + (parseInt(row.quantity) || 0), 0);
-    const totalValue = excelData.reduce((sum, row) => sum + ((parseInt(row.quantity) || 0) * (parseFloat(row.purchasePrice) || 0)), 0);
-    const categories = [...new Set(excelData.map(row => row.category).filter(Boolean))];
+    const totalQuantity = excelData.reduce(
+      (sum, row) => sum + (parseInt(row.quantity) || 0),
+      0,
+    );
+    const totalValue = excelData.reduce(
+      (sum, row) =>
+        sum +
+        (parseInt(row.quantity) || 0) * (parseFloat(row.purchasePrice) || 0),
+      0,
+    );
+    const categories = [
+      ...new Set(excelData.map((row) => row.category).filter(Boolean)),
+    ];
     return { totalQuantity, totalValue, categories: categories.length };
   };
 
@@ -419,7 +485,9 @@ const UploadExcel = () => {
           </div>
           <div>
             <p className="text-white text-xs font-medium">Bulk Import System</p>
-            <p className="text-blue-300/70 text-xs">Excel validation • Data preview • Batch processing</p>
+            <p className="text-blue-300/70 text-xs">
+              Excel validation • Data preview • Batch processing
+            </p>
           </div>
           <Sparkles size={14} className="text-blue-400 ml-auto animate-pulse" />
         </div>
@@ -431,10 +499,13 @@ const UploadExcel = () => {
               <div>
                 <div className="flex items-center gap-2 mb-2">
                   <FileSpreadsheet size={18} className="text-blue-400" />
-                  <h2 className="text-lg font-semibold text-white">Excel Template Format</h2>
+                  <h2 className="text-lg font-semibold text-white">
+                    Excel Template Format
+                  </h2>
                 </div>
                 <p className="text-sm text-gray-400">
-                  Ensure your Excel file contains all required columns for successful import
+                  Ensure your Excel file contains all required columns for
+                  successful import
                 </p>
               </div>
 
@@ -461,7 +532,8 @@ const UploadExcel = () => {
                 ))}
               </div>
               <p className="text-xs text-gray-500 mt-3">
-                <span className="text-blue-400">Optional:</span> {optionalHeaders.join(", ")}
+                <span className="text-blue-400">Optional:</span>{" "}
+                {optionalHeaders.join(", ")}
               </p>
             </div>
           </div>
@@ -472,10 +544,11 @@ const UploadExcel = () => {
           <div className="p-6">
             {/* DROPZONE */}
             <div
-              className={`border-2 border-dashed rounded-2xl p-10 flex flex-col items-center justify-center text-center cursor-pointer transition-all duration-200 ${dragActive
-                ? "border-blue-400 bg-blue-500/10"
-                : "border-white/20 hover:border-blue-400/50 hover:bg-white/5"
-                }`}
+              className={`border-2 border-dashed rounded-2xl p-10 flex flex-col items-center justify-center text-center cursor-pointer transition-all duration-200 ${
+                dragActive
+                  ? "border-blue-400 bg-blue-500/10"
+                  : "border-white/20 hover:border-blue-400/50 hover:bg-white/5"
+              }`}
               onDragEnter={handleDrag}
               onDragLeave={handleDrag}
               onDragOver={handleDrag}
@@ -513,7 +586,10 @@ const UploadExcel = () => {
                   <div>
                     <h3 className="font-semibold text-white">{fileName}</h3>
                     <p className="text-sm text-gray-400">
-                      {rowCount} records • {errors.length > 0 ? "Contains errors" : "Ready for import"}
+                      {rowCount} records •{" "}
+                      {errors.length > 0
+                        ? "Contains errors"
+                        : "Ready for import"}
                     </p>
                   </div>
                 </div>
@@ -542,8 +618,12 @@ const UploadExcel = () => {
               <div className="mt-6 bg-green-500/10 border border-green-500/20 rounded-xl p-4 flex items-start gap-3">
                 <CheckCircle2 size={20} className="text-green-400 mt-0.5" />
                 <div>
-                  <h3 className="font-semibold text-green-400">Validation Successful</h3>
-                  <p className="text-sm text-green-300/80 mt-1">{successMessage}</p>
+                  <h3 className="font-semibold text-green-400">
+                    Validation Successful
+                  </h3>
+                  <p className="text-sm text-green-300/80 mt-1">
+                    {successMessage}
+                  </p>
                 </div>
               </div>
             )}
@@ -568,7 +648,9 @@ const UploadExcel = () => {
               <div className="mt-6 bg-red-500/10 border border-red-500/20 rounded-xl p-4">
                 <div className="flex items-center gap-3 mb-3">
                   <AlertCircle size={18} className="text-red-400" />
-                  <h2 className="font-semibold text-red-400">Validation Errors</h2>
+                  <h2 className="font-semibold text-red-400">
+                    Validation Errors
+                  </h2>
                 </div>
                 <ul className="space-y-1 text-sm text-red-300/80 max-h-48 overflow-y-auto">
                   {errors.map((error, index) => (
@@ -584,21 +666,27 @@ const UploadExcel = () => {
                 <div className="bg-white/5 border border-white/10 rounded-xl p-3 flex items-center justify-between">
                   <div>
                     <p className="text-xs text-gray-400">Total Records</p>
-                    <p className="text-xl font-bold text-white">{excelData.length}</p>
+                    <p className="text-xl font-bold text-white">
+                      {excelData.length}
+                    </p>
                   </div>
                   <Database size={20} className="text-blue-400" />
                 </div>
                 <div className="bg-white/5 border border-white/10 rounded-xl p-3 flex items-center justify-between">
                   <div>
                     <p className="text-xs text-gray-400">Total Quantity</p>
-                    <p className="text-xl font-bold text-white">{previewStats.totalQuantity}</p>
+                    <p className="text-xl font-bold text-white">
+                      {previewStats.totalQuantity}
+                    </p>
                   </div>
                   <TrendingUp size={20} className="text-green-400" />
                 </div>
                 <div className="bg-white/5 border border-white/10 rounded-xl p-3 flex items-center justify-between">
                   <div>
                     <p className="text-xs text-gray-400">Categories</p>
-                    <p className="text-xl font-bold text-white">{previewStats.categories}</p>
+                    <p className="text-xl font-bold text-white">
+                      {previewStats.categories}
+                    </p>
                   </div>
                   <Table size={20} className="text-indigo-400" />
                 </div>
@@ -610,7 +698,9 @@ const UploadExcel = () => {
               <div className="mt-8">
                 <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
                   <div>
-                    <h2 className="text-lg font-semibold text-white">Data Preview</h2>
+                    <h2 className="text-lg font-semibold text-white">
+                      Data Preview
+                    </h2>
                     <p className="text-sm text-gray-400">
                       First 10 rows of {excelData.length} records
                     </p>
@@ -622,10 +712,7 @@ const UploadExcel = () => {
                     className="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white px-6 py-2.5 rounded-xl flex items-center gap-2 transition-all duration-200 shadow-lg shadow-blue-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {isUploading ? (
-                      <>
-                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                        Uploading...
-                      </>
+                      <ButtonLoader text="Uploading Medicines..." />
                     ) : (
                       <>
                         <UploadCloud size={18} />
@@ -639,9 +726,14 @@ const UploadExcel = () => {
                   <table className="w-full min-w-[1200px]">
                     <thead className="bg-white/10 border-b border-white/10">
                       <tr>
-                        <th className="text-left p-3 text-xs font-semibold text-gray-300">#</th>
+                        <th className="text-left p-3 text-xs font-semibold text-gray-300">
+                          #
+                        </th>
                         {requiredHeaders.map((header, index) => (
-                          <th key={index} className="text-left p-3 text-xs font-semibold text-gray-300">
+                          <th
+                            key={index}
+                            className="text-left p-3 text-xs font-semibold text-gray-300"
+                          >
                             {header}
                           </th>
                         ))}
@@ -649,11 +741,18 @@ const UploadExcel = () => {
                     </thead>
                     <tbody>
                       {excelData.slice(0, 10).map((row, index) => (
-                        <tr key={index} className="border-b border-white/10 hover:bg-white/5 transition-colors">
-                          <td className="p-3 text-sm text-gray-400">{index + 1}</td>
+                        <tr
+                          key={index}
+                          className="border-b border-white/10 hover:bg-white/5 transition-colors"
+                        >
+                          <td className="p-3 text-sm text-gray-400">
+                            {index + 1}
+                          </td>
                           {requiredHeaders.map((header, idx) => (
                             <td key={idx} className="p-3 text-sm text-gray-300">
-                              {row[header] || <span className="text-gray-500">—</span>}
+                              {row[header] || (
+                                <span className="text-gray-500">—</span>
+                              )}
                             </td>
                           ))}
                         </tr>
@@ -684,33 +783,49 @@ const UploadExcel = () => {
             <div className="border border-white/10 rounded-xl p-4 bg-white/5">
               <div className="flex items-center gap-2 mb-2">
                 <div className="w-1.5 h-1.5 bg-blue-400 rounded-full"></div>
-                <span className="text-sm font-medium text-gray-300">Column Names</span>
+                <span className="text-sm font-medium text-gray-300">
+                  Column Names
+                </span>
               </div>
-              <p className="text-sm text-gray-400">Do not rename or modify required column headers</p>
+              <p className="text-sm text-gray-400">
+                Do not rename or modify required column headers
+              </p>
             </div>
 
             <div className="border border-white/10 rounded-xl p-4 bg-white/5">
               <div className="flex items-center gap-2 mb-2">
                 <div className="w-1.5 h-1.5 bg-blue-400 rounded-full"></div>
-                <span className="text-sm font-medium text-gray-300">Date Format</span>
+                <span className="text-sm font-medium text-gray-300">
+                  Date Format
+                </span>
               </div>
-              <p className="text-sm text-gray-400">Expiry dates must be future dates (YYYY-MM-DD format)</p>
+              <p className="text-sm text-gray-400">
+                Expiry dates must be future dates (YYYY-MM-DD format)
+              </p>
             </div>
 
             <div className="border border-white/10 rounded-xl p-4 bg-white/5">
               <div className="flex items-center gap-2 mb-2">
                 <div className="w-1.5 h-1.5 bg-blue-400 rounded-full"></div>
-                <span className="text-sm font-medium text-gray-300">Numeric Values</span>
+                <span className="text-sm font-medium text-gray-300">
+                  Numeric Values
+                </span>
               </div>
-              <p className="text-sm text-gray-400">Quantity and prices must be valid numbers</p>
+              <p className="text-sm text-gray-400">
+                Quantity and prices must be valid numbers
+              </p>
             </div>
 
             <div className="border border-white/10 rounded-xl p-4 bg-white/5">
               <div className="flex items-center gap-2 mb-2">
                 <div className="w-1.5 h-1.5 bg-blue-400 rounded-full"></div>
-                <span className="text-sm font-medium text-gray-300">Batch Numbers</span>
+                <span className="text-sm font-medium text-gray-300">
+                  Batch Numbers
+                </span>
               </div>
-              <p className="text-sm text-gray-400">Duplicate batch numbers will be flagged for review</p>
+              <p className="text-sm text-gray-400">
+                Duplicate batch numbers will be flagged for review
+              </p>
             </div>
           </div>
         </div>

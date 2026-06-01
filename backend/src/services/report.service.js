@@ -1,10 +1,8 @@
 const pool = require("../config/db");
 
-
 // DAILY SALES REPORT
 exports.getDailySalesReport = async () => {
-
-    const [rows] = await pool.query(`
+  const [rows] = await pool.query(`
         SELECT
             DATE(bill_date) AS sales_date,
             COUNT(*) AS total_bills,
@@ -16,17 +14,13 @@ exports.getDailySalesReport = async () => {
         ORDER BY sales_date DESC
     `);
 
-    return rows;
+  return rows;
 };
 
-
 // SALES REPORT BETWEEN DATES
-exports.getSalesReportByDate = async (
-    start_date,
-    end_date
-) => {
-
-    const [rows] = await pool.query(`
+exports.getSalesReportByDate = async (start_date, end_date) => {
+  const [rows] = await pool.query(
+    `
         SELECT
             bills.*,
             patients.patient_name,
@@ -37,33 +31,28 @@ exports.getSalesReportByDate = async (
         WHERE DATE(bills.bill_date)
         BETWEEN ? AND ?
         ORDER BY bills.bill_date DESC
-    `, [
-        start_date,
-        end_date
-    ]);
+    `,
+    [start_date, end_date],
+  );
 
-    return rows;
+  return rows;
 };
-
 
 // LOW STOCK REPORT
 exports.getLowStockReport = async () => {
-
-    const [rows] = await pool.query(`
+  const [rows] = await pool.query(`
         SELECT *
         FROM medicines
         WHERE quantity <= min_stock
         ORDER BY quantity ASC
     `);
 
-    return rows;
+  return rows;
 };
-
 
 // CURRENT STOCK REPORT
 exports.getCurrentStockReport = async () => {
-
-    const [rows] = await pool.query(`
+  const [rows] = await pool.query(`
         SELECT
             medicine_name,
             category,
@@ -76,14 +65,12 @@ exports.getCurrentStockReport = async () => {
         ORDER BY medicine_name ASC
     `);
 
-    return rows;
+  return rows;
 };
-
 
 // INVENTORY MOVEMENT REPORT
 exports.getInventoryMovementReport = async () => {
-
-    const [rows] = await pool.query(`
+  const [rows] = await pool.query(`
         SELECT
             inventory_logs.*,
             medicines.medicine_name
@@ -93,14 +80,12 @@ exports.getInventoryMovementReport = async () => {
         ORDER BY inventory_logs.created_at DESC
     `);
 
-    return rows;
+  return rows;
 };
-
 
 // EXPIRY REPORT
 exports.getExpiryReport = async () => {
-
-    const [rows] = await pool.query(`
+  const [rows] = await pool.query(`
         SELECT
             medicine_name,
             batch_number,
@@ -118,14 +103,12 @@ exports.getExpiryReport = async () => {
         ORDER BY expiry_date ASC
     `);
 
-    return rows;
+  return rows;
 };
-
 
 // TOP SELLING MEDICINES
 exports.getTopSellingMedicines = async () => {
-
-    const [rows] = await pool.query(`
+  const [rows] = await pool.query(`
         SELECT
             medicines.medicine_name,
             SUM(bill_items.quantity)
@@ -139,5 +122,5 @@ exports.getTopSellingMedicines = async () => {
         LIMIT 10
     `);
 
-    return rows;
+  return rows;
 };

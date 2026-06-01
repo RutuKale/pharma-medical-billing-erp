@@ -63,7 +63,7 @@ const Settings = () => {
   const handleSave = async () => {
     setIsSaving(true);
     // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1500));
+    await new Promise((resolve) => setTimeout(resolve, 1500));
     alert("Settings saved successfully");
     setIsSaving(false);
   };
@@ -172,7 +172,10 @@ const Settings = () => {
                     Mobile Number
                   </label>
                   <div className="relative">
-                    <Phone size={18} className="absolute left-3 top-3 text-gray-400" />
+                    <Phone
+                      size={18}
+                      className="absolute left-3 top-3 text-gray-400"
+                    />
                     <input
                       type="text"
                       name="mobile"
@@ -187,7 +190,10 @@ const Settings = () => {
                     Email Address
                   </label>
                   <div className="relative">
-                    <Mail size={18} className="absolute left-3 top-3 text-gray-400" />
+                    <Mail
+                      size={18}
+                      className="absolute left-3 top-3 text-gray-400"
+                    />
                     <input
                       type="email"
                       name="email"
@@ -202,7 +208,10 @@ const Settings = () => {
                     Address
                   </label>
                   <div className="relative">
-                    <MapPin size={18} className="absolute left-3 top-3 text-gray-400" />
+                    <MapPin
+                      size={18}
+                      className="absolute left-3 top-3 text-gray-400"
+                    />
                     <textarea
                       rows={3}
                       name="address"
@@ -420,9 +429,7 @@ const Settings = () => {
                       <Sun size={20} className="text-yellow-400" />
                     )}
                     <div>
-                      <h3 className="font-medium text-white">
-                        Dark Mode
-                      </h3>
+                      <h3 className="font-medium text-white">Dark Mode</h3>
                       <p className="text-sm text-gray-400 mt-1">
                         Enable dark theme interface
                       </p>
@@ -443,9 +450,7 @@ const Settings = () => {
                   <div className="flex items-center gap-3">
                     <Database size={20} className="text-blue-400" />
                     <div>
-                      <h3 className="font-medium text-white">
-                        Auto Backup
-                      </h3>
+                      <h3 className="font-medium text-white">Auto Backup</h3>
                       <p className="text-sm text-gray-400 mt-1">
                         Daily automatic database backup
                       </p>

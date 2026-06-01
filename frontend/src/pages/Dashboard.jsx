@@ -29,17 +29,14 @@ import {
 } from "lucide-react";
 import { Link } from "react-router-dom";
 
-
-
 import apiClient from "../utils/apiClient";
-
+import DashboardSkeleton from "../components/DashboardSkeleton";
 
 const Dashboard = () => {
   const [currentTime, setCurrentTime] = useState("");
   const [currentDate, setCurrentDate] = useState("");
   const [greeting, setGreeting] = useState("");
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-
 
   const [totalProducts, setTotalProducts] = useState(0);
   const [activePatients, setActivePatients] = useState(0);
@@ -64,13 +61,13 @@ const Dashboard = () => {
           // Adjust the endpoint paths as needed based on your backend configuration
           // Here we fetch separate reports for clarity
           // Daily sales
-          apiClient.get('/reports/daily-sales'),
+          apiClient.get("/reports/daily-sales"),
           // All bills
-          apiClient.get('/bills'),
+          apiClient.get("/bills"),
           // Low stock report
-          apiClient.get('/reports/low-stock'),
+          apiClient.get("/reports/low-stock"),
           // Expiry report
-          apiClient.get('/reports/expiry'),
+          apiClient.get("/reports/expiry"),
         ]);
 
         // Build stats array based on responses
@@ -83,7 +80,7 @@ const Dashboard = () => {
         const statsData = [
           {
             title: "Today's Sales",
-            value: `₹${dailySales}`,
+            value: `₹${Number(dailySales).toLocaleString("en-IN")}`,
             icon: <IndianRupee size={22} />, // keep same icon
             color: "from-emerald-500 to-teal-500",
             bgColor: "bg-emerald-500/10",
@@ -128,11 +125,59 @@ const Dashboard = () => {
         ];
         setStats(statsData);
 
-        // Set other dynamic lists
-        setLowStockMedicines(lowStockRes?.data?.data ?? []);
-        setExpiryMedicines(expiryRes?.data?.data ?? []);
-        // For recent bills, take the most recent three entries
-        setRecentBills(billsRes?.data?.data?.slice(0, 3) ?? []);
+        // Set other dynamic lists with appropriate key mapping
+        const formattedLowStock = (lowStockRes?.data?.data ?? [])
+          .slice(0, 5)
+          .map((med) => ({
+            id: med.medicine_id,
+            name: med.medicine_name,
+            stock: med.quantity,
+            minStock: med.min_stock,
+            category: med.category || "General",
+          }));
+        setLowStockMedicines(formattedLowStock);
+
+        const formattedExpiry = (expiryRes?.data?.data ?? [])
+          .slice(0, 5)
+          .map((med) => {
+            const daysLeft = med.days_remaining ?? 0;
+            let status = "Safe";
+            if (daysLeft <= 0) {
+              status = "Expired";
+            } else if (daysLeft <= 30) {
+              status = "Critical";
+            } else if (daysLeft <= 60) {
+              status = "Warning";
+            }
+            return {
+              id: med.medicine_id || med.medicine_name,
+              name: med.medicine_name,
+              expiry: med.expiry_date
+                ? new Date(med.expiry_date).toLocaleDateString("en-US", {
+                    year: "numeric",
+                    month: "short",
+                    day: "numeric",
+                  })
+                : "-",
+              status,
+              daysLeft,
+            };
+          });
+        setExpiryMedicines(formattedExpiry);
+
+        // For recent bills, map backend keys to match UI table expectations
+        const formattedBills = (billsRes?.data?.data ?? [])
+          .slice(0, 3)
+          .map((b) => ({
+            id: b.bill_number,
+            patient: b.patient_name || "Walk-in Customer",
+            amount: `₹${Number(b.grand_total || 0).toLocaleString("en-IN")}`,
+            payment: b.payment_mode || "-",
+            status: b.payment_status
+              ? b.payment_status.toLowerCase()
+              : "completed",
+          }));
+        setRecentBills(formattedBills);
         // Reminders could be fetched from a future endpoint; keep empty for now
       } catch (error) {
         console.error("Error fetching dashboard data:", error);
@@ -140,7 +185,6 @@ const Dashboard = () => {
     };
     fetchData();
   }, []);
-
 
   useEffect(() => {
     const updateDateTime = () => {
@@ -339,79 +383,6 @@ const Dashboard = () => {
     }
   };
 
-  // MOCK DATA
-  // const stats = [
-  //   {
-  //     title: "Today's Sales",
-  //     value: "₹24,580",
-  //     icon: <IndianRupee size={22} />,
-  //     color: "from-emerald-500 to-teal-500",
-  //     bgColor: "bg-emerald-500/10",
-  //     iconColor: "text-emerald-400",
-  //     growth: "+12%",
-  //     growthUp: true,
-  //     subtitle: "vs yesterday",
-  //   },
-  //   {
-  //     title: "Total Bills",
-  //     value: "142",
-  //     icon: <Receipt size={22} />,
-  //     color: "from-pink-500 to-red-500",
-  //     bgColor: "bg-pink-500/10",
-  //     iconColor: "text-pink-400",
-  //     growth: "+8%",
-  //     growthUp: true,
-  //     subtitle: "this month",
-  //   },
-  //   {
-  //     title: "Low Stock Items",
-  //     value: "18",
-  //     icon: <AlertTriangle size={22} />,
-  //     color: "from-orange-500 to-amber-500",
-  //     bgColor: "bg-orange-500/10",
-  //     iconColor: "text-orange-400",
-  //     growth: "Needs Attention",
-  //     growthUp: false,
-  //     subtitle: "critical items",
-  //   },
-  //   {
-  //     title: "Upcoming Reminders",
-  //     value: "26",
-  //     icon: <BellRing size={22} />,
-  //     color: "from-purple-500 to-pink-500",
-  //     bgColor: "bg-purple-500/10",
-  //     iconColor: "text-purple-400",
-  //     growth: "Next 7 Days",
-  //     growthUp: false,
-  //     subtitle: "patient follow-ups",
-  //   },
-  // ];
-
-  // const lowStockMedicines = [
-  //   { id: 1, name: "Azithromycin 500mg", stock: 5, minStock: 20, category: "Antibiotic" },
-  //   { id: 2, name: "Vitamin D Capsules", stock: 2, minStock: 15, category: "Supplement" },
-  //   { id: 3, name: "Paracetamol Syrup", stock: 7, minStock: 25, category: "Pain Relief" },
-  // ];
-
-  // const expiryMedicines = [
-  //   { id: 1, name: "Dolo 650", expiry: "2025-06-12", status: "Critical", daysLeft: 30 },
-  //   { id: 2, name: "Amoxicillin", expiry: "2025-07-04", status: "Warning", daysLeft: 52 },
-  //   { id: 3, name: "Vitamin B12", expiry: "2025-05-28", status: "Expired", daysLeft: 0 },
-  // ];
-
-  // const reminders = [
-  //   { id: 1, patient: "Ramesh Sharma", medicine: "Metformin 500mg", dueDate: "Tomorrow", phone: "+91 98765 43210" },
-  //   { id: 2, patient: "Priya Patil", medicine: "BP Tablets", dueDate: "2 Days", phone: "+91 87654 32109" },
-  //   { id: 3, patient: "Amit Verma", medicine: "Antibiotics", dueDate: "Today", phone: "+91 76543 21098" },
-  // ];
-
-  // const recentBills = [
-  //   { id: "BILL-1001", patient: "Rahul Patil", amount: "₹850", payment: "UPI", date: "Today", status: "completed" },
-  //   { id: "BILL-1002", patient: "Sneha Kale", amount: "₹1,240", payment: "Cash", date: "Today", status: "completed" },
-  //   { id: "BILL-1003", patient: "Ajay Sharma", amount: "₹560", payment: "Card", date: "Today", status: "pending" },
-  // ];
-
-
   const getStatusColor = (status) => {
     switch (status) {
       case "Expired":
@@ -430,11 +401,7 @@ const Dashboard = () => {
   };
 
   if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-900 text-white">
-        Loading dashboard...
-      </div>
-    );
+    return <DashboardSkeleton />;
   }
 
   if (error) {
@@ -629,13 +596,13 @@ const Dashboard = () => {
                         <td className="p-3 sm:p-4">
                           <div className="flex items-center gap-1.5 sm:gap-2">
                             <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-gradient-to-br from-blue-400 to-indigo-500 flex items-center justify-center text-white text-[10px] sm:text-xs font-bold">
-                              {bill.patient
+                              {(bill.patient || "Unknown")
                                 .split(" ")
                                 .map((n) => n[0])
                                 .join("")}
                             </div>
                             <span className="text-white text-xs sm:text-sm truncate max-w-[80px] sm:max-w-none">
-                              {bill.patient}
+                              {bill.patient || "Unknown Patient"}
                             </span>
                           </div>
                         </td>
@@ -855,14 +822,14 @@ const Dashboard = () => {
                   >
                     <div className="flex items-center gap-2 sm:gap-3 mb-2 sm:mb-3">
                       <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-gradient-to-br from-purple-400 to-pink-500 flex items-center justify-center text-white font-bold text-xs sm:text-sm">
-                        {reminder.patient
+                        {(reminder.patient || "Unknown")
                           .split(" ")
                           .map((n) => n[0])
                           .join("")}
                       </div>
                       <div>
                         <h3 className="text-white font-semibold text-xs sm:text-sm">
-                          {reminder.patient}
+                          {reminder.patient || "Unknown Patient"}
                         </h3>
                         <p className="text-white/50 text-[10px] sm:text-xs">
                           {reminder.phone}
@@ -959,7 +926,6 @@ const Dashboard = () => {
           </div>
         </div>
       </div>
-
 
       <style>{`
         @keyframes blob {

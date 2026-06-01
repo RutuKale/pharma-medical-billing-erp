@@ -24,6 +24,7 @@ import {
 
 import Swal from "sweetalert2";
 import apiClient from "../../utils/apiClient";
+import DashboardSkeleton from "../../components/DashboardSkeleton";
 
 const API_URL = "/medicines";
 const INVENTORY_API = "/inventory";
@@ -157,50 +158,50 @@ const Inventory = () => {
     }
   };
 
- const handleDelete = async (medicineId) => {
-  const result = await Swal.fire({
-    title: "Are you sure?",
-    text: "You won't be able to recover this medicine!",
-    icon: "warning",
-    iconColor: "#ef4444", 
-    background: "#fff",
-    color: "#000",
-    showCancelButton: true,
-    confirmButtonColor: "#ef4444",
-    cancelButtonColor: "#64748b",
-    confirmButtonText: "Yes, Delete It!",
-    cancelButtonText: "Cancel",
-  });
-
-  if (!result.isConfirmed) return;
-
-  try {
-    const response = await apiClient.delete(`${API_URL}/${medicineId}`);
-
-    if (response.data.success) {
-      Swal.fire({
-        title: "Deleted!",
-        text: "Medicine deleted successfully.",
-        icon: "success",
-        iconColor: "#22c55e",
-        background: "#fff",
-        color: "#000",
-        confirmButtonColor: "#22c55e",
-      });
-      fetchMedicines();
-    }
-  } catch (error) {
-    Swal.fire({
-      title: "Error!",
-      text: "Failed to delete medicine.",
-      icon: "error",
+  const handleDelete = async (medicineId) => {
+    const result = await Swal.fire({
+      title: "Are you sure?",
+      text: "You won't be able to recover this medicine!",
+      icon: "warning",
       iconColor: "#ef4444",
-      background: "linear-gradient(to right, #141e30, #243b55)",
-      color: "#ffffff",
+      background: "#fff",
+      color: "#000",
+      showCancelButton: true,
       confirmButtonColor: "#ef4444",
+      cancelButtonColor: "#64748b",
+      confirmButtonText: "Yes, Delete It!",
+      cancelButtonText: "Cancel",
     });
-  }
-};
+
+    if (!result.isConfirmed) return;
+
+    try {
+      const response = await apiClient.delete(`${API_URL}/${medicineId}`);
+
+      if (response.data.success) {
+        Swal.fire({
+          title: "Deleted!",
+          text: "Medicine deleted successfully.",
+          icon: "success",
+          iconColor: "#22c55e",
+          background: "#fff",
+          color: "#000",
+          confirmButtonColor: "#22c55e",
+        });
+        fetchMedicines();
+      }
+    } catch (error) {
+      Swal.fire({
+        title: "Error!",
+        text: "Failed to delete medicine.",
+        icon: "error",
+        iconColor: "#ef4444",
+        background: "linear-gradient(to right, #141e30, #243b55)",
+        color: "#ffffff",
+        confirmButtonColor: "#ef4444",
+      });
+    }
+  };
 
   const handleDeleteAll = async () => {
     const result = await Swal.fire({
@@ -218,7 +219,11 @@ const Inventory = () => {
     });
     if (!result.isConfirmed) return;
     try {
-      await Promise.all(medicinesData.map(m => apiClient.delete(`${API_URL}/${m.medicine_id}`)));
+      await Promise.all(
+        medicinesData.map((m) =>
+          apiClient.delete(`${API_URL}/${m.medicine_id}`),
+        ),
+      );
       Swal.fire({
         title: "Deleted!",
         text: "All medicines deleted successfully.",
@@ -241,7 +246,6 @@ const Inventory = () => {
       });
     }
   };
-
 
   const getExpiryStatus = (expiryDate) => {
     const today = new Date();
@@ -335,7 +339,10 @@ const Inventory = () => {
     return filtered;
   }, [medicinesData, search, category, sortBy, sortOrder]);
 
-  const totalPages = itemsPerPage === "All" ? 1 : Math.ceil(filteredMedicines.length / itemsPerPage);
+  const totalPages =
+    itemsPerPage === "All"
+      ? 1
+      : Math.ceil(filteredMedicines.length / itemsPerPage);
 
   const paginatedMedicines = useMemo(() => {
     if (itemsPerPage === "All") return filteredMedicines;
@@ -368,7 +375,7 @@ const Inventory = () => {
   };
 
   if (loading) {
-    return <div className="text-white p-10">Loading medicines...</div>;
+    return <DashboardSkeleton />;
   }
 
   const SortIcon = ({ column }) => {
@@ -400,7 +407,9 @@ const Inventory = () => {
 
           <div className="relative z-10 w-full max-w-md mx-auto">
             <div className="bg-white rounded-2xl p-6 shadow-xl">
-              <h3 className="text-lg font-semibold mb-3 text-slate-900">{stockType === "IN" ? "Stock In" : "Stock Out"}</h3>
+              <h3 className="text-lg font-semibold mb-3 text-slate-900">
+                {stockType === "IN" ? "Stock In" : "Stock Out"}
+              </h3>
 
               <label className="text-sm text-slate-600">Quantity</label>
               <input
@@ -412,7 +421,9 @@ const Inventory = () => {
                 className="w-full bg-white/90 border rounded-xl px-3 py-2 text-slate-900 outline-none focus:ring-2 focus:ring-blue-500 mt-2 mb-4"
               />
 
-              <label className="text-sm text-slate-600">Remarks (optional)</label>
+              <label className="text-sm text-slate-600">
+                Remarks (optional)
+              </label>
               <input
                 type="text"
                 value={stockRemarks}
@@ -503,7 +514,7 @@ const Inventory = () => {
         )}
 
         {/* STATS CARDS - Responsive Grid */}
-        <div className="grid grid-cols-1 xs:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3 sm:gap-4 mb-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3 sm:gap-4 mb-6">
           <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-xl p-4 sm:p-5 hover:bg-white/10 transition-all duration-300 group">
             <div className="flex justify-between items-start">
               <div>
@@ -576,7 +587,7 @@ const Inventory = () => {
             </div>
           </div>
 
-          <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-xl p-4 sm:p-5 hover:bg-white/10 transition-all duration-300 group col-span-1 xs:col-span-2 lg:col-span-1">
+          <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-xl p-4 sm:p-5 hover:bg-white/10 transition-all duration-300 group col-span-1 sm:col-span-2 lg:col-span-1">
             <div className="flex justify-between items-start">
               <div>
                 <p className="text-gray-400 text-xs sm:text-sm">
@@ -678,16 +689,28 @@ const Inventory = () => {
               <select
                 value={itemsPerPage}
                 onChange={(e) => {
-                  setItemsPerPage(e.target.value === "All" ? "All" : Number(e.target.value));
+                  setItemsPerPage(
+                    e.target.value === "All" ? "All" : Number(e.target.value),
+                  );
                   setCurrentPage(1);
                 }}
                 className="bg-white/10 border border-white/20 rounded-lg px-4 py-2.5 text-white outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer text-sm sm:text-base"
               >
-                <option value={10} className="bg-slate-800">10 per page</option>
-                <option value={20} className="bg-slate-800">20 per page</option>
-                <option value={50} className="bg-slate-800">50 per page</option>
-                <option value={100} className="bg-slate-800">100 per page</option>
-                <option value="All" className="bg-slate-800">All</option>
+                <option value={10} className="bg-slate-800">
+                  10 per page
+                </option>
+                <option value={20} className="bg-slate-800">
+                  20 per page
+                </option>
+                <option value={50} className="bg-slate-800">
+                  50 per page
+                </option>
+                <option value={100} className="bg-slate-800">
+                  100 per page
+                </option>
+                <option value="All" className="bg-slate-800">
+                  All
+                </option>
               </select>
             </div>
           </div>
@@ -699,7 +722,11 @@ const Inventory = () => {
             <button
               onClick={async () => {
                 try {
-                  await Promise.all(selectedIds.map(id => apiClient.delete(`${API_URL}/${id}`)));
+                  await Promise.all(
+                    selectedIds.map((id) =>
+                      apiClient.delete(`${API_URL}/${id}`),
+                    ),
+                  );
                   Swal.fire({
                     icon: "success",
                     title: "Deleted",
@@ -743,14 +770,23 @@ const Inventory = () => {
               <thead className="bg-white/10 border-b border-white/10">
                 <tr>
                   <th className="p-4">
-                    <input type="checkbox" checked={selectedIds.length === filteredMedicines.length && filteredMedicines.length > 0} onChange={(e) => {
-                      const checked = e.target.checked;
-                      if (checked) {
-                        setSelectedIds(filteredMedicines.map(m => m.medicine_id));
-                      } else {
-                        setSelectedIds([]);
+                    <input
+                      type="checkbox"
+                      checked={
+                        selectedIds.length === filteredMedicines.length &&
+                        filteredMedicines.length > 0
                       }
-                    }} />
+                      onChange={(e) => {
+                        const checked = e.target.checked;
+                        if (checked) {
+                          setSelectedIds(
+                            filteredMedicines.map((m) => m.medicine_id),
+                          );
+                        } else {
+                          setSelectedIds([]);
+                        }
+                      }}
+                    />
                   </th>
                   <th
                     className="text-left p-4 text-sm font-semibold text-gray-300 cursor-pointer hover:text-blue-400 transition-colors"
@@ -808,13 +844,20 @@ const Inventory = () => {
                       className="border-b border-white/10 hover:bg-white/10 transition-all duration-200 group"
                     >
                       <td className="p-4">
-                        <input type="checkbox" checked={selectedIds.includes(medicine.medicine_id)} onChange={(e) => {
-                          const checked = e.target.checked;
-                          setSelectedIds(prev => {
-                            if (checked) return [...prev, medicine.medicine_id];
-                            return prev.filter(id => id !== medicine.medicine_id);
-                          });
-                        }} />
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.includes(medicine.medicine_id)}
+                          onChange={(e) => {
+                            const checked = e.target.checked;
+                            setSelectedIds((prev) => {
+                              if (checked)
+                                return [...prev, medicine.medicine_id];
+                              return prev.filter(
+                                (id) => id !== medicine.medicine_id,
+                              );
+                            });
+                          }}
+                        />
                       </td>
                       <td className="p-4">
                         <div>
@@ -1080,7 +1123,9 @@ const Inventory = () => {
         {totalPages > 1 && (
           <div className="mt-6 flex flex-col sm:flex-row items-center justify-between gap-4 bg-white/5 border border-white/10 p-4 rounded-xl backdrop-blur-sm">
             <span className="text-gray-400 text-sm">
-              Showing {(currentPage - 1) * itemsPerPage + 1} to {Math.min(currentPage * itemsPerPage, filteredMedicines.length)} of {filteredMedicines.length} medicines
+              Showing {(currentPage - 1) * itemsPerPage + 1} to{" "}
+              {Math.min(currentPage * itemsPerPage, filteredMedicines.length)}{" "}
+              of {filteredMedicines.length} medicines
             </span>
             <div className="flex items-center gap-2">
               <button
@@ -1090,7 +1135,7 @@ const Inventory = () => {
               >
                 Previous
               </button>
-              
+
               <div className="flex flex-wrap items-center gap-1">
                 {[...Array(totalPages)].map((_, idx) => {
                   const pageNumber = idx + 1;
@@ -1098,7 +1143,8 @@ const Inventory = () => {
                   if (
                     pageNumber === 1 ||
                     pageNumber === totalPages ||
-                    (pageNumber >= currentPage - 1 && pageNumber <= currentPage + 1)
+                    (pageNumber >= currentPage - 1 &&
+                      pageNumber <= currentPage + 1)
                   ) {
                     return (
                       <button
@@ -1117,14 +1163,20 @@ const Inventory = () => {
                     pageNumber === currentPage - 2 ||
                     pageNumber === currentPage + 2
                   ) {
-                    return <span key={pageNumber} className="text-gray-500 px-1">...</span>;
+                    return (
+                      <span key={pageNumber} className="text-gray-500 px-1">
+                        ...
+                      </span>
+                    );
                   }
                   return null;
                 })}
               </div>
 
               <button
-                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                onClick={() =>
+                  setCurrentPage((p) => Math.min(totalPages, p + 1))
+                }
                 disabled={currentPage === totalPages}
                 className="px-3 py-1.5 rounded-lg border border-white/10 bg-white/5 text-gray-300 hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed transition-all text-sm"
               >
@@ -1133,7 +1185,6 @@ const Inventory = () => {
             </div>
           </div>
         )}
-
       </div>
     </div>
   );

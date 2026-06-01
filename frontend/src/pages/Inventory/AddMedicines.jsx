@@ -23,6 +23,7 @@ import {
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import Swal from "sweetalert2";
 import apiClient from "../../utils/apiClient";
+import ButtonLoader from "../../components/ButtonLoader";
 
 const InputField = ({
   label,
@@ -755,10 +756,11 @@ const AddMedicines = () => {
                   className="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white px-4 sm:px-6 py-2.5 sm:py-3 rounded-xl flex items-center justify-center gap-2 transition-all duration-200 shadow-lg shadow-blue-500/20 disabled:opacity-50 disabled:cursor-not-allowed text-sm sm:text-base"
                 >
                   {isSubmitting ? (
-                    <>
-                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                      <span>{editMode ? "Updating..." : "Saving..."}</span>
-                    </>
+                    <ButtonLoader
+                      text={
+                        editMode ? "Updating Medicine..." : "Saving Medicine..."
+                      }
+                    />
                   ) : (
                     <>
                       <Save size={16} className="sm:size-[18px]" />

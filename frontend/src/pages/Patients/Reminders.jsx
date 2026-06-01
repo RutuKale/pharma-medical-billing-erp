@@ -67,6 +67,8 @@ const Reminders = () => {
   const [statusFilter, setStatusFilter] = useState("All");
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 5;
+  const [loading, setLoading] = useState(true);
+  const [reminders, setReminders] = useState([]);
 
   const filteredReminders = useMemo(() => {
     return remindersData.filter((reminder) => {
@@ -74,7 +76,8 @@ const Reminders = () => {
         reminder.patientName.toLowerCase().includes(search.toLowerCase()) ||
         reminder.mobile.includes(search) ||
         reminder.medicine.toLowerCase().includes(search.toLowerCase());
-      const matchesStatus = statusFilter === "All" || reminder.status === statusFilter;
+      const matchesStatus =
+        statusFilter === "All" || reminder.status === statusFilter;
       return matchesSearch && matchesStatus;
     });
   }, [search, statusFilter]);
@@ -83,7 +86,7 @@ const Reminders = () => {
   const totalPages = Math.ceil(filteredReminders.length / itemsPerPage);
   const paginatedReminders = filteredReminders.slice(
     (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage
+    currentPage * itemsPerPage,
   );
 
   const stats = {
@@ -239,7 +242,10 @@ const Reminders = () => {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
             {/* Search */}
             <div className="relative lg:col-span-2">
-              <Search size={18} className="absolute left-3 top-3 text-gray-400" />
+              <Search
+                size={18}
+                className="absolute left-3 top-3 text-gray-400"
+              />
               <input
                 type="text"
                 placeholder="Search patient, medicine or mobile..."
@@ -254,7 +260,10 @@ const Reminders = () => {
 
             {/* Status Filter */}
             <div className="relative">
-              <Filter size={18} className="absolute left-3 top-3 text-gray-400" />
+              <Filter
+                size={18}
+                className="absolute left-3 top-3 text-gray-400"
+              />
               <select
                 value={statusFilter}
                 onChange={(e) => {
@@ -338,7 +347,7 @@ const Reminders = () => {
                     <td className="p-4">
                       <span
                         className={`px-3 py-1 rounded-full text-xs font-semibold flex items-center gap-1 w-fit border ${getStatusBadge(
-                          reminder.status
+                          reminder.status,
                         )}`}
                       >
                         {getStatusIcon(reminder.status)}
@@ -383,12 +392,14 @@ const Reminders = () => {
             <div className="border-t border-white/10 px-6 py-4 flex items-center justify-between">
               <p className="text-sm text-gray-400">
                 Showing {(currentPage - 1) * itemsPerPage + 1} to{" "}
-                {Math.min(currentPage * itemsPerPage, filteredReminders.length)} of{" "}
-                {filteredReminders.length} entries
+                {Math.min(currentPage * itemsPerPage, filteredReminders.length)}{" "}
+                of {filteredReminders.length} entries
               </p>
               <div className="flex gap-2">
                 <button
-                  onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+                  onClick={() =>
+                    setCurrentPage((prev) => Math.max(prev - 1, 1))
+                  }
                   disabled={currentPage === 1}
                   className="p-2 rounded-lg bg-slate-800/50 border border-white/10 text-white hover:bg-white/5 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 >

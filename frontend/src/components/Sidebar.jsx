@@ -1,6 +1,5 @@
-import React, { useState } from "react";
-import { NavLink } from "react-router-dom";
-
+import React, { useState, useEffect } from "react";
+import { NavLink, useLocation } from "react-router-dom";
 import {
   LayoutDashboard,
   Package,
@@ -29,19 +28,53 @@ const Sidebar = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [expandedSections, setExpandedSections] = useState({
     MAIN: true,
-    INVENTORY: true,
-    BILLING: true,
-    PATIENTS: true,
-    ANALYTICS: true,
-    SETTINGS: true,
+    INVENTORY: false,
+    BILLING: false,
+    PATIENTS: false,
+    ANALYTICS: false,
+    SETTINGS: false,
   });
   const { logout, user } = useAuth();
 
+  const location = useLocation();
+
+  useEffect(() => {
+  const pathname = location.pathname;
+
+  if (
+    pathname.startsWith("/inventory") ||
+    pathname.startsWith("/upload")
+  ) {
+    toggleSection("INVENTORY");
+  } else if (
+    pathname.startsWith("/billing") ||
+    pathname === "/billing-history"
+  ) {
+    toggleSection("BILLING");
+  } else if (
+    pathname.startsWith("/patients") ||
+    pathname.startsWith("/reminders")
+  ) {
+    toggleSection("PATIENTS");
+  } else if (pathname.startsWith("/reports")) {
+    toggleSection("ANALYTICS");
+  } else if (pathname.startsWith("/settings")) {
+    toggleSection("SETTINGS");
+  } else {
+    toggleSection("MAIN");
+  }
+}, [location.pathname]);
+
   const toggleSection = (section) => {
-    setExpandedSections((prev) => ({
-      ...prev,
-      [section]: !prev[section],
-    }));
+    setExpandedSections({
+      MAIN: false,
+      INVENTORY: false,
+      BILLING: false,
+      PATIENTS: false,
+      ANALYTICS: false,
+      SETTINGS: false,
+      [section]: true,
+    });
   };
 
   const menuItems = [
@@ -87,7 +120,7 @@ const Sidebar = () => {
         },
         {
           name: "Upload Excel",
-          path: "/upload",
+          path: "/inventory/upload",
           icon: <Upload size={18} />,
         },
       ],
@@ -151,7 +184,7 @@ const Sidebar = () => {
   return (
     <>
       {/* MOBILE TOPBAR */}
-     <div className="lg:hidden fixed top-0 left-0 right-0 flex items-center justify-between bg-gradient-to-r from-slate-900 via-blue-950 to-slate-900 text-white px-4 py-3 z-50 border-b border-white/10">
+      <div className="lg:hidden fixed top-0 left-0 right-0 flex items-center justify-between bg-gradient-to-r from-slate-900 via-blue-950 to-slate-900 text-white px-4 py-3 z-50 border-b border-white/10">
         <div className="flex items-center gap-3">
           <div className="relative group">
             <div className="absolute inset-0 bg-gradient-to-r from-blue-400 to-indigo-400 rounded-xl blur-lg opacity-75 group-hover:opacity-100 transition-opacity"></div>
@@ -229,7 +262,10 @@ const Sidebar = () => {
             <p className="text-white text-xs font-medium">Secure Session</p>
             <p className="text-indigo-300/70 text-xs">HIPAA Compliant</p>
           </div>
-          <Sparkles size={14} className="text-indigo-400 ml-auto animate-pulse" />
+          <Sparkles
+            size={14}
+            className="text-indigo-400 ml-auto animate-pulse"
+          />
         </div>
 
         {/* NAVIGATION */}
@@ -305,7 +341,10 @@ const Sidebar = () => {
           <div className="flex items-center gap-3 mb-3 p-3 bg-white/5 rounded-xl border border-white/10">
             <div className="relative">
               <img
-                src={user?.photoURL || `https://ui-avatars.com/api/?name=${user?.displayName}&background=14b8a6&color=fff`}
+                src={
+                  user?.photoURL ||
+                  `https://ui-avatars.com/api/?name=${user?.displayName}&background=14b8a6&color=fff`
+                }
                 alt="user"
                 className="w-10 h-10 rounded-xl ring-2 ring-blue-500/30"
               />
@@ -326,7 +365,10 @@ const Sidebar = () => {
             onClick={logout}
             className="w-full bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 hover:border-red-500/30 text-red-400 hover:text-red-300 py-2.5 rounded-xl flex items-center justify-center gap-2 transition-all duration-200 group"
           >
-            <LogOut size={16} className="group-hover:rotate-12 transition-transform" />
+            <LogOut
+              size={16}
+              className="group-hover:rotate-12 transition-transform"
+            />
             <span className="text-sm font-medium">Logout</span>
           </button>
         </div>

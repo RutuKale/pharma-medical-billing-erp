@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import API from "../../utils/api";
+import DashboardSkeleton from "../../components/DashboardSkeleton";
 
 const ExpiryAlerts = () => {
   const [search, setSearch] = useState("");
@@ -41,7 +42,7 @@ const ExpiryAlerts = () => {
     try {
       setLoading(true);
 
-      const response = await API.get("/api/medicines");
+      const response = await API.get("/medicines");
 
       // map backend data according to UI structure
       const medicines = response?.data?.data || [];
@@ -206,11 +207,7 @@ const ExpiryAlerts = () => {
   ];
 
   if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-900 text-white">
-        Loading medicines...
-      </div>
-    );
+    return <DashboardSkeleton />;
   }
 
   if (error) {

@@ -17,42 +17,55 @@ import Patients from "./pages/Patients/Patients";
 import Reminders from "./pages/Patients/Reminders";
 import Reports from "./pages/Reports/Reports";
 import Settings from "./pages/Settings";
+import { Suspense } from "react";
+import AppLoader from "./components/AppLoader";
 
 function App() {
   return (
     <AuthProvider>
       <BrowserRouter>
         <Toaster position="top-right" />
-        <Routes>
-          {/* LOGIN */}
-          <Route path="/login" element={<Login />} />
+        <Suspense fallback={<AppLoader />}>
+          <Routes>
+            {/* LOGIN */}
+            <Route path="/login" element={<Login />} />
 
-          {/* PROTECTED ROUTES */}
-          <Route
-            path="/*"
-            element={
-              <ProtectedRoute>
-                <Layout>
-                  <Routes>
-                    <Route path="/" element={<Dashboard />} />
-                    <Route path="/inventory" element={<Inventory />} />
-                    <Route path="/inventory/add-medicine" element={<AddMedicines />} />
-                    <Route path="/inventory/stock" element={<Stock />} />
-                    <Route path="/inventory/stock-in" element={<StockIn />} />
-                    <Route path="/inventory/expiry-alerts" element={<ExpiryAlerts />} />
-                    <Route path="/upload" element={<UploadExcel />} />
-                    <Route path="/billing" element={<Billing />} />
-                    <Route path="/billing-history" element={<BillingHistory />} />
-                    <Route path="/patients" element={<Patients />} />
-                    <Route path="/reminders" element={<Reminders />} />
-                    <Route path="/reports" element={<Reports />} />
-                    <Route path="/settings" element={<Settings />} />
-                  </Routes>
-                </Layout>
-              </ProtectedRoute>
-            }
-          />
-        </Routes>
+            {/* PROTECTED ROUTES */}
+            <Route
+              path="/*"
+              element={
+                <ProtectedRoute>
+                  <Layout>
+                    <Routes>
+                      <Route path="/" element={<Dashboard />} />
+                      <Route path="/inventory" element={<Inventory />} />
+                      <Route
+                        path="/inventory/add-medicine"
+                        element={<AddMedicines />}
+                      />
+                      <Route path="/inventory/stock" element={<Stock />} />
+                      <Route path="/inventory/stock-in" element={<StockIn />} />
+                      <Route
+                        path="/inventory/expiry-alerts"
+                        element={<ExpiryAlerts />}
+                      />
+                      <Route path="/inventory/upload" element={<UploadExcel />} />
+                      <Route path="/billing" element={<Billing />} />
+                      <Route
+                        path="/billing-history"
+                        element={<BillingHistory />}
+                      />
+                      <Route path="/patients" element={<Patients />} />
+                      <Route path="/reminders" element={<Reminders />} />
+                      <Route path="/reports" element={<Reports />} />
+                      <Route path="/settings" element={<Settings />} />
+                    </Routes>
+                  </Layout>
+                </ProtectedRoute>
+              }
+            />
+          </Routes>
+        </Suspense>
       </BrowserRouter>
     </AuthProvider>
   );

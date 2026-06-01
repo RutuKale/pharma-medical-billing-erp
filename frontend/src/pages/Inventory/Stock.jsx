@@ -17,6 +17,7 @@ import {
   BarChart3,
 } from "lucide-react";
 import API from "../../utils/api";
+import DashboardSkeleton from "../../components/DashboardSkeleton";
 
 const Stock = () => {
   const [medicines, setMedicines] = useState([]);
@@ -30,8 +31,8 @@ const Stock = () => {
       setLoading(true);
       try {
         const [medicinesRes, logsRes] = await Promise.all([
-          API.get("/api/medicines"),
-          API.get("/api/inventory"),
+          API.get("/medicines"),
+          API.get("/inventory"),
         ]);
 
         if (medicinesRes.data?.success) {
@@ -80,12 +81,17 @@ const Stock = () => {
 
   const stats = useMemo(() => {
     const total = medicines.length;
-    const outOfStock = medicines.filter((item) => Number(item.quantity) === 0).length;
+    const outOfStock = medicines.filter(
+      (item) => Number(item.quantity) === 0,
+    ).length;
     const lowStock = medicines.filter(
-      (item) => Number(item.quantity) > 0 && Number(item.quantity) <= Number(item.min_stock || 0),
+      (item) =>
+        Number(item.quantity) > 0 &&
+        Number(item.quantity) <= Number(item.min_stock || 0),
     ).length;
     const totalValue = medicines.reduce(
-      (sum, item) => sum + Number(item.selling_price || 0) * Number(item.quantity || 0),
+      (sum, item) =>
+        sum + Number(item.selling_price || 0) * Number(item.quantity || 0),
       0,
     );
 
@@ -93,11 +99,7 @@ const Stock = () => {
   }, [medicines]);
 
   if (loading) {
-    return (
-      <div className="min-h-screen bg-slate-950 text-white flex items-center justify-center">
-        Loading stock information...
-      </div>
-    );
+    return <DashboardSkeleton />;
   }
 
   return (
@@ -125,7 +127,8 @@ const Stock = () => {
                   Stock Overview
                 </h1>
                 <p className="text-blue-300/70 text-sm mt-1">
-                  Medicine stock levels driven by billing and inventory movement.
+                  Medicine stock levels driven by billing and inventory
+                  movement.
                 </p>
               </div>
             </div>
@@ -152,8 +155,13 @@ const Stock = () => {
           <div className="flex items-center gap-3">
             <Shield size={18} className="text-indigo-400" />
             <div>
-              <p className="text-white text-sm font-medium">Billing-driven Stock Changes</p>
-              <p className="text-indigo-300 text-xs">Stock out updates are recorded from billing operations automatically.</p>
+              <p className="text-white text-sm font-medium">
+                Billing-driven Stock Changes
+              </p>
+              <p className="text-indigo-300 text-xs">
+                Stock out updates are recorded from billing operations
+                automatically.
+              </p>
             </div>
           </div>
           <Sparkles size={18} className="text-indigo-400 animate-pulse" />
@@ -161,57 +169,118 @@ const Stock = () => {
 
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
           <div className="bg-white/5 border border-white/10 rounded-2xl p-4">
-            <p className="text-gray-400 text-xs uppercase tracking-[0.2em]">Total Medicines</p>
+            <p className="text-gray-400 text-xs uppercase tracking-[0.2em]">
+              Total Medicines
+            </p>
             <p className="text-3xl font-bold text-white mt-3">{stats.total}</p>
           </div>
           <div className="bg-white/5 border border-white/10 rounded-2xl p-4">
-            <p className="text-gray-400 text-xs uppercase tracking-[0.2em]">Low Stock</p>
-            <p className="text-3xl font-bold text-orange-400 mt-3">{stats.lowStock}</p>
+            <p className="text-gray-400 text-xs uppercase tracking-[0.2em]">
+              Low Stock
+            </p>
+            <p className="text-3xl font-bold text-orange-400 mt-3">
+              {stats.lowStock}
+            </p>
           </div>
           <div className="bg-white/5 border border-white/10 rounded-2xl p-4">
-            <p className="text-gray-400 text-xs uppercase tracking-[0.2em]">Out of Stock</p>
-            <p className="text-3xl font-bold text-red-400 mt-3">{stats.outOfStock}</p>
+            <p className="text-gray-400 text-xs uppercase tracking-[0.2em]">
+              Out of Stock
+            </p>
+            <p className="text-3xl font-bold text-red-400 mt-3">
+              {stats.outOfStock}
+            </p>
           </div>
           <div className="bg-white/5 border border-white/10 rounded-2xl p-4">
-            <p className="text-gray-400 text-xs uppercase tracking-[0.2em]">Inventory Value</p>
-            <p className="text-3xl font-bold text-emerald-400 mt-3">₹{stats.totalValue.toLocaleString()}</p>
+            <p className="text-gray-400 text-xs uppercase tracking-[0.2em]">
+              Inventory Value
+            </p>
+            <p className="text-3xl font-bold text-emerald-400 mt-3">
+              ₹{stats.totalValue.toLocaleString()}
+            </p>
           </div>
         </div>
 
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 mb-6">
           <div className="xl:col-span-2 bg-white/5 border border-white/10 rounded-2xl overflow-hidden">
             <div className="border-b border-white/10 p-4">
-              <h2 className="text-lg font-semibold text-white">Medicine Stock</h2>
+              <h2 className="text-lg font-semibold text-white">
+                Medicine Stock
+              </h2>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full min-w-[720px]">
                 <thead className="bg-slate-800/70 border-b border-white/10">
                   <tr>
-                    <th className="text-left p-4 text-xs uppercase tracking-[0.18em] text-gray-400">Medicine</th>
-                    <th className="text-left p-4 text-xs uppercase tracking-[0.18em] text-gray-400">Stock</th>
-                    <th className="text-left p-4 text-xs uppercase tracking-[0.18em] text-gray-400">Min Stock</th>
-                    <th className="text-left p-4 text-xs uppercase tracking-[0.18em] text-gray-400">Price</th>
-                    <th className="text-left p-4 text-xs uppercase tracking-[0.18em] text-gray-400">Expiry</th>
-                    <th className="text-left p-4 text-xs uppercase tracking-[0.18em] text-gray-400">Status</th>
+                    <th className="text-left p-4 text-xs uppercase tracking-[0.18em] text-gray-400">
+                      Medicine
+                    </th>
+                    <th className="text-left p-4 text-xs uppercase tracking-[0.18em] text-gray-400">
+                      Stock
+                    </th>
+                    <th className="text-left p-4 text-xs uppercase tracking-[0.18em] text-gray-400">
+                      Min Stock
+                    </th>
+                    <th className="text-left p-4 text-xs uppercase tracking-[0.18em] text-gray-400">
+                      Price
+                    </th>
+                    <th className="text-left p-4 text-xs uppercase tracking-[0.18em] text-gray-400">
+                      Expiry
+                    </th>
+                    <th className="text-left p-4 text-xs uppercase tracking-[0.18em] text-gray-400">
+                      Status
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
                   {filteredMedicines.map((medicine) => {
-                    const expiryDate = new Date(medicine.expiry_date || medicine.expiryDate || medicine.expiry);
-                    const expiryDays = Math.ceil((expiryDate - new Date()) / (1000 * 60 * 60 * 24));
-                    const expiryStatus = expiryDays < 0 ? "Expired" : expiryDays <= 30 ? "Critical" : expiryDays <= 90 ? "Warning" : "Safe";
+                    const expiryDate = new Date(
+                      medicine.expiry_date ||
+                        medicine.expiryDate ||
+                        medicine.expiry,
+                    );
+                    const expiryDays = Math.ceil(
+                      (expiryDate - new Date()) / (1000 * 60 * 60 * 24),
+                    );
+                    const expiryStatus =
+                      expiryDays < 0
+                        ? "Expired"
+                        : expiryDays <= 30
+                          ? "Critical"
+                          : expiryDays <= 90
+                            ? "Warning"
+                            : "Safe";
                     return (
-                      <tr key={medicine.medicine_id || medicine.id} className="border-b border-white/10 hover:bg-white/5 transition">
+                      <tr
+                        key={medicine.medicine_id || medicine.id}
+                        className="border-b border-white/10 hover:bg-white/5 transition"
+                      >
                         <td className="p-4">
-                          <div className="font-medium text-white">{medicine.medicine_name || medicine.name}</div>
-                          <div className="text-xs text-gray-400 mt-1">{medicine.batch_number || medicine.batch}</div>
+                          <div className="font-medium text-white">
+                            {medicine.medicine_name || medicine.name}
+                          </div>
+                          <div className="text-xs text-gray-400 mt-1">
+                            {medicine.batch_number || medicine.batch}
+                          </div>
                         </td>
-                        <td className="p-4 text-white font-semibold">{medicine.quantity}</td>
-                        <td className="p-4 text-gray-300">{medicine.min_stock ?? "-"}</td>
-                        <td className="p-4 text-gray-300">₹{Number(medicine.selling_price || medicine.price || 0).toFixed(2)}</td>
-                        <td className="p-4 text-gray-300">{medicine.expiry_date || medicine.expiry || "-"}</td>
+                        <td className="p-4 text-white font-semibold">
+                          {medicine.quantity}
+                        </td>
+                        <td className="p-4 text-gray-300">
+                          {medicine.min_stock ?? "-"}
+                        </td>
+                        <td className="p-4 text-gray-300">
+                          ₹
+                          {Number(
+                            medicine.selling_price || medicine.price || 0,
+                          ).toFixed(2)}
+                        </td>
+                        <td className="p-4 text-gray-300">
+                          {medicine.expiry_date || medicine.expiry || "-"}
+                        </td>
                         <td className="p-4">
-                          <span className={`px-3 py-1 rounded-full text-xs font-semibold ${expiryStatus === "Expired" ? "bg-red-500/10 text-red-400 border border-red-500/20" : expiryStatus === "Critical" ? "bg-orange-500/10 text-orange-400 border border-orange-500/20" : expiryStatus === "Warning" ? "bg-yellow-500/10 text-yellow-400 border border-yellow-500/20" : "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"}`}>
+                          <span
+                            className={`px-3 py-1 rounded-full text-xs font-semibold ${expiryStatus === "Expired" ? "bg-red-500/10 text-red-400 border border-red-500/20" : expiryStatus === "Critical" ? "bg-orange-500/10 text-orange-400 border border-orange-500/20" : expiryStatus === "Warning" ? "bg-yellow-500/10 text-yellow-400 border border-yellow-500/20" : "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"}`}
+                          >
                             {expiryStatus}
                           </span>
                         </td>
@@ -238,24 +307,42 @@ const Stock = () => {
               <div>
                 <h3 className="text-white font-semibold">Billing Stock Out</h3>
                 <p className="text-gray-400 text-sm mt-1">
-                  Stock out activity is generated from billing operations, not manual adjustments.
+                  Stock out activity is generated from billing operations, not
+                  manual adjustments.
                 </p>
               </div>
             </div>
             <div className="bg-slate-900/80 border border-white/10 rounded-2xl p-4">
-              <p className="text-xs uppercase text-gray-400 tracking-[0.2em] mb-2">Last Billing Stock Outs</p>
+              <p className="text-xs uppercase text-gray-400 tracking-[0.2em] mb-2">
+                Last Billing Stock Outs
+              </p>
               <div className="space-y-3">
-                {logs.filter((log) => log.movement_type === "STOCK_OUT").slice(0, 4).map((log) => (
-                  <div key={log.inventory_log_id} className="rounded-xl bg-white/5 p-3">
-                    <div className="flex items-center justify-between gap-3">
-                      <span className="text-sm text-white font-semibold">{log.medicine_name}</span>
-                      <span className="text-xs text-red-300">-{log.quantity}</span>
+                {logs
+                  .filter((log) => log.movement_type === "STOCK_OUT")
+                  .slice(0, 4)
+                  .map((log) => (
+                    <div
+                      key={log.inventory_log_id}
+                      className="rounded-xl bg-white/5 p-3"
+                    >
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="text-sm text-white font-semibold">
+                          {log.medicine_name}
+                        </span>
+                        <span className="text-xs text-red-300">
+                          -{log.quantity}
+                        </span>
+                      </div>
+                      <p className="text-xs text-gray-400 mt-1">
+                        {log.remarks || "Sold via billing"}
+                      </p>
                     </div>
-                    <p className="text-xs text-gray-400 mt-1">{log.remarks || "Sold via billing"}</p>
-                  </div>
-                ))}
-                {logs.filter((log) => log.movement_type === "STOCK_OUT").length === 0 && (
-                  <p className="text-sm text-gray-400">No billing stock-out records found yet.</p>
+                  ))}
+                {logs.filter((log) => log.movement_type === "STOCK_OUT")
+                  .length === 0 && (
+                  <p className="text-sm text-gray-400">
+                    No billing stock-out records found yet.
+                  </p>
                 )}
               </div>
             </div>
@@ -265,12 +352,20 @@ const Stock = () => {
         <div className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden">
           <div className="border-b border-white/10 p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
             <div>
-              <h2 className="text-lg font-semibold text-white">Inventory Movement Log</h2>
-              <p className="text-sm text-gray-400 mt-1">Track stock in/out entries created from billing and stock adjustments.</p>
+              <h2 className="text-lg font-semibold text-white">
+                Inventory Movement Log
+              </h2>
+              <p className="text-sm text-gray-400 mt-1">
+                Track stock in/out entries created from billing and stock
+                adjustments.
+              </p>
             </div>
             <div className="flex flex-wrap items-center gap-3">
               <div className="relative">
-                <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                <Search
+                  size={16}
+                  className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+                />
                 <input
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
@@ -293,22 +388,50 @@ const Stock = () => {
             <table className="w-full min-w-[960px]">
               <thead className="bg-slate-800/70 border-b border-white/10">
                 <tr>
-                  <th className="text-left p-4 text-xs uppercase tracking-[0.18em] text-gray-400">Date</th>
-                  <th className="text-left p-4 text-xs uppercase tracking-[0.18em] text-gray-400">Medicine</th>
-                  <th className="text-left p-4 text-xs uppercase tracking-[0.18em] text-gray-400">Type</th>
-                  <th className="text-left p-4 text-xs uppercase tracking-[0.18em] text-gray-400">Quantity</th>
-                  <th className="text-left p-4 text-xs uppercase tracking-[0.18em] text-gray-400">Previous</th>
-                  <th className="text-left p-4 text-xs uppercase tracking-[0.18em] text-gray-400">Current</th>
-                  <th className="text-left p-4 text-xs uppercase tracking-[0.18em] text-gray-400">Remarks</th>
+                  <th className="text-left p-4 text-xs uppercase tracking-[0.18em] text-gray-400">
+                    Date
+                  </th>
+                  <th className="text-left p-4 text-xs uppercase tracking-[0.18em] text-gray-400">
+                    Medicine
+                  </th>
+                  <th className="text-left p-4 text-xs uppercase tracking-[0.18em] text-gray-400">
+                    Type
+                  </th>
+                  <th className="text-left p-4 text-xs uppercase tracking-[0.18em] text-gray-400">
+                    Quantity
+                  </th>
+                  <th className="text-left p-4 text-xs uppercase tracking-[0.18em] text-gray-400">
+                    Previous
+                  </th>
+                  <th className="text-left p-4 text-xs uppercase tracking-[0.18em] text-gray-400">
+                    Current
+                  </th>
+                  <th className="text-left p-4 text-xs uppercase tracking-[0.18em] text-gray-400">
+                    Remarks
+                  </th>
                 </tr>
               </thead>
               <tbody>
                 {filteredLogs.map((log) => (
-                  <tr key={log.inventory_log_id} className="border-b border-white/10 hover:bg-white/5 transition">
-                    <td className="p-4 text-gray-300 text-sm">{new Date(log.created_at || log.createdAt || log.date || Date.now()).toLocaleString()}</td>
-                    <td className="p-4 text-white font-medium">{log.medicine_name}</td>
+                  <tr
+                    key={log.inventory_log_id}
+                    className="border-b border-white/10 hover:bg-white/5 transition"
+                  >
+                    <td className="p-4 text-gray-300 text-sm">
+                      {new Date(
+                        log.created_at ||
+                          log.createdAt ||
+                          log.date ||
+                          Date.now(),
+                      ).toLocaleString()}
+                    </td>
+                    <td className="p-4 text-white font-medium">
+                      {log.medicine_name}
+                    </td>
                     <td className="p-4 text-sm text-white">
-                      <span className={`px-2 py-1 rounded-full text-[11px] font-semibold ${log.movement_type === "STOCK_IN" ? "bg-emerald-500/10 text-emerald-300" : "bg-red-500/10 text-red-300"}`}>
+                      <span
+                        className={`px-2 py-1 rounded-full text-[11px] font-semibold ${log.movement_type === "STOCK_IN" ? "bg-emerald-500/10 text-emerald-300" : "bg-red-500/10 text-red-300"}`}
+                      >
                         {log.movement_type}
                       </span>
                     </td>

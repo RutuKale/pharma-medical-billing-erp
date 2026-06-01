@@ -47,7 +47,7 @@ const StockIn = () => {
   useEffect(() => {
     const fetchMedicines = async () => {
       try {
-        const response = await API.get("/api/medicines");
+        const response = await API.get("/medicines");
         if (response.data?.success) {
           const mapped = response.data.data.map((medicine) => ({
             id: medicine.medicine_id,
@@ -70,7 +70,7 @@ const StockIn = () => {
   // FILTER MEDICINES
   const filteredMedicines = useMemo(() => {
     return medicinesData.filter((medicine) =>
-      medicine.name.toLowerCase().includes(search.toLowerCase())
+      medicine.name.toLowerCase().includes(search.toLowerCase()),
     );
   }, [search]);
 
@@ -133,7 +133,8 @@ const StockIn = () => {
     if (formData.manufactureDate && formData.expiryDate) {
       const manufacture = new Date(formData.manufactureDate);
       if (manufacture >= expiry) {
-        newErrors.manufactureDate = "Manufacture date must be before expiry date";
+        newErrors.manufactureDate =
+          "Manufacture date must be before expiry date";
       }
     }
 
@@ -157,7 +158,7 @@ const StockIn = () => {
     };
 
     try {
-      const response = await API.post("/api/inventory/stock-in", stockInData);
+      const response = await API.post("/inventory/stock-in", stockInData);
       if (response.data?.success) {
         alert("Stock added successfully");
       } else {
@@ -209,13 +210,20 @@ const StockIn = () => {
     setSearch(medicine.name);
     setShowResults(false);
     // Auto-fill batch number from existing medicine
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
       batchNumber: medicine.batch || "",
     }));
   };
 
-  const InputField = ({ label, name, type = "text", placeholder, required, icon: Icon }) => (
+  const InputField = ({
+    label,
+    name,
+    type = "text",
+    placeholder,
+    required,
+    icon: Icon,
+  }) => (
     <div>
       <label className="block text-sm font-medium text-gray-300 mb-2">
         {label} {required && <span className="text-indigo-400">*</span>}
@@ -232,7 +240,7 @@ const StockIn = () => {
           value={formData[name]}
           onChange={handleChange}
           placeholder={placeholder}
-          className={`w-full bg-white/10 border rounded-lg ${Icon ? 'pl-10' : 'pl-4'} pr-4 py-2.5 text-white placeholder-gray-400 outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all ${
+          className={`w-full bg-white/10 border rounded-lg ${Icon ? "pl-10" : "pl-4"} pr-4 py-2.5 text-white placeholder-gray-400 outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all ${
             errors[name]
               ? "border-red-500 focus:ring-red-500"
               : "border-white/20 hover:border-white/30"
@@ -248,7 +256,13 @@ const StockIn = () => {
     </div>
   );
 
-  const TextAreaField = ({ label, name, rows = 4, placeholder, icon: Icon }) => (
+  const TextAreaField = ({
+    label,
+    name,
+    rows = 4,
+    placeholder,
+    icon: Icon,
+  }) => (
     <div>
       <label className="block text-sm font-medium text-gray-300 mb-2">
         {label}
@@ -265,7 +279,7 @@ const StockIn = () => {
           value={formData[name]}
           onChange={handleChange}
           placeholder={placeholder}
-          className={`w-full bg-white/10 border border-white/20 rounded-lg ${Icon ? 'pl-10' : 'pl-4'} pr-4 py-2.5 text-white placeholder-gray-400 outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all resize-none`}
+          className={`w-full bg-white/10 border border-white/20 rounded-lg ${Icon ? "pl-10" : "pl-4"} pr-4 py-2.5 text-white placeholder-gray-400 outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all resize-none`}
         />
       </div>
     </div>
@@ -308,7 +322,10 @@ const StockIn = () => {
             to="/inventory"
             className="flex items-center gap-2 px-4 py-2 rounded-lg bg-white/5 border border-white/10 text-gray-300 hover:bg-white/10 hover:text-white transition-all duration-200 w-fit group"
           >
-            <ArrowLeft size={18} className="group-hover:-translate-x-1 transition-transform" />
+            <ArrowLeft
+              size={18}
+              className="group-hover:-translate-x-1 transition-transform"
+            />
             Back to Inventory
           </Link>
         </div>
@@ -319,10 +336,17 @@ const StockIn = () => {
             <Shield size={14} className="text-indigo-400" />
           </div>
           <div>
-            <p className="text-white text-xs font-medium">Stock Receiving Protocol</p>
-            <p className="text-indigo-300/70 text-xs">Batch tracking • Expiry validation • Supplier verification</p>
+            <p className="text-white text-xs font-medium">
+              Stock Receiving Protocol
+            </p>
+            <p className="text-indigo-300/70 text-xs">
+              Batch tracking • Expiry validation • Supplier verification
+            </p>
           </div>
-          <Sparkles size={14} className="text-indigo-400 ml-auto animate-pulse" />
+          <Sparkles
+            size={14}
+            className="text-indigo-400 ml-auto animate-pulse"
+          />
         </div>
 
         {/* FORM */}
@@ -395,12 +419,21 @@ const StockIn = () => {
                                     {medicine.name}
                                   </h3>
                                   <div className="flex items-center gap-3 mt-1 text-sm">
-                                    <span className="text-gray-400">Batch: {medicine.batch}</span>
-                                    <span className="text-gray-400">Stock: {medicine.currentStock}</span>
-                                    <span className="text-gray-400">{medicine.category}</span>
+                                    <span className="text-gray-400">
+                                      Batch: {medicine.batch}
+                                    </span>
+                                    <span className="text-gray-400">
+                                      Stock: {medicine.currentStock}
+                                    </span>
+                                    <span className="text-gray-400">
+                                      {medicine.category}
+                                    </span>
                                   </div>
                                 </div>
-                                <CheckCircle size={18} className="text-indigo-400 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                <CheckCircle
+                                  size={18}
+                                  className="text-indigo-400 opacity-0 group-hover:opacity-100 transition-opacity"
+                                />
                               </div>
                             </button>
                           ))
@@ -542,7 +575,9 @@ const StockIn = () => {
                 <div className="border-b border-white/10 p-5">
                   <div className="flex items-center gap-3">
                     <PackagePlus size={20} className="text-indigo-400" />
-                    <h2 className="font-semibold text-white">Selected Medicine</h2>
+                    <h2 className="font-semibold text-white">
+                      Selected Medicine
+                    </h2>
                   </div>
                 </div>
 
@@ -550,7 +585,9 @@ const StockIn = () => {
                   {selectedMedicine ? (
                     <div className="space-y-4">
                       <div className="p-3 bg-white/5 rounded-xl">
-                        <p className="text-xs text-gray-400 mb-1">Medicine Name</p>
+                        <p className="text-xs text-gray-400 mb-1">
+                          Medicine Name
+                        </p>
                         <h3 className="font-semibold text-white text-lg">
                           {selectedMedicine.name}
                         </h3>
@@ -562,7 +599,9 @@ const StockIn = () => {
                           <p className="text-2xl font-bold text-indigo-400">
                             {selectedMedicine.currentStock}
                           </p>
-                          <p className="text-xs text-gray-500 mt-1">{selectedMedicine.unit}</p>
+                          <p className="text-xs text-gray-500 mt-1">
+                            {selectedMedicine.unit}
+                          </p>
                         </div>
                         <div className="p-3 bg-white/5 rounded-xl">
                           <p className="text-xs text-gray-400">Batch Number</p>
@@ -574,17 +613,22 @@ const StockIn = () => {
 
                       <div className="p-3 bg-white/5 rounded-xl">
                         <p className="text-xs text-gray-400">Category</p>
-                        <p className="text-white">{selectedMedicine.category}</p>
+                        <p className="text-white">
+                          {selectedMedicine.category}
+                        </p>
                       </div>
 
                       {formData.quantity && (
                         <div className="bg-gradient-to-r from-indigo-500/20 to-blue-500/20 border border-indigo-500/30 rounded-xl p-4">
                           <div className="flex items-center justify-between mb-2">
-                            <p className="text-sm text-indigo-300">Updated Stock After Entry</p>
+                            <p className="text-sm text-indigo-300">
+                              Updated Stock After Entry
+                            </p>
                             <TrendingUp size={16} className="text-indigo-400" />
                           </div>
                           <h2 className="text-3xl font-bold text-indigo-400">
-                            {Number(selectedMedicine.currentStock) + Number(formData.quantity)}
+                            {Number(selectedMedicine.currentStock) +
+                              Number(formData.quantity)}
                           </h2>
                           <p className="text-xs text-indigo-300/70 mt-1">
                             +{formData.quantity} {selectedMedicine.unit} added
@@ -594,12 +638,19 @@ const StockIn = () => {
 
                       {formData.purchasePrice && formData.quantity && (
                         <div className="p-3 bg-white/5 rounded-xl">
-                          <p className="text-xs text-gray-400">Total Purchase Value</p>
+                          <p className="text-xs text-gray-400">
+                            Total Purchase Value
+                          </p>
                           <p className="text-xl font-bold text-white">
-                            ₹{(parseFloat(formData.purchasePrice) * parseInt(formData.quantity)).toLocaleString()}
+                            ₹
+                            {(
+                              parseFloat(formData.purchasePrice) *
+                              parseInt(formData.quantity)
+                            ).toLocaleString()}
                           </p>
                           <p className="text-xs text-gray-500 mt-1">
-                            @ ₹{formData.purchasePrice} per {selectedMedicine.unit}
+                            @ ₹{formData.purchasePrice} per{" "}
+                            {selectedMedicine.unit}
                           </p>
                         </div>
                       )}
@@ -609,8 +660,12 @@ const StockIn = () => {
                       <div className="w-16 h-16 mx-auto bg-white/10 rounded-2xl flex items-center justify-center mb-4">
                         <Truck size={32} className="text-gray-500" />
                       </div>
-                      <p className="text-gray-400">Search and select a medicine</p>
-                      <p className="text-xs text-gray-500 mt-1">to start receiving stock</p>
+                      <p className="text-gray-400">
+                        Search and select a medicine
+                      </p>
+                      <p className="text-xs text-gray-500 mt-1">
+                        to start receiving stock
+                      </p>
                     </div>
                   )}
                 </div>
@@ -621,7 +676,9 @@ const StockIn = () => {
                 <div className="flex items-start gap-3">
                   <AlertCircle size={18} className="text-amber-400 mt-0.5" />
                   <div>
-                    <h3 className="font-semibold text-amber-400">Important Guidelines</h3>
+                    <h3 className="font-semibold text-amber-400">
+                      Important Guidelines
+                    </h3>
                     <ul className="text-sm text-amber-300/80 mt-3 space-y-2">
                       <li className="flex items-center gap-2">
                         <span className="w-1.5 h-1.5 bg-amber-400 rounded-full"></span>
@@ -651,12 +708,16 @@ const StockIn = () => {
                     <User size={16} className="text-indigo-400" />
                     <div>
                       <p className="text-xs text-gray-400">Supplier</p>
-                      <p className="text-white font-medium">{formData.supplierName}</p>
+                      <p className="text-white font-medium">
+                        {formData.supplierName}
+                      </p>
                     </div>
                     {formData.invoiceNumber && (
                       <div className="ml-auto text-right">
                         <p className="text-xs text-gray-400">Invoice</p>
-                        <p className="text-white font-mono text-sm">{formData.invoiceNumber}</p>
+                        <p className="text-white font-mono text-sm">
+                          {formData.invoiceNumber}
+                        </p>
                       </div>
                     )}
                   </div>

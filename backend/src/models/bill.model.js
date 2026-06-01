@@ -1,22 +1,21 @@
 const pool = require("../config/db");
 
-
 // CREATE BILL
 exports.createBill = async (data) => {
+  const {
+    patient_id,
+    bill_number,
+    subtotal,
+    total_discount,
+    total_gst,
+    grand_total,
+    payment_mode,
+    payment_status,
+    notes,
+  } = data;
 
-    const {
-        patient_id,
-        bill_number,
-        subtotal,
-        total_discount,
-        total_gst,
-        grand_total,
-        payment_mode,
-        payment_status,
-        notes
-    } = data;
-
-    const [result] = await pool.query(`
+  const [result] = await pool.query(
+    `
         INSERT INTO bills (
             patient_id,
             bill_number,
@@ -29,26 +28,26 @@ exports.createBill = async (data) => {
             notes
         )
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `, [
-        patient_id,
-        bill_number,
-        subtotal,
-        total_discount,
-        total_gst,
-        grand_total,
-        payment_mode,
-        payment_status,
-        notes
-    ]);
+    `,
+    [
+      patient_id,
+      bill_number,
+      subtotal,
+      total_discount,
+      total_gst,
+      grand_total,
+      payment_mode,
+      payment_status,
+      notes,
+    ],
+  );
 
-    return result;
+  return result;
 };
-
 
 // GET ALL BILLS
 exports.getAllBills = async () => {
-
-    const [rows] = await pool.query(`
+  const [rows] = await pool.query(`
         SELECT
             bills.*,
             patients.patient_name,
@@ -59,14 +58,13 @@ exports.getAllBills = async () => {
         ORDER BY bill_id DESC
     `);
 
-    return rows;
+  return rows;
 };
-
 
 // GET SINGLE BILL
 exports.getBillById = async (id) => {
-
-    const [rows] = await pool.query(`
+  const [rows] = await pool.query(
+    `
         SELECT
             bills.*,
             patients.patient_name,
@@ -79,19 +77,22 @@ exports.getBillById = async (id) => {
         LEFT JOIN patients
         ON bills.patient_id = patients.patient_id
         WHERE bill_id = ?
-    `, [id]);
+    `,
+    [id],
+  );
 
-    return rows[0];
+  return rows[0];
 };
-
 
 // DELETE BILL
 exports.deleteBill = async (id) => {
-
-    const [result] = await pool.query(`
+  const [result] = await pool.query(
+    `
         DELETE FROM bills
         WHERE bill_id = ?
-    `, [id]);
+    `,
+    [id],
+  );
 
-    return result;
+  return result;
 };

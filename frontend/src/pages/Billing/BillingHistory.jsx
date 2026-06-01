@@ -17,7 +17,10 @@ import {
   ChevronRight,
 } from "lucide-react";
 import apiClient from "../../utils/apiClient";
-import { printBill as utilityPrintBill, downloadBillPDF as utilityDownloadBillPDF } from "../../utils/billUtils";
+import {
+  printBill as utilityPrintBill,
+  downloadBillPDF as utilityDownloadBillPDF,
+} from "../../utils/billUtils";
 
 const BillingHistory = () => {
   const [search, setSearch] = useState("");
@@ -39,10 +42,14 @@ const BillingHistory = () => {
         // map backend fields to front-end friendly shape if needed
         const mapped = res.data.data.map((b) => ({
           id: b.bill_id,
-          billNumber: b.bill_number,
+          billNumber: b.bill_number || b.billNumber || "-",
           patientName: b.patient_name || b.patientName || "-",
           mobile: b.mobile_number || b.mobile || "-",
-          date: b.created_at ? new Date(b.created_at).toISOString().slice(0, 10) : b.date || "-",
+          date: b.bill_date
+            ? new Date(b.bill_date).toISOString().slice(0, 10)
+            : b.created_at
+              ? new Date(b.created_at).toISOString().slice(0, 10)
+              : b.date || "-",
           amount: b.grand_total || b.amount || 0,
           paymentMode: b.payment_mode || "-",
           status: b.payment_status || "Completed",
@@ -61,10 +68,11 @@ const BillingHistory = () => {
   const filteredBills = useMemo(() => {
     return bills.filter((bill) => {
       const matchesSearch =
-        bill.billNumber.toLowerCase().includes(search.toLowerCase()) ||
-        bill.patientName.toLowerCase().includes(search.toLowerCase()) ||
-        bill.mobile.includes(search);
-      const matchesStatus = statusFilter === "All" || bill.status === statusFilter;
+        (bill.billNumber || "").toLowerCase().includes(search.toLowerCase()) ||
+        (bill.patientName || "").toLowerCase().includes(search.toLowerCase()) ||
+        (bill.mobile || "").includes(search);
+      const matchesStatus =
+        statusFilter === "All" || bill.status === statusFilter;
       const matchesDate = !dateFilter || bill.date === dateFilter;
       return matchesSearch && matchesStatus && matchesDate;
     });
@@ -74,7 +82,7 @@ const BillingHistory = () => {
   const totalPages = Math.ceil(filteredBills.length / itemsPerPage);
   const paginatedBills = filteredBills.slice(
     (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage
+    currentPage * itemsPerPage,
   );
 
   const stats = {
@@ -83,7 +91,9 @@ const BillingHistory = () => {
       .filter((bill) => bill.status === "Completed")
       .reduce((acc, bill) => acc + Number(bill.amount || 0), 0),
     cancelledBills: bills.filter((bill) => bill.status === "Cancelled").length,
-    todayBills: bills.filter((bill) => bill.date === new Date().toISOString().slice(0, 10)).length,
+    todayBills: bills.filter(
+      (bill) => bill.date === new Date().toISOString().slice(0, 10),
+    ).length,
   };
 
   const viewBill = async (bill) => {
@@ -107,10 +117,14 @@ const BillingHistory = () => {
       if (res.data?.success) {
         const fullBill = res.data.bill || res.data.data;
         const items = res.data.items || [];
-        
+
         return {
           invoiceNo: fullBill.bill_number,
-          date: fullBill.created_at ? new Date(fullBill.created_at).toLocaleString() : fullBill.date || "-",
+          date: fullBill.bill_date
+            ? new Date(fullBill.bill_date).toLocaleString()
+            : fullBill.created_at
+              ? new Date(fullBill.created_at).toLocaleString()
+              : fullBill.date || "-",
           patient: {
             name: fullBill.patient_name || "-",
             mobile: fullBill.mobile_number || "-",
@@ -118,24 +132,24 @@ const BillingHistory = () => {
             prescriptionNumber: fullBill.prescription_number || "-",
             age: fullBill.age || "-",
             gender: fullBill.gender || "-",
-            patientId: fullBill.patient_id || ""
+            patientId: fullBill.patient_id || "",
           },
-          medicines: items.map(it => ({
+          medicines: items.map((it) => ({
             name: it.medicine_name || it.name || it.medicine_id,
             batch: it.batch_number || "-",
             quantity: Number(it.quantity),
             price: Number(it.price),
             gst: Number(it.gst || 0),
             discount: Number(it.discount || 0),
-            total: Number(it.total)
+            total: Number(it.total),
           })),
           paymentMode: fullBill.payment_mode || "-",
           totals: {
             subtotal: Number(fullBill.subtotal || 0),
             discountTotal: Number(fullBill.total_discount || 0),
             gstTotal: Number(fullBill.total_gst || 0),
-            grandTotal: Number(fullBill.grand_total || 0)
-          }
+            grandTotal: Number(fullBill.grand_total || 0),
+          },
         };
       }
     } catch (error) {
@@ -196,22 +210,43 @@ const BillingHistory = () => {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
           <div className="bg-slate-900 w-[92%] md:w-3/4 lg:w-2/3 rounded-2xl border border-white/10 shadow-xl overflow-hidden">
             <div className="p-4 border-b border-white/10 flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-white">Bill Details - {viewingBill.bill_number || viewingBill.billNumber}</h3>
-              <button onClick={() => { setViewingBill(null); setViewingItems([]); }} className="text-gray-400 hover:text-white">Close</button>
+              <h3 className="text-lg font-semibold text-white">
+                Bill Details -{" "}
+                {viewingBill.bill_number || viewingBill.billNumber}
+              </h3>
+              <button
+                onClick={() => {
+                  setViewingBill(null);
+                  setViewingItems([]);
+                }}
+                className="text-gray-400 hover:text-white"
+              >
+                Close
+              </button>
             </div>
             <div className="p-4">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                 <div>
                   <p className="text-xs text-gray-400">Patient</p>
-                  <p className="text-white font-medium">{viewingBill.patient_name || viewingBill.patientName || "-"}</p>
+                  <p className="text-white font-medium">
+                    {viewingBill.patient_name || viewingBill.patientName || "-"}
+                  </p>
                 </div>
                 <div>
                   <p className="text-xs text-gray-400">Mobile</p>
-                  <p className="text-white font-medium">{viewingBill.mobile_number || viewingBill.mobile || "-"}</p>
+                  <p className="text-white font-medium">
+                    {viewingBill.mobile_number || viewingBill.mobile || "-"}
+                  </p>
                 </div>
                 <div>
                   <p className="text-xs text-gray-400">Date</p>
-                  <p className="text-white font-medium">{viewingBill.created_at ? new Date(viewingBill.created_at).toLocaleString() : viewingBill.date}</p>
+                  <p className="text-white font-medium">
+                    {viewingBill.bill_date
+                      ? new Date(viewingBill.bill_date).toLocaleString()
+                      : viewingBill.created_at
+                        ? new Date(viewingBill.created_at).toLocaleString()
+                        : viewingBill.date || "-"}
+                  </p>
                 </div>
               </div>
 
@@ -219,17 +254,30 @@ const BillingHistory = () => {
                 <table className="w-full min-w-[600px]">
                   <thead className="bg-slate-800/50 border-b border-white/10">
                     <tr>
-                      <th className="text-left p-3 text-sm text-gray-400">Medicine</th>
-                      <th className="text-left p-3 text-sm text-gray-400">Qty</th>
-                      <th className="text-left p-3 text-sm text-gray-400">Price</th>
-                      <th className="text-left p-3 text-sm text-gray-400">Total</th>
+                      <th className="text-left p-3 text-sm text-gray-400">
+                        Medicine
+                      </th>
+                      <th className="text-left p-3 text-sm text-gray-400">
+                        Qty
+                      </th>
+                      <th className="text-left p-3 text-sm text-gray-400">
+                        Price
+                      </th>
+                      <th className="text-left p-3 text-sm text-gray-400">
+                        Total
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
                     {viewingItems.length > 0 ? (
                       viewingItems.map((it) => (
-                        <tr key={it.bill_item_id || it.id} className="border-b border-white/5">
-                          <td className="p-3 text-white">{it.medicine_name || it.name || it.medicine_id}</td>
+                        <tr
+                          key={it.bill_item_id || it.id}
+                          className="border-b border-white/5"
+                        >
+                          <td className="p-3 text-white">
+                            {it.medicine_name || it.name || it.medicine_id}
+                          </td>
                           <td className="p-3 text-white">{it.quantity}</td>
                           <td className="p-3 text-white">₹{it.price}</td>
                           <td className="p-3 text-white">₹{it.total}</td>
@@ -237,7 +285,9 @@ const BillingHistory = () => {
                       ))
                     ) : (
                       <tr>
-                        <td className="p-3 text-gray-400" colSpan={4}>No items available</td>
+                        <td className="p-3 text-gray-400" colSpan={4}>
+                          No items available
+                        </td>
                       </tr>
                     )}
                   </tbody>
@@ -247,7 +297,9 @@ const BillingHistory = () => {
               <div className="mt-4 flex items-center justify-end gap-3">
                 <div className="text-right">
                   <p className="text-xs text-gray-400">Total</p>
-                  <p className="text-xl font-bold text-white">₹{viewingBill.grand_total || viewingBill.amount || 0}</p>
+                  <p className="text-xl font-bold text-white">
+                    ₹{viewingBill.grand_total || viewingBill.amount || 0}
+                  </p>
                 </div>
               </div>
             </div>
@@ -354,7 +406,10 @@ const BillingHistory = () => {
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
             {/* Search */}
             <div className="relative lg:col-span-2">
-              <Search size={18} className="absolute left-3 top-3 text-gray-400" />
+              <Search
+                size={18}
+                className="absolute left-3 top-3 text-gray-400"
+              />
               <input
                 type="text"
                 placeholder="Search bill no, patient or mobile..."
@@ -369,7 +424,10 @@ const BillingHistory = () => {
 
             {/* Status Filter */}
             <div className="relative">
-              <Filter size={18} className="absolute left-3 top-3 text-gray-400" />
+              <Filter
+                size={18}
+                className="absolute left-3 top-3 text-gray-400"
+              />
               <select
                 value={statusFilter}
                 onChange={(e) => {
@@ -515,7 +573,9 @@ const BillingHistory = () => {
               </p>
               <div className="flex gap-2">
                 <button
-                  onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+                  onClick={() =>
+                    setCurrentPage((prev) => Math.max(prev - 1, 1))
+                  }
                   disabled={currentPage === 1}
                   className="p-2 rounded-lg bg-slate-800/50 border border-white/10 text-white hover:bg-white/5 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 >

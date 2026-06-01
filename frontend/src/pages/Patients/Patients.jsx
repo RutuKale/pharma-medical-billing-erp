@@ -24,6 +24,7 @@ import {
 const API_URL = "/patients";
 import Swal from "sweetalert2";
 import apiClient from "../../utils/apiClient";
+import DashboardSkeleton from "../../components/DashboardSkeleton";
 
 const Patients = () => {
   const [formData, setFormData] = useState({
@@ -252,7 +253,9 @@ const Patients = () => {
     if (!result.isConfirmed) return;
 
     try {
-      const response = await apiClient.delete(`${API_URL}/${patient.patient_id}`);
+      const response = await apiClient.delete(
+        `${API_URL}/${patient.patient_id}`,
+      );
 
       if (response.data.success) {
         await Swal.fire({
@@ -316,11 +319,7 @@ const Patients = () => {
   };
 
   if (loading) {
-    return (
-      <div className="min-h-screen bg-slate-900 flex items-center justify-center">
-        <div className="text-white text-xl">Loading Patients...</div>
-      </div>
-    );
+    return <DashboardSkeleton />;
   }
 
   return (

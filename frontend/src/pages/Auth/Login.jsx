@@ -25,13 +25,17 @@ import {
 import { FcGoogle } from "react-icons/fc";
 import { useAuth } from "../../context/AuthContext";
 import { Navigate } from "react-router-dom";
+import ButtonLoader from "../../components/ButtonLoader";
 
 const Login = () => {
-  const { user, loginWithGoogle, loginWithEmail, registerWithEmail } = useAuth();
+  const { user, loginWithGoogle, loginWithEmail, registerWithEmail } =
+    useAuth();
 
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  // const [password, setPassword] = useState("");
+  const [otp, setOtp] = useState("");
+  const [otpSent, setOtpSent] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [currentTime, setCurrentTime] = useState("");
@@ -51,7 +55,8 @@ const Login = () => {
       role: "Director of Pharmacy",
     },
     {
-      quote: "Innovation in pharmaceuticals saves lives and transforms futures.",
+      quote:
+        "Innovation in pharmaceuticals saves lives and transforms futures.",
       author: "Dr. Emily Watson",
       role: "Head of Research",
     },
@@ -62,7 +67,11 @@ const Login = () => {
   const stats = [
     { icon: Hospital, label: "500+ Hospitals", color: "text-indigo-400" },
     { icon: Users, label: "50K+ Healthcare Pros", color: "text-teal-400" },
-    { icon: ClipboardCheck, label: "1M+ Prescriptions", color: "text-cyan-400" },
+    {
+      icon: ClipboardCheck,
+      label: "1M+ Prescriptions",
+      color: "text-cyan-400",
+    },
     { icon: Award, label: "99.9% Accuracy", color: "text-green-400" },
   ];
 
@@ -81,7 +90,7 @@ const Login = () => {
     const updateDateTime = () => {
       const now = new Date();
       setCurrentTime(
-        now.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })
+        now.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }),
       );
       setCurrentDate(
         now.toLocaleDateString("en-US", {
@@ -89,7 +98,7 @@ const Login = () => {
           year: "numeric",
           month: "long",
           day: "numeric",
-        })
+        }),
       );
     };
     updateDateTime();
@@ -116,18 +125,58 @@ const Login = () => {
     return <Navigate to="/" replace />;
   }
 
+  const sendOtp = async () => {
+    try {
+      setLoading(true);
+
+      const res = await fetch(`${import.meta.env.VITE_API_BASE_URL}/auth/send-otp`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ email }),
+      });
+
+      const data = await res.json();
+
+      if (data.success) {
+        setOtpSent(true);
+      } else {
+        setError(data.message);
+      }
+    } catch (err) {
+      setError("Failed to send OTP");
+    }
+
+    setLoading(false);
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setLoading(true);
-    setError("");
-    let result;
-    if (isLogin) {
-      result = await loginWithEmail(email, password);
-    } else {
-      result = await registerWithEmail(email, password);
-    }
-    if (!result.success) {
-      setError(result.message);
+    try {
+      setLoading(true);
+      const res = await fetch(
+        `${import.meta.env.VITE_API_BASE_URL}/auth/verify-otp`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            email,
+            otp,
+          }),
+        },
+      );
+      const data = await res.json();
+      if (!data.success) {
+        setError(data.message);
+        return;
+      }
+      localStorage.setItem("token", data.token);
+      window.location.href = "/";
+    } catch (err) {
+      setError("OTP verification failed");
     }
     setLoading(false);
   };
@@ -141,7 +190,7 @@ const Login = () => {
           <div className="absolute top-0 -left-4 w-96 h-96 bg-teal-500/20 rounded-full mix-blend-screen filter blur-[100px] animate-blob"></div>
           <div className="absolute top-0 -right-4 w-96 h-96 bg-indigo-500/20 rounded-full mix-blend-screen filter blur-[100px] animate-blob animation-delay-2000"></div>
           <div className="absolute -bottom-8 left-20 w-96 h-96 bg-cyan-500/20 rounded-full mix-blend-screen filter blur-[100px] animate-blob animation-delay-4000"></div>
-          
+
           {/* Grid Pattern */}
           <div className="absolute inset-0 opacity-10">
             <div className="h-full w-full bg-[linear-gradient(rgba(20,184,166,0.1)_1px,transparent_1px),linear-gradient(90deg,rgba(20,184,166,0.1)_1px,transparent_1px)] bg-[size:64px_64px]"></div>
@@ -162,7 +211,9 @@ const Login = () => {
               </div>
               <div>
                 <h1 className="text-xl font-bold text-white">PharmaMed</h1>
-                <p className="text-teal-300 text-xs tracking-wider">ERP SYSTEM</p>
+                <p className="text-teal-300 text-xs tracking-wider">
+                  ERP SYSTEM
+                </p>
               </div>
             </div>
 
@@ -175,8 +226,8 @@ const Login = () => {
                 </span>
               </h2>
               <p className="mt-2 text-teal-100/80 text-sm leading-relaxed max-w-lg">
-                Streamline inventory, automate billing, and deliver exceptional patient care 
-                with our intelligent pharmacy management platform.
+                Streamline inventory, automate billing, and deliver exceptional
+                patient care with our intelligent pharmacy management platform.
               </p>
             </div>
 
@@ -187,7 +238,10 @@ const Login = () => {
                   key={index}
                   className="flex items-center gap-2 text-teal-100/90 group hover:text-white transition-colors"
                 >
-                  <CheckCircle2 size={16} className="text-indigo-400 flex-shrink-0" />
+                  <CheckCircle2
+                    size={16}
+                    className="text-indigo-400 flex-shrink-0"
+                  />
                   <span className="text-xs xl:text-sm">{feature}</span>
                 </div>
               ))}
@@ -237,7 +291,9 @@ const Login = () => {
                     size={20}
                     className={`mx-auto ${stat.color} transition-colors`}
                   />
-                  <p className="text-white font-bold text-xs mt-1">{stat.label}</p>
+                  <p className="text-white font-bold text-xs mt-1">
+                    {stat.label}
+                  </p>
                 </div>
               ))}
             </div>
@@ -321,7 +377,7 @@ const Login = () => {
                 </div>
               </div>
 
-              <div>
+              {/* <div>
                 <label className="block text-teal-200 text-xs mb-1.5 ml-1">
                   Password
                 </label>
@@ -339,34 +395,48 @@ const Login = () => {
                     required
                   />
                 </div>
-              </div>
+              </div> */}
 
-              {error && (
-                <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-2.5">
-                  <p className="text-red-300 text-xs flex items-center gap-1.5">
-                    <span>⚠️</span> {error}
-                  </p>
+              {otpSent && (
+                <div>
+                  <label className="block text-teal-200 text-xs mb-1.5 ml-1">
+                    OTP
+                  </label>
+                  <div className="relative group">
+                    <Lock
+                      size={16}
+                      className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-teal-400 transition-colors"
+                    />
+                    <input
+                      type="text"
+                      placeholder="Enter 6 digit OTP"
+                      className="w-full pl-10 pr-3 py-2.5 bg-white/5 border border-white/10 rounded-xl text-white text-sm placeholder-slate-400 outline-none transition-all duration-300 focus:border-teal-400/50 focus:bg-white/10 focus:shadow-lg"
+                      value={otp}
+                      onChange={(e) => setOtp(e.target.value)}
+                      required
+                    />
+                  </div>
                 </div>
               )}
 
-              {isLogin && (
-                <div className="flex justify-end">
-                  <button
-                    type="button"
-                    className="text-teal-400 text-xs hover:text-teal-300 transition-colors"
-                  >
-                    Forgot password?
-                  </button>
-                </div>
-              )}
+              <button
+                type="button"
+                disabled={!email || loading}
+                onClick={sendOtp}
+                className="w-full bg-gradient-to-r from-teal-500 to-indigo-500 hover:from-teal-600 hover:to-indigo-600 text-white py-2.5 rounded-xl text-sm font-medium transition-all duration-300 flex items-center justify-center gap-1.5 group disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Send OTP
+              </button>
 
               <button
                 type="submit"
                 disabled={loading}
                 className="w-full bg-gradient-to-r from-teal-500 to-indigo-500 hover:from-teal-600 hover:to-indigo-600 text-white py-2.5 rounded-xl text-sm font-medium transition-all duration-300 flex items-center justify-center gap-1.5 group disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {loading ? (
-                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                {/* {loading ? (
+                  <ButtonLoader
+                    text={isLogin ? "Signing In..." : "Creating Account..."}
+                  />
                 ) : (
                   <>
                     {isLogin ? "Sign In" : "Create Account"}
@@ -375,7 +445,8 @@ const Login = () => {
                       className="group-hover:translate-x-1 transition-transform"
                     />
                   </>
-                )}
+                )} */}
+                Verify OTP
               </button>
             </form>
 
@@ -424,11 +495,18 @@ const Login = () => {
         </div>
       </div>
 
-      <style jsx>{`
+      <style>{`
         @keyframes blob {
-          0%, 100% { transform: translate(0px, 0px) scale(1); }
-          33% { transform: translate(30px, -50px) scale(1.1); }
-          66% { transform: translate(-20px, 20px) scale(0.9); }
+          0%,
+          100% {
+            transform: translate(0px, 0px) scale(1);
+          }
+          33% {
+            transform: translate(30px, -50px) scale(1.1);
+          }
+          66% {
+            transform: translate(-20px, 20px) scale(0.9);
+          }
         }
         .animate-blob {
           animation: blob 7s infinite;

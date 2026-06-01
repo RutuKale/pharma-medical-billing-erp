@@ -295,20 +295,20 @@ const Billing = () => {
           grand_total: billData.totals.grandTotal,
           payment_mode: billData.paymentMode,
           payment_status: "Completed",
-          notes: ""
+          notes: "",
         },
-        items: billData.medicines.map(m => ({
+        items: billData.medicines.map((m) => ({
           medicine_id: m.medicine_id || m.id,
           quantity: m.quantity,
           price: m.price,
           gst: m.gst,
           discount: m.discount,
-          total: m.total
-        }))
+          total: m.total,
+        })),
       };
 
       const res = await apiClient.post("/bills", payload);
-      
+
       if (res.data.success) {
         Swal.fire({
           icon: "success",
@@ -318,7 +318,7 @@ const Billing = () => {
           color: "#fff",
           confirmButtonColor: "#22c55e",
         });
-        
+
         // Optionally print automatically or just clear form
         setBillItems([]);
         setPatient({
@@ -331,7 +331,7 @@ const Billing = () => {
           prescriptionNumber: "",
         });
         setSelectedPatientId("");
-        
+
         // Refresh medicines to get updated stock
         fetchMedicines();
       }
@@ -340,7 +340,8 @@ const Billing = () => {
       Swal.fire({
         icon: "error",
         title: "Error Generating Bill",
-        text: error.response?.data?.message || "Failed to save bill to database",
+        text:
+          error.response?.data?.message || "Failed to save bill to database",
         background: "#1e293b",
         color: "#fff",
         confirmButtonColor: "#ef4444",
@@ -512,7 +513,7 @@ const Billing = () => {
           </div>
         </div>
 
-       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 relative">
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 relative">
           {/* LEFT SECTION */}
           <div className="xl:col-span-2 space-y-6 relative overflow-visible">
             {/* Patient Info Card */}
@@ -612,7 +613,7 @@ const Billing = () => {
             </div>
 
             {/* Add Medicine Card */}
-           <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl shadow-xl overflow-visible relative z-50">
+            <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl shadow-xl overflow-visible relative z-50">
               <div className="bg-gradient-to-r from-purple-500/10 to-pink-500/10 px-6 py-4 border-b border-white/10">
                 <div className="flex items-center gap-3">
                   <div className="bg-purple-500/20 p-2 rounded-xl">
@@ -640,7 +641,7 @@ const Billing = () => {
                   />
 
                   {search && (
-                   <div className="absolute left-0 right-0 top-full mt-2 bg-slate-800 border border-white/10 rounded-xl shadow-2xl w-full max-h-72 overflow-y-auto backdrop-blur-xl custom-scrollbar z-[99999]">
+                    <div className="absolute left-0 right-0 top-full mt-2 bg-slate-800 border border-white/10 rounded-xl shadow-2xl w-full max-h-72 overflow-y-auto backdrop-blur-xl custom-scrollbar z-[99999]">
                       {loading ? (
                         <div className="p-4 text-center text-gray-400">
                           Loading medicines...
@@ -751,7 +752,7 @@ const Billing = () => {
             </div>
 
             {/* Bill Table */}
-           <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl shadow-xl overflow-visible relative z-0">
+            <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl shadow-xl overflow-visible relative z-0">
               <div className="bg-gradient-to-r from-green-500/10 to-emerald-500/10 px-6 py-4 border-b border-white/10">
                 <h2 className="text-lg font-semibold text-white">Bill Items</h2>
               </div>
