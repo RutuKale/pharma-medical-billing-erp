@@ -27,54 +27,49 @@ import { useAuth } from "../context/AuthContext";
 const Sidebar = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [expandedSections, setExpandedSections] = useState({
-    MAIN: true,
     INVENTORY: false,
     BILLING: false,
     PATIENTS: false,
-    ANALYTICS: false,
-    SETTINGS: false,
   });
   const { logout, user } = useAuth();
 
   const location = useLocation();
 
   useEffect(() => {
-  const pathname = location.pathname;
-
-  if (
-    pathname.startsWith("/inventory") ||
-    pathname.startsWith("/upload")
-  ) {
-    toggleSection("INVENTORY");
-  } else if (
-    pathname.startsWith("/billing") ||
-    pathname === "/billing-history"
-  ) {
-    toggleSection("BILLING");
-  } else if (
-    pathname.startsWith("/patients") ||
-    pathname.startsWith("/reminders")
-  ) {
-    toggleSection("PATIENTS");
-  } else if (pathname.startsWith("/reports")) {
-    toggleSection("ANALYTICS");
-  } else if (pathname.startsWith("/settings")) {
-    toggleSection("SETTINGS");
-  } else {
-    toggleSection("MAIN");
-  }
-}, [location.pathname]);
-
-  const toggleSection = (section) => {
-    setExpandedSections({
-      MAIN: false,
+    const pathname = location.pathname;
+    const newExpanded = {
       INVENTORY: false,
       BILLING: false,
       PATIENTS: false,
-      ANALYTICS: false,
-      SETTINGS: false,
-      [section]: true,
-    });
+    };
+
+    if (
+      pathname.startsWith("/inventory") ||
+      pathname.startsWith("/upload")
+    ) {
+      newExpanded.INVENTORY = true;
+    } else if (
+      pathname.startsWith("/billing") ||
+      pathname === "/billing-history"
+    ) {
+      newExpanded.BILLING = true;
+    } else if (
+      pathname.startsWith("/patients") ||
+      pathname.startsWith("/reminders")
+    ) {
+      newExpanded.PATIENTS = true;
+    }
+
+    setExpandedSections(newExpanded);
+  }, [location.pathname]);
+
+  const toggleSection = (section) => {
+    setExpandedSections((prev) => ({
+      INVENTORY: false,
+      BILLING: false,
+      PATIENTS: false,
+      [section]: !prev[section],
+    }));
   };
 
   const menuItems = [
@@ -270,108 +265,108 @@ const Sidebar = () => {
 
         {/* NAVIGATION */}
         <div className="relative z-10 flex-1 overflow-y-auto px-3 py-4 scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-transparent">
-          {menuItems.map((section, sectionIndex) => (
-            <div key={sectionIndex} className="mb-4">
-              {/* SECTION TITLE - Clickable */}
-              <button
-                onClick={() => toggleSection(section.section)}
-                className="w-full px-3 py-2 flex items-center justify-between group hover:bg-white/5 rounded-lg transition-all duration-200"
-              >
-                <div className="flex items-center gap-2">
-                  <span className="text-blue-400/70">{section.icon}</span>
-                  <p className="text-xs font-semibold tracking-wider text-blue-300/70 uppercase group-hover:text-blue-300 transition-colors">
-                    {section.section}
-                  </p>
-                </div>
-                <ChevronRight
-                  size={14}
-                  className={`text-blue-400/50 transition-transform duration-200 ${
-                    expandedSections[section.section] ? "rotate-90" : ""
-                  }`}
-                />
-              </button>
+          {menuItems.map((section, sectionIndex) => {
+            const isDropdown = !['MAIN', 'ANALYTICS', 'SETTINGS'].includes(section.section);
 
-              {/* LINKS */}
-              <div
-                className={`space-y-1 mt-1 overflow-hidden transition-all duration-300 ${
-                  expandedSections[section.section]
-                    ? "max-h-96 opacity-100"
-                    : "max-h-0 opacity-0"
-                }`}
-              >
-                {section.items.map((item, index) => (
-                  <NavLink
-                    key={index}
-                    to={item.path}
-                    onClick={() => setIsOpen(false)}
-                    className={({ isActive }) =>
-                      `flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-200 group relative overflow-hidden
-                      ${
-                        isActive
+            if (!isDropdown) {
+              return (
+                <div key={sectionIndex} className="mb-2">
+                  {section.items.map((item, index) => (
+                    <NavLink
+                      key={index}
+                      to={item.path}
+                      onClick={() => setIsOpen(false)}
+                      className={({ isActive }) =>
+                        `flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-200 group relative overflow-hidden
+                        ${isActive
                           ? "bg-gradient-to-r from-blue-500/20 to-indigo-500/20 text-white border border-blue-500/30 shadow-lg"
                           : "hover:bg-white/5 text-gray-400 hover:text-white border border-transparent"
-                      }`
-                    }
-                  >
-                    {({ isActive }) => (
-                      <>
-                        {isActive && (
-                          <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-gradient-to-b from-blue-400 to-indigo-400 rounded-r-full"></div>
-                        )}
-                        <span
-                          className={`transition-transform group-hover:scale-110 ${
-                            isActive ? "text-blue-400" : ""
-                          }`}
-                        >
-                          {item.icon}
-                        </span>
-                        <span className="text-sm font-medium">{item.name}</span>
-                      </>
-                    )}
-                  </NavLink>
-                ))}
+                        }`
+                      }
+                    >
+                      {({ isActive }) => (
+                        <>
+                          {isActive && (
+                            <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-gradient-to-b from-blue-400 to-indigo-400 rounded-r-full"></div>
+                          )}
+                          <span
+                            className={`transition-transform group-hover:scale-110 ${isActive ? "text-blue-400" : ""
+                              }`}
+                          >
+                            {item.icon}
+                          </span>
+                          <span className="text-sm font-medium">{item.name}</span>
+                        </>
+                      )}
+                    </NavLink>
+                  ))}
+                </div>
+              );
+            }
+
+            return (
+              <div key={sectionIndex} className="mb-4">
+                {/* SECTION TITLE - Clickable */}
+                <button
+                  onClick={() => toggleSection(section.section)}
+                  className="w-full px-3 py-2 flex items-center justify-between group hover:bg-white/5 rounded-lg transition-all duration-200"
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="text-blue-400/70">{section.icon}</span>
+                    <p className="text-xs font-semibold tracking-wider text-blue-300/70 uppercase group-hover:text-blue-300 transition-colors">
+                      {section.section}
+                    </p>
+                  </div>
+                  <ChevronRight
+                    size={14}
+                    className={`text-blue-400/50 transition-transform duration-200 ${expandedSections[section.section] ? "rotate-90" : ""
+                      }`}
+                  />
+                </button>
+
+                {/* LINKS */}
+                <div
+                  className={`space-y-1 mt-1 overflow-hidden transition-all duration-300 ${expandedSections[section.section]
+                    ? "max-h-96 opacity-100"
+                    : "max-h-0 opacity-0"
+                    }`}
+                >
+                  {section.items.map((item, index) => (
+                    <NavLink
+                      key={index}
+                      to={item.path}
+                      onClick={() => setIsOpen(false)}
+                      className={({ isActive }) =>
+                        `flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-200 group relative overflow-hidden
+                        ${isActive
+                          ? "bg-gradient-to-r from-blue-500/20 to-indigo-500/20 text-white border border-blue-500/30 shadow-lg"
+                          : "hover:bg-white/5 text-gray-400 hover:text-white border border-transparent"
+                        }`
+                      }
+                    >
+                      {({ isActive }) => (
+                        <>
+                          {isActive && (
+                            <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-gradient-to-b from-blue-400 to-indigo-400 rounded-r-full"></div>
+                          )}
+                          <span
+                            className={`transition-transform group-hover:scale-110 ${isActive ? "text-blue-400" : ""
+                              }`}
+                          >
+                            {item.icon}
+                          </span>
+                          <span className="text-sm font-medium">{item.name}</span>
+                        </>
+                      )}
+                    </NavLink>
+                  ))}
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
 
-        {/* FOOTER */}
-        <div className="relative z-10 p-4 border-t border-white/10 bg-gradient-to-t from-slate-900 to-transparent">
-          {/* USER */}
-          <div className="flex items-center gap-3 mb-3 p-3 bg-white/5 rounded-xl border border-white/10">
-            <div className="relative">
-              <img
-                src={
-                  user?.photoURL ||
-                  `https://ui-avatars.com/api/?name=${user?.displayName}&background=14b8a6&color=fff`
-                }
-                alt="user"
-                className="w-10 h-10 rounded-xl ring-2 ring-blue-500/30"
-              />
-              <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-indigo-400 rounded-full border-2 border-slate-900"></div>
-            </div>
-            <div className="flex-1 min-w-0">
-              <h3 className="text-sm font-semibold text-white truncate">
-                {user?.displayName || "User"}
-              </h3>
-              <p className="text-xs text-blue-300/70 truncate">
-                {user?.email || "user@example.com"}
-              </p>
-            </div>
-          </div>
 
-          {/* LOGOUT */}
-          <button
-            onClick={logout}
-            className="w-full bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 hover:border-red-500/30 text-red-400 hover:text-red-300 py-2.5 rounded-xl flex items-center justify-center gap-2 transition-all duration-200 group"
-          >
-            <LogOut
-              size={16}
-              className="group-hover:rotate-12 transition-transform"
-            />
-            <span className="text-sm font-medium">Logout</span>
-          </button>
-        </div>
       </aside>
     </>
   );

@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   Users,
   Search,
@@ -635,8 +636,8 @@ const Patients = () => {
           </div>
 
           {/* Patient Modal */}
-          {showModal && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          {showModal && createPortal(
+            <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
               <div className="w-full max-w-2xl max-h-[95vh] overflow-y-auto bg-slate-900 border border-white/10 rounded-2xl shadow-2xl">
                 {/* Modal Header */}
                 <div className="sticky top-0 bg-slate-900 border-b border-white/10 px-6 py-4 flex items-center justify-between">
@@ -661,192 +662,189 @@ const Patients = () => {
                   </button>
                 </div>
 
-                {/* Modal Body */}
                 <div className="p-6">
                   <form onSubmit={handleSubmit} className="space-y-5">
-                    {/* Name */}
-                    <div>
-                      <label className="block text-sm font-medium text-gray-300 mb-1">
-                        Patient Name *
-                      </label>
-
-                      <input
-                        type="text"
-                        name="name"
-                        value={formData.name}
-                        onChange={handleChange}
-                        placeholder="Enter patient name"
-                        className={`w-full bg-slate-800/50 border rounded-xl px-4 py-2 text-white placeholder-gray-400 outline-none focus:ring-2 focus:border-transparent transition-all ${
-                          errors.name
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                      {/* Name */}
+                      <div>
+                        <label className="block text-sm font-medium text-gray-300 mb-1">
+                          Patient Name *
+                        </label>
+                        <input
+                          type="text"
+                          name="name"
+                          value={formData.name}
+                          onChange={handleChange}
+                          placeholder="Enter patient name"
+                          autoComplete="off"
+                          className={`w-full bg-slate-800/50 border rounded-xl px-4 py-2.5 text-white placeholder-gray-500 outline-none focus:ring-2 focus:border-transparent transition-all ${errors.name
                             ? "border-red-500/50 focus:ring-red-500/50"
                             : "border-white/10 focus:ring-blue-500/50"
-                        }`}
-                      />
+                            }`}
+                        />
+                        {errors.name && (
+                          <p className="text-red-400 text-xs mt-1">{errors.name}</p>
+                        )}
+                      </div>
 
-                      {errors.name && (
-                        <p className="text-red-400 text-sm mt-1">
-                          {errors.name}
-                        </p>
-                      )}
-                    </div>
-
-                    {/* Mobile */}
-                    <div>
-                      <label className="block text-sm font-medium text-gray-300 mb-1">
-                        Mobile Number *
-                      </label>
-
-                      <input
-                        type="text"
-                        name="mobile"
-                        value={formData.mobile}
-                        onChange={handleChange}
-                        placeholder="Enter mobile number"
-                        className={`w-full bg-slate-800/50 border rounded-xl px-4 py-2 text-white placeholder-gray-400 outline-none focus:ring-2 focus:border-transparent transition-all ${
-                          errors.mobile
+                      {/* Mobile */}
+                      <div>
+                        <label className="block text-sm font-medium text-gray-300 mb-1">
+                          Mobile Number *
+                        </label>
+                        <input
+                          type="text"
+                          name="mobile"
+                          value={formData.mobile}
+                          onChange={handleChange}
+                          placeholder="Enter mobile number"
+                          autoComplete="off"
+                          className={`w-full bg-slate-800/50 border rounded-xl px-4 py-2.5 text-white placeholder-gray-500 outline-none focus:ring-2 focus:border-transparent transition-all ${errors.mobile
                             ? "border-red-500/50 focus:ring-red-500/50"
                             : "border-white/10 focus:ring-blue-500/50"
-                        }`}
-                      />
+                            }`}
+                        />
+                        {errors.mobile && (
+                          <p className="text-red-400 text-xs mt-1">{errors.mobile}</p>
+                        )}
+                      </div>
 
-                      {errors.mobile && (
-                        <p className="text-red-400 text-sm mt-1">
-                          {errors.mobile}
-                        </p>
-                      )}
-                    </div>
-
-                    {/* Age + Gender */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {/* Age */}
                       <div>
                         <label className="block text-sm font-medium text-gray-300 mb-1">
                           Age
                         </label>
-
                         <input
                           type="number"
                           name="age"
                           value={formData.age}
                           onChange={handleChange}
                           placeholder="Enter age"
-                          className="w-full bg-slate-800/50 border border-white/10 rounded-xl px-4 py-2 text-white placeholder-gray-400 outline-none focus:ring-2 focus:ring-blue-500/50"
+                          autoComplete="off"
+                          className="w-full bg-slate-800/50 border border-white/10 rounded-xl px-4 py-2.5 text-white placeholder-gray-500 outline-none focus:ring-2 focus:ring-blue-500/50 transition-all"
                         />
                       </div>
 
+                      {/* Gender */}
                       <div>
                         <label className="block text-sm font-medium text-gray-300 mb-1">
                           Gender *
                         </label>
-
                         <select
                           name="gender"
                           value={formData.gender}
                           onChange={handleChange}
-                          className={`w-full bg-slate-800/50 border rounded-xl px-4 py-2 text-white outline-none focus:ring-2 ${
-                            errors.gender
-                              ? "border-red-500/50 focus:ring-red-500/50"
-                              : "border-white/10 focus:ring-blue-500/50"
-                          }`}
+                          className={`w-full bg-slate-800/50 border rounded-xl px-4 py-2.5 text-white outline-none focus:ring-2 transition-all ${errors.gender
+                            ? "border-red-500/50 focus:ring-red-500/50"
+                            : "border-white/10 focus:ring-blue-500/50"
+                            }`}
                         >
-                          <option value="" className="bg-slate-900">
-                            Select Gender
-                          </option>
-
-                          <option className="bg-slate-900">Male</option>
-                          <option className="bg-slate-900">Female</option>
-                          <option className="bg-slate-900">Other</option>
+                          <option value="" className="bg-slate-900 text-gray-400">Select Gender</option>
+                          <option value="Male" className="bg-slate-900">Male</option>
+                          <option value="Female" className="bg-slate-900">Female</option>
+                          <option value="Other" className="bg-slate-900">Other</option>
                         </select>
+                        {errors.gender && (
+                          <p className="text-red-400 text-xs mt-1">{errors.gender}</p>
+                        )}
+                      </div>
+
+                      {/* Doctor */}
+                      <div>
+                        <label className="block text-sm font-medium text-gray-300 mb-1">
+                          Doctor Name
+                        </label>
+                        <input
+                          type="text"
+                          name="doctorName"
+                          value={formData.doctorName}
+                          onChange={handleChange}
+                          placeholder="Enter doctor name"
+                          autoComplete="off"
+                          className="w-full bg-slate-800/50 border border-white/10 rounded-xl px-4 py-2.5 text-white placeholder-gray-500 outline-none focus:ring-2 focus:ring-blue-500/50 transition-all"
+                        />
+                      </div>
+
+                      {/* Prescription */}
+                      <div>
+                        <label className="block text-sm font-medium text-gray-300 mb-1">
+                          Prescription Number
+                        </label>
+                        <input
+                          type="text"
+                          name="prescriptionNumber"
+                          value={formData.prescriptionNumber}
+                          onChange={handleChange}
+                          placeholder="Enter prescription"
+                          autoComplete="off"
+                          className="w-full bg-slate-800/50 border border-white/10 rounded-xl px-4 py-2.5 text-white placeholder-gray-500 outline-none focus:ring-2 focus:ring-blue-500/50 transition-all"
+                        />
+                      </div>
+
+                      {/* Address */}
+                      <div className="md:col-span-2">
+                        <label className="block text-sm font-medium text-gray-300 mb-1">
+                          Address
+                        </label>
+                        <textarea
+                          name="address"
+                          value={formData.address}
+                          onChange={handleChange}
+                          placeholder="Enter patient address"
+                          rows={2}
+                          className="w-full bg-slate-800/50 border border-white/10 rounded-xl px-4 py-2.5 text-white placeholder-gray-500 outline-none focus:ring-2 focus:ring-blue-500/50 resize-none transition-all"
+                        />
+                      </div>
+
+                      {/* Notes */}
+                      <div className="md:col-span-2">
+                        <label className="block text-sm font-medium text-gray-300 mb-1">
+                          Remark
+                        </label>
+                        <textarea
+                          name="notes"
+                          value={formData.notes}
+                          onChange={handleChange}
+                          placeholder="Enter Patient Notes"
+                          rows={2}
+                          className="w-full bg-slate-800/50 border border-white/10 rounded-xl px-4 py-2.5 text-white placeholder-gray-500 outline-none focus:ring-2 focus:ring-blue-500/50 resize-none transition-all"
+                        />
                       </div>
                     </div>
 
-                    {/* Doctor */}
-                    <div>
-                      <label className="block text-sm font-medium text-gray-300 mb-1">
-                        Doctor Name
-                      </label>
-
-                      <input
-                        type="text"
-                        name="doctorName"
-                        value={formData.doctorName}
-                        onChange={handleChange}
-                        placeholder="Enter doctor name"
-                        className="w-full bg-slate-800/50 border border-white/10 rounded-xl px-4 py-2 text-white placeholder-gray-400 outline-none focus:ring-2 focus:ring-blue-500/50"
-                      />
-                    </div>
-
-                    {/* Prescription */}
-                    <div>
-                      <label className="block text-sm font-medium text-gray-300 mb-1">
-                        Prescription Number
-                      </label>
-
-                      <input
-                        type="text"
-                        name="prescriptionNumber"
-                        value={formData.prescriptionNumber}
-                        onChange={handleChange}
-                        placeholder="Enter prescription number"
-                        className="w-full bg-slate-800/50 border border-white/10 rounded-xl px-4 py-2 text-white placeholder-gray-400 outline-none focus:ring-2 focus:ring-blue-500/50"
-                      />
-                    </div>
-
-                    {/* Address */}
-                    <div>
-                      <label className="block text-sm font-medium text-gray-300 mb-1">
-                        Address
-                      </label>
-
-                      <textarea
-                        name="address"
-                        value={formData.address}
-                        onChange={handleChange}
-                        placeholder="Enter patient address"
-                        rows={2}
-                        className="w-full bg-slate-800/50 border border-white/10 rounded-xl px-4 py-2 text-white placeholder-gray-400 outline-none focus:ring-2 focus:ring-blue-500/50 resize-none"
-                      />
-                    </div>
-
-                    {/* Notes */}
-                    <div>
-                      <label className="block text-sm font-medium text-gray-300 mb-1">
-                        Remark
-                      </label>
-
-                      <textarea
-                        name="notes"
-                        value={formData.notes}
-                        onChange={handleChange}
-                        placeholder="Enter Patient Notes"
-                        rows={2}
-                        className="w-full bg-slate-800/50 border border-white/10 rounded-xl px-4 py-2 text-white placeholder-gray-400 outline-none focus:ring-2 focus:ring-blue-500/50"
-                      />
-                    </div>
-
                     {/* Reminder */}
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-3 bg-slate-800/30 p-3.5 rounded-xl border border-white/5 group transition-colors hover:bg-slate-800/50">
                       <input
                         type="checkbox"
                         name="remindersEnabled"
                         checked={formData.remindersEnabled}
                         onChange={handleChange}
-                        className="w-5 h-5 rounded border-white/10 bg-slate-800/50 text-blue-600"
+                        className="w-5 h-5 rounded border-white/20 bg-slate-900 text-blue-500 focus:ring-blue-500/50 cursor-pointer"
                       />
-
-                      <label className="text-sm text-gray-300">
+                      <label className="text-sm text-gray-300 font-medium cursor-pointer" onClick={() => setFormData(p => ({ ...p, remindersEnabled: !p.remindersEnabled }))}>
                         Enable WhatsApp refill reminders
                       </label>
+                      <BellRing size={18} className={`ml-auto mr-2 transition-colors ${formData.remindersEnabled ? 'text-blue-400' : 'text-gray-500'}`} />
                     </div>
 
                     {/* Buttons */}
-                    <div className="flex justify-end gap-3 pt-2">
+                    <div className="flex justify-end gap-3 pt-5 border-t border-white/10">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowModal(false);
+                          setEditMode(false);
+                        }}
+                        className="px-6 py-2.5 rounded-xl border border-white/10 text-gray-300 hover:bg-white/5 font-medium transition-colors"
+                      >
+                        Cancel
+                      </button>
                       <button
                         type="submit"
                         disabled={submitting}
-                        className="flex-1 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white px-4 py-3 rounded-xl flex items-center justify-center gap-2 transition-all duration-200 shadow-lg"
+                        className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white px-6 py-2.5 rounded-xl flex items-center justify-center gap-2 transition-all duration-200 shadow-lg font-medium shadow-blue-500/20 disabled:opacity-50"
                       >
                         <UserPlus size={18} />
-
                         {editMode
                           ? submitting
                             ? "Updating..."
@@ -855,22 +853,12 @@ const Patients = () => {
                             ? "Registering..."
                             : "Register Patient"}
                       </button>
-
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setShowModal(false);
-                          setEditMode(false);
-                        }}
-                        className="px-5 py-3 rounded-xl border border-white/10 text-gray-300 hover:bg-white/5"
-                      >
-                        Cancel
-                      </button>
                     </div>
                   </form>
                 </div>
               </div>
-            </div>
+            </div>,
+            document.body
           )}
         </div>
 

@@ -1,4 +1,5 @@
 import Sidebar from "./Sidebar";
+import Navbar from "./Navbar";
 
 const Layout = ({ children }) => {
   return (
@@ -6,10 +7,14 @@ const Layout = ({ children }) => {
       {/* Sidebar */}
       <Sidebar />
 
-      {/* Main Content */}
-      <main className="flex-1 w-full pt-[72px] lg:pt-0">
-        {children}
-      </main>
+      {/* Main Content Area */}
+      <div className="flex-1 flex flex-col w-full min-w-0 pt-[65px] lg:pt-0">
+        <Navbar />
+
+        <main className="flex-1 w-full overflow-x-hidden">
+          {children}
+        </main>
+      </div>
     </div>
   );
 };
