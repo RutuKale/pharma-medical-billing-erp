@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { createPortal } from "react-dom";
+import { Link } from "react-router-dom";
+import Pagination from "../../components/Pagination";
 import {
   Users,
   Search,
@@ -9,23 +10,24 @@ import {
   Calendar,
   FileText,
   BellRing,
-  Eye,
   Edit,
   Trash2,
   CheckCircle2,
   XCircle,
-  Sparkles,
-  Shield,
   TrendingUp,
   AlertCircle,
-  ChevronLeft,
-  ChevronRight,
-  Locate,
+  MapPin,
+  Stethoscope,
+  IndianRupee,
+  X,
+  Shield,
+  RotateCcw,
 } from "lucide-react";
-const API_URL = "/patients";
 import Swal from "sweetalert2";
 import apiClient from "../../utils/apiClient";
 import DashboardSkeleton from "../../components/DashboardSkeleton";
+
+const API_URL = "/patients";
 
 const Patients = () => {
   const [formData, setFormData] = useState({
@@ -40,6 +42,7 @@ const Patients = () => {
     notes: "",
   });
   const [search, setSearch] = useState("");
+  const [reminderFilter, setReminderFilter] = useState("All");
   const [errors, setErrors] = useState({});
   const [currentPage, setCurrentPage] = useState(1);
   const [patientsData, setPatientsData] = useState([]);
@@ -48,7 +51,7 @@ const Patients = () => {
   const [editMode, setEditMode] = useState(false);
   const [selectedPatient, setSelectedPatient] = useState(null);
   const [showModal, setShowModal] = useState(false);
-  const itemsPerPage = 4;
+  const itemsPerPage = 8;
 
   const fetchPatients = async () => {
     try {
@@ -59,6 +62,12 @@ const Patients = () => {
       }
     } catch (error) {
       console.error("Fetch Patients Error:", error);
+      Swal.fire({
+        icon: "error",
+        title: "Error Loading Patients",
+        text: "Unable to retrieve patient register.",
+        confirmButtonColor: "#2563eb",
+      });
     } finally {
       setLoading(false);
     }
@@ -69,12 +78,19 @@ const Patients = () => {
   }, []);
 
   const filteredPatients = useMemo(() => {
-    return patientsData.filter(
-      (patient) =>
+    return patientsData.filter((patient) => {
+      const matchesSearch =
         patient.patient_name?.toLowerCase().includes(search.toLowerCase()) ||
-        patient.mobile_number?.includes(search),
-    );
-  }, [patientsData, search]);
+        patient.mobile_number?.includes(search) ||
+        (patient.doctor_name || "").toLowerCase().includes(search.toLowerCase());
+      const matchesReminder =
+        reminderFilter === "All" ||
+        (reminderFilter === "Enabled" && patient.reminders_enabled) ||
+        (reminderFilter === "Disabled" && !patient.reminders_enabled);
+
+      return matchesSearch && matchesReminder;
+    });
+  }, [patientsData, search, reminderFilter]);
 
   // Pagination
   const totalPages = Math.ceil(filteredPatients.length / itemsPerPage);
@@ -99,7 +115,7 @@ const Patients = () => {
     if (!formData.name.trim()) newErrors.name = "Patient name is required";
     if (!formData.mobile.trim()) newErrors.mobile = "Mobile number is required";
     if (formData.mobile.length !== 10)
-      newErrors.mobile = "Enter valid 10-digit mobile number";
+      newErrors.mobile = "Enter a valid 10-digit mobile number";
     if (!formData.gender) newErrors.gender = "Please select gender";
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -116,7 +132,7 @@ const Patients = () => {
       const patientPayload = {
         patient_name: formData.name,
         mobile_number: formData.mobile,
-        age: Number(formData.age),
+        age: formData.age ? Number(formData.age) : null,
         gender: formData.gender,
         address: formData.address,
         doctor_name: formData.doctorName,
@@ -124,49 +140,32 @@ const Patients = () => {
         reminders_enabled: formData.remindersEnabled,
         notes: formData.notes,
       };
-      let response;
 
-      // =========================
-      // EDIT → PUT
-      // =========================
       if (editMode) {
-        response = await apiClient.put(
+        await apiClient.put(
           `${API_URL}/${selectedPatient.patient_id}`,
           patientPayload,
         );
 
         await Swal.fire({
-          title: "Updated!",
-          text: "Patient Updated Successfully",
+          title: "Patient Updated",
+          text: "Patient details updated successfully.",
           icon: "success",
-          iconColor: "#22c55e",
-          background: "#fff",
-          color: "#000",
-          confirmButtonColor: "#22c55e",
+          confirmButtonColor: "#2563eb",
         });
-      }
-
-      // =========================
-      // CREATE → POST
-      // =========================
-      else {
-        response = await apiClient.post(API_URL, patientPayload);
+      } else {
+        await apiClient.post(API_URL, patientPayload);
 
         await Swal.fire({
-          title: "Success!",
-          text: "Patient Registered Successfully",
+          title: "Patient Registered",
+          text: "New patient registered into pharmacy records.",
           icon: "success",
-          iconColor: "#22c55e",
-          background: "#fff",
-          color: "#000",
-          confirmButtonColor: "#22c55e",
+          confirmButtonColor: "#2563eb",
         });
       }
 
-      // Refresh table
       fetchPatients();
 
-      // Reset form
       setFormData({
         name: "",
         mobile: "",
@@ -179,7 +178,6 @@ const Patients = () => {
         notes: "",
       });
 
-      // Reset edit state
       setEditMode(false);
       setSelectedPatient(null);
       setErrors({});
@@ -190,27 +188,14 @@ const Patients = () => {
         error,
       );
 
-      if (error.response) {
-        Swal.fire({
-          title: "Error!",
-          text: error.response.data.message,
-          icon: "error",
-          iconColor: "#ef4444",
-          background: "#fff",
-          color: "#000",
-          confirmButtonColor: "#ef4444",
-        });
-      } else {
-        Swal.fire({
-          title: "Server Error!",
-          text: "Something went wrong.",
-          icon: "error",
-          iconColor: "#ef4444",
-          background: "#fff",
-          color: "#000",
-          confirmButtonColor: "#ef4444",
-        });
-      }
+      Swal.fire({
+        title: "Submission Error",
+        text:
+          error.response?.data?.message ||
+          "Failed to save patient. Please check input values.",
+        icon: "error",
+        confirmButtonColor: "#2563eb",
+      });
     } finally {
       setSubmitting(false);
     }
@@ -218,7 +203,6 @@ const Patients = () => {
 
   const editPatient = (patient) => {
     setEditMode(true);
-
     setSelectedPatient(patient);
 
     setFormData({
@@ -229,24 +213,40 @@ const Patients = () => {
       address: patient.address || "",
       doctorName: patient.doctor_name || "",
       prescriptionNumber: patient.prescription_number || "",
-      remindersEnabled: patient.reminders_enabled || false,
+      remindersEnabled: Boolean(patient.reminders_enabled),
       notes: patient.notes || "",
     });
 
+    setErrors({});
+    setShowModal(true);
+  };
+
+  const openNewPatientModal = () => {
+    setEditMode(false);
+    setSelectedPatient(null);
+    setFormData({
+      name: "",
+      mobile: "",
+      age: "",
+      gender: "",
+      address: "",
+      doctorName: "",
+      prescriptionNumber: "",
+      remindersEnabled: true,
+      notes: "",
+    });
+    setErrors({});
     setShowModal(true);
   };
 
   const deletePatient = async (patient) => {
     const result = await Swal.fire({
-      title: "Are you sure?",
-      text: `Delete ${patient.patient_name}?`,
+      title: "Delete Patient?",
+      text: `Are you sure you want to remove "${patient.patient_name}" from the register?`,
       icon: "warning",
-      iconColor: "#ff0000",
-      color: "#000",
-      background: "#ffffff",
       showCancelButton: true,
-      confirmButtonColor: "#ef4444",
-      cancelButtonColor: "#475569",
+      confirmButtonColor: "#e11d48",
+      cancelButtonColor: "#64748b",
       confirmButtonText: "Yes, Delete",
       cancelButtonText: "Cancel",
     });
@@ -261,12 +261,9 @@ const Patients = () => {
       if (response.data.success) {
         await Swal.fire({
           title: "Deleted!",
-          text: "Patient Deleted Successfully",
+          text: "Patient record has been deleted.",
           icon: "success",
-          iconColor: "#22c55e",
-          background: "#fff",
-          color: "#000",
-          confirmButtonColor: "#22c55e",
+          confirmButtonColor: "#2563eb",
         });
 
         fetchPatients();
@@ -277,624 +274,652 @@ const Patients = () => {
         ) {
           setEditMode(false);
           setSelectedPatient(null);
-
-          setFormData({
-            name: "",
-            mobile: "",
-            age: "",
-            gender: "",
-            address: "",
-            doctorName: "",
-            prescriptionNumber: "",
-            remindersEnabled: true,
-            notes: "",
-          });
         }
       }
     } catch (error) {
       console.error("Delete Patient Error:", error);
-
       Swal.fire({
-        title: "Error!",
+        title: "Delete Failed",
         text: error.response?.data?.message || "Failed to delete patient",
         icon: "error",
-        iconColor: "#ef4444",
-        background: "#fff",
-        color: "#000",
-        confirmButtonColor: "#ef4444",
+        confirmButtonColor: "#2563eb",
       });
     }
   };
 
-  const stats = {
-    totalPatients: patientsData.length,
-
-    activeReminders: patientsData.filter((p) => p.reminders_enabled).length,
-
-    totalBills: patientsData.reduce(
+  const stats = useMemo(() => {
+    const totalPatients = patientsData.length;
+    const activeReminders = patientsData.filter(
+      (p) => p.reminders_enabled,
+    ).length;
+    const totalBills = patientsData.reduce(
       (acc, patient) => acc + (patient.total_bills || 0),
       0,
-    ),
+    );
+    const doctors = [
+      ...new Set(patientsData.map((p) => p.doctor_name).filter(Boolean)),
+    ].length;
 
-    doctors: [...new Set(patientsData.map((p) => p.doctor_name))].length,
-  };
+    return { totalPatients, activeReminders, totalBills, doctors };
+  }, [patientsData]);
 
   if (loading) {
     return <DashboardSkeleton />;
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-950 to-slate-900">
-      {/* Animated Background Pattern */}
-      <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-0 -left-4 w-96 h-96 bg-blue-500/20 rounded-full filter blur-3xl animate-pulse"></div>
-        <div className="absolute bottom-1/4 -right-4 w-96 h-96 bg-indigo-500/20 rounded-full filter blur-3xl animate-pulse delay-1000"></div>
-        <div className="absolute inset-0 opacity-[0.03]">
-          <div className="h-full w-full bg-[linear-gradient(rgba(20,184,166,0.1)_1px,transparent_1px),linear-gradient(90deg,rgba(20,184,166,0.1)_1px,transparent_1px)] bg-[size:32px_32px]"></div>
+    <div className="p-4 sm:p-6 lg:p-8 max-w-[1600px] mx-auto space-y-6">
+      {/* 1. HEADER SECTION (No icon next to title per design standards) */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight flex items-center gap-2">
+            <span>Patient Register</span>
+          </h1>
+          <p className="text-slate-500 text-xs sm:text-sm mt-0.5">
+            Manage pharmacy patient profiles, prescription history, and refill notifications.
+          </p>
+        </div>
+
+        <div className="flex items-center gap-2.5 flex-wrap">
+          <button
+            onClick={openNewPatientModal}
+            className="inline-flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-semibold shadow-xs transition-colors"
+          >
+            <UserPlus size={16} />
+            <span>Register Patient</span>
+          </button>
+          <Link
+            to="/billing"
+            className="inline-flex items-center gap-2 px-4 py-2.5 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-xl text-sm font-semibold shadow-xs transition-colors"
+          >
+            <IndianRupee size={16} className="text-slate-500" />
+            <span>New Billing</span>
+          </Link>
+          <Link
+            to="/reminders"
+            className="inline-flex items-center gap-2 px-4 py-2.5 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-xl text-sm font-semibold shadow-xs transition-colors"
+          >
+            <BellRing size={16} className="text-slate-500" />
+            <span>Reminders</span>
+          </Link>
         </div>
       </div>
 
-      <div className="relative z-10 p-4 md:p-6">
-        {/* Header */}
-        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-6">
-          <div>
-            <div className="flex items-center gap-3">
-              <div className="relative group">
-                <div className="absolute inset-0 bg-gradient-to-r from-blue-400 to-indigo-400 rounded-xl blur-lg opacity-75 group-hover:opacity-100 transition-opacity"></div>
-                <div className="relative bg-gradient-to-br from-blue-500 to-indigo-600 p-2.5 rounded-xl shadow-lg">
-                  <Users size={24} className="text-white" />
-                </div>
-              </div>
-              <div>
-                <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-400 to-indigo-400 bg-clip-text text-transparent">
-                  Patient Register
-                </h1>
-                <p className="text-blue-300/70 text-sm mt-1">
-                  Manage pharmacy patients and refill reminders
-                </p>
-              </div>
+      {/* 2. STAT CARDS ROW */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Total Patients */}
+        <div className="bg-white rounded-2xl p-5 border border-slate-200/90 shadow-xs hover:shadow-sm transition-all flex flex-col justify-between">
+          <div className="flex items-start justify-between">
+            <div>
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                Total Patients
+              </p>
+              <p className="text-2xl font-bold text-slate-900 mt-2">
+                {stats.totalPatients}
+              </p>
+            </div>
+            <div className="p-2.5 rounded-xl bg-blue-50 text-blue-600 border border-blue-100">
+              <Users size={20} />
             </div>
           </div>
-
-          <div className="bg-indigo-500/10 border border-indigo-500/20 rounded-xl px-4 py-3 flex items-center gap-3 backdrop-blur-sm">
-            <Shield size={18} className="text-indigo-400" />
-            <p className="text-indigo-300/90 text-sm">
-              Returning patients are auto-detected during billing
-            </p>
-            <Sparkles size={16} className="text-indigo-400 animate-pulse" />
+          <div className="mt-4 flex items-center gap-1.5 text-xs text-slate-500 font-medium">
+            <span>Registered customer base</span>
           </div>
         </div>
 
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5 mb-6">
-          <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl shadow-xl p-5 hover:bg-white/10 transition-all duration-300 group">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-400">Total Patients</p>
-                <h2 className="text-3xl font-bold mt-2 bg-gradient-to-r from-blue-400 to-indigo-400 bg-clip-text text-transparent">
-                  {stats.totalPatients}
-                </h2>
-              </div>
-              <div className="bg-blue-500/20 p-4 rounded-2xl group-hover:scale-110 transition-transform duration-300">
-                <Users size={24} className="text-blue-400" />
-              </div>
+        {/* Active Reminders */}
+        <div className="bg-white rounded-2xl p-5 border border-slate-200/90 shadow-xs hover:shadow-sm transition-all flex flex-col justify-between">
+          <div className="flex items-start justify-between">
+            <div>
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                Active Reminders
+              </p>
+              <p className="text-2xl font-bold text-slate-900 mt-2">
+                {stats.activeReminders}
+              </p>
+            </div>
+            <div className="p-2.5 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-100">
+              <BellRing size={20} />
             </div>
           </div>
-
-          <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl shadow-xl p-5 hover:bg-white/10 transition-all duration-300 group">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-400">Active Reminders</p>
-                <h2 className="text-3xl font-bold mt-2 bg-gradient-to-r from-green-400 to-emerald-400 bg-clip-text text-transparent">
-                  {stats.activeReminders}
-                </h2>
-              </div>
-              <div className="bg-green-500/20 p-4 rounded-2xl group-hover:scale-110 transition-transform duration-300">
-                <BellRing size={24} className="text-green-400" />
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl shadow-xl p-5 hover:bg-white/10 transition-all duration-300 group">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-400">Total Bills</p>
-                <h2 className="text-3xl font-bold mt-2 bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
-                  {stats.totalBills}
-                </h2>
-              </div>
-              <div className="bg-purple-500/20 p-4 rounded-2xl group-hover:scale-110 transition-transform duration-300">
-                <FileText size={24} className="text-purple-400" />
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl shadow-xl p-5 hover:bg-white/10 transition-all duration-300 group">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-400">Doctors</p>
-                <h2 className="text-3xl font-bold mt-2 bg-gradient-to-r from-orange-400 to-red-400 bg-clip-text text-transparent">
-                  {stats.doctors}
-                </h2>
-              </div>
-              <div className="bg-orange-500/20 p-4 rounded-2xl group-hover:scale-110 transition-transform duration-300">
-                <User size={24} className="text-orange-400" />
-              </div>
-            </div>
+          <div className="mt-4 flex items-center gap-1.5 text-xs text-emerald-600 font-medium">
+            <CheckCircle2 size={13} />
+            <span>Automated refill reminders</span>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 gap-6">
-          {/* Patient Table */}
-          <div className="xl:col-span-2 bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl shadow-xl overflow-hidden">
-            <div className="bg-gradient-to-r from-blue-500/10 to-indigo-500/10 px-6 py-4 border-b border-white/10">
-              <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-                <div>
-                  <h2 className="text-lg font-semibold text-white">
-                    Registered Patients
-                  </h2>
-                  <p className="text-sm text-gray-400 mt-1">
-                    Search and manage patient records
-                  </p>
-                </div>
-
-                <div className="flex gap-3">
-                  {/* Search */}
-                  <div className="relative w-full lg:w-80">
-                    <Search
-                      size={18}
-                      className="absolute left-3 top-3 text-gray-400"
-                    />
-                    <input
-                      type="text"
-                      placeholder="Search patient..."
-                      value={search}
-                      onChange={(e) => {
-                        setSearch(e.target.value);
-                        setCurrentPage(1);
-                      }}
-                      className="w-full bg-slate-800/50 border border-white/10 rounded-xl pl-10 pr-4 py-3 text-white placeholder-gray-400 outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-transparent transition-all"
-                    />
-                  </div>
-                  {/* Add Patient Button */}
-                  <button
-                    onClick={() => {
-                      setEditMode(false);
-                      setSelectedPatient(null);
-
-                      setFormData({
-                        name: "",
-                        mobile: "",
-                        age: "",
-                        gender: "",
-                        address: "",
-                        doctorName: "",
-                        prescriptionNumber: "",
-                        remindersEnabled: true,
-                        notes: "",
-                      });
-
-                      setShowModal(true);
-                    }}
-                    className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white px-5 py-3 rounded-xl flex items-center justify-center gap-2 transition-all duration-200 shadow-lg whitespace-nowrap"
-                  >
-                    <UserPlus size={18} />
-                    Add Patient
-                  </button>
-                </div>
-              </div>
+        {/* Total Bills */}
+        <div className="bg-white rounded-2xl p-5 border border-slate-200/90 shadow-xs hover:shadow-sm transition-all flex flex-col justify-between">
+          <div className="flex items-start justify-between">
+            <div>
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                Recorded Invoices
+              </p>
+              <p className="text-2xl font-bold text-slate-900 mt-2">
+                {stats.totalBills}
+              </p>
             </div>
-
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[900px]">
-                <thead className="bg-slate-800/50 border-b border-white/10">
-                  <tr>
-                    <th className="text-left p-4 text-sm font-semibold text-gray-300">
-                      Patient
-                    </th>
-                    <th className="text-left p-4 text-sm font-semibold text-gray-300">
-                      Mobile
-                    </th>
-                    <th className="text-left p-4 text-sm font-semibold text-gray-300">
-                      Address
-                    </th>
-                    <th className="text-left p-4 text-sm font-semibold text-gray-300">
-                      Prescription Number
-                    </th>
-                    <th className="text-left p-4 text-sm font-semibold text-gray-300">
-                      Doctor
-                    </th>
-                    <th className="text-left p-4 text-sm font-semibold text-gray-300">
-                      Remark
-                    </th>
-                    <th className="text-left p-4 text-sm font-semibold text-gray-300">
-                      Reminders
-                    </th>
-                    <th className="text-left p-4 text-sm font-semibold text-gray-300">
-                      Actions
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {paginatedPatients.map((patient) => (
-                    <tr
-                      key={patient.patient_id}
-                      className="border-b border-white/5 hover:bg-white/5 transition-colors"
-                    >
-                      <td className="p-4">
-                        <div>
-                          <h3 className="font-semibold text-white">
-                            {patient.patient_name}
-                          </h3>
-                          <p className="text-sm text-gray-400 mt-1">
-                            {patient.age} yrs • {patient.gender}
-                          </p>
-                        </div>
-                      </td>
-                      <td className="p-4">
-                        <div className="flex items-center gap-2 text-gray-300">
-                          <Phone size={16} className="text-gray-500" />
-                          {patient.mobile_number}
-                        </div>
-                      </td>
-                      <td className="p-4">
-                        <div className="flex items-center gap-2 text-gray-300">
-                          <Locate size={16} className="text-gray-500" />
-                          {patient.address}
-                        </div>
-                      </td>
-                      <td className="p-4 text-gray-300">
-                        {patient.prescription_number}
-                      </td>
-                      <td className="p-4 text-gray-300">
-                        {patient.doctor_name}
-                      </td>
-                      <td className="p-4 font-semibold text-white">
-                        {patient.notes}
-                      </td>
-                      <td className="p-4">
-                        {patient.reminders_enabled ? (
-                          <span className="bg-green-500/20 text-green-400 px-3 py-1 rounded-full text-xs flex items-center gap-1 w-fit border border-green-500/30">
-                            <CheckCircle2 size={14} />
-                            Enabled
-                          </span>
-                        ) : (
-                          <span className="bg-red-500/20 text-red-400 px-3 py-1 rounded-full text-xs flex items-center gap-1 w-fit border border-red-500/30">
-                            <XCircle size={14} />
-                            Disabled
-                          </span>
-                        )}
-                      </td>
-                      <td className="p-4">
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => editPatient(patient)}
-                            className="bg-yellow-500/20 hover:bg-yellow-500/30 text-yellow-400 p-2 rounded-lg transition-all duration-200 hover:scale-110"
-                          >
-                            <Edit size={16} />
-                          </button>
-                          <button
-                            onClick={() => deletePatient(patient)}
-                            className="bg-red-500/20 hover:bg-red-500/30 text-red-400 p-2 rounded-lg transition-all duration-200 hover:scale-110"
-                          >
-                            <Trash2 size={16} />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-
-              {filteredPatients.length === 0 && (
-                <div className="text-center py-12">
-                  <AlertCircle
-                    className="mx-auto text-gray-400 mb-3"
-                    size={48}
-                  />
-                  <p className="text-gray-400">No patients found.</p>
-                </div>
-              )}
+            <div className="p-2.5 rounded-xl bg-purple-50 text-purple-600 border border-purple-100">
+              <FileText size={20} />
             </div>
+          </div>
+          <div className="mt-4 flex items-center gap-1.5 text-xs text-slate-500 font-medium">
+            <span>Customer billing history</span>
+          </div>
+        </div>
 
-            {/* Pagination */}
-            {filteredPatients.length > 0 && (
-              <div className="border-t border-white/10 px-6 py-4 flex items-center justify-between">
-                <p className="text-sm text-gray-400">
-                  Showing {(currentPage - 1) * itemsPerPage + 1} to{" "}
-                  {Math.min(
-                    currentPage * itemsPerPage,
-                    filteredPatients.length,
-                  )}{" "}
-                  of {filteredPatients.length} entries
-                </p>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() =>
-                      setCurrentPage((prev) => Math.max(prev - 1, 1))
-                    }
-                    disabled={currentPage === 1}
-                    className="p-2 rounded-lg bg-slate-800/50 border border-white/10 text-white hover:bg-white/5 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    <ChevronLeft size={18} />
-                  </button>
-                  <span className="px-4 py-2 rounded-lg bg-blue-500/20 text-blue-400 border border-blue-500/30">
-                    {currentPage}
-                  </span>
-                  <button
-                    onClick={() =>
-                      setCurrentPage((prev) => Math.min(prev + 1, totalPages))
-                    }
-                    disabled={currentPage === totalPages}
-                    className="p-2 rounded-lg bg-slate-800/50 border border-white/10 text-white hover:bg-white/5 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    <ChevronRight size={18} />
-                  </button>
-                </div>
-              </div>
+        {/* Doctors Tracked */}
+        <div className="bg-white rounded-2xl p-5 border border-slate-200/90 shadow-xs hover:shadow-sm transition-all flex flex-col justify-between">
+          <div className="flex items-start justify-between">
+            <div>
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                Prescribing Doctors
+              </p>
+              <p className="text-2xl font-bold text-slate-900 mt-2">
+                {stats.doctors}
+              </p>
+            </div>
+            <div className="p-2.5 rounded-xl bg-amber-50 text-amber-600 border border-amber-100">
+              <Stethoscope size={20} />
+            </div>
+          </div>
+          <div className="mt-4 flex items-center gap-1.5 text-xs text-slate-500 font-medium">
+            <span>Associated practitioners</span>
+          </div>
+        </div>
+      </div>
+
+      {/* 3. SEARCH & QUICK FILTER BAR */}
+      <div className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200/90 shadow-xs space-y-3">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          {/* Search Input */}
+          <div className="relative flex-1">
+            <Search
+              size={16}
+              className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"
+            />
+            <input
+              type="text"
+              placeholder="Search by patient name, mobile, or doctor..."
+              value={search}
+              onChange={(e) => {
+                setSearch(e.target.value);
+                setCurrentPage(1);
+              }}
+              className="w-full bg-slate-50/60 border border-slate-200 rounded-xl pl-10 pr-10 py-2.5 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all font-medium"
+            />
+            {search && (
+              <button
+                type="button"
+                onClick={() => setSearch("")}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1"
+              >
+                <X size={15} />
+              </button>
             )}
           </div>
 
-          {/* Patient Modal */}
-          {showModal && createPortal(
-            <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-              <div className="w-full max-w-2xl max-h-[95vh] overflow-y-auto bg-slate-900 border border-white/10 rounded-2xl shadow-2xl">
-                {/* Modal Header */}
-                <div className="sticky top-0 bg-slate-900 border-b border-white/10 px-6 py-4 flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="bg-green-500/20 p-2 rounded-xl">
-                      <UserPlus size={20} className="text-green-400" />
-                    </div>
-
-                    <h2 className="text-lg font-semibold text-white">
-                      {editMode ? "Edit Patient" : "Register Patient"}
-                    </h2>
-                  </div>
-
-                  <button
-                    onClick={() => {
-                      setShowModal(false);
-                      setEditMode(false);
-                    }}
-                    className="text-gray-400 hover:text-white text-2xl"
-                  >
-                    ×
-                  </button>
-                </div>
-
-                <div className="p-6">
-                  <form onSubmit={handleSubmit} className="space-y-5">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                      {/* Name */}
-                      <div>
-                        <label className="block text-sm font-medium text-gray-300 mb-1">
-                          Patient Name *
-                        </label>
-                        <input
-                          type="text"
-                          name="name"
-                          value={formData.name}
-                          onChange={handleChange}
-                          placeholder="Enter patient name"
-                          autoComplete="off"
-                          className={`w-full bg-slate-800/50 border rounded-xl px-4 py-2.5 text-white placeholder-gray-500 outline-none focus:ring-2 focus:border-transparent transition-all ${errors.name
-                            ? "border-red-500/50 focus:ring-red-500/50"
-                            : "border-white/10 focus:ring-blue-500/50"
-                            }`}
-                        />
-                        {errors.name && (
-                          <p className="text-red-400 text-xs mt-1">{errors.name}</p>
-                        )}
-                      </div>
-
-                      {/* Mobile */}
-                      <div>
-                        <label className="block text-sm font-medium text-gray-300 mb-1">
-                          Mobile Number *
-                        </label>
-                        <input
-                          type="text"
-                          name="mobile"
-                          value={formData.mobile}
-                          onChange={handleChange}
-                          placeholder="Enter mobile number"
-                          autoComplete="off"
-                          className={`w-full bg-slate-800/50 border rounded-xl px-4 py-2.5 text-white placeholder-gray-500 outline-none focus:ring-2 focus:border-transparent transition-all ${errors.mobile
-                            ? "border-red-500/50 focus:ring-red-500/50"
-                            : "border-white/10 focus:ring-blue-500/50"
-                            }`}
-                        />
-                        {errors.mobile && (
-                          <p className="text-red-400 text-xs mt-1">{errors.mobile}</p>
-                        )}
-                      </div>
-
-                      {/* Age */}
-                      <div>
-                        <label className="block text-sm font-medium text-gray-300 mb-1">
-                          Age
-                        </label>
-                        <input
-                          type="number"
-                          name="age"
-                          value={formData.age}
-                          onChange={handleChange}
-                          placeholder="Enter age"
-                          autoComplete="off"
-                          className="w-full bg-slate-800/50 border border-white/10 rounded-xl px-4 py-2.5 text-white placeholder-gray-500 outline-none focus:ring-2 focus:ring-blue-500/50 transition-all"
-                        />
-                      </div>
-
-                      {/* Gender */}
-                      <div>
-                        <label className="block text-sm font-medium text-gray-300 mb-1">
-                          Gender *
-                        </label>
-                        <select
-                          name="gender"
-                          value={formData.gender}
-                          onChange={handleChange}
-                          className={`w-full bg-slate-800/50 border rounded-xl px-4 py-2.5 text-white outline-none focus:ring-2 transition-all ${errors.gender
-                            ? "border-red-500/50 focus:ring-red-500/50"
-                            : "border-white/10 focus:ring-blue-500/50"
-                            }`}
-                        >
-                          <option value="" className="bg-slate-900 text-gray-400">Select Gender</option>
-                          <option value="Male" className="bg-slate-900">Male</option>
-                          <option value="Female" className="bg-slate-900">Female</option>
-                          <option value="Other" className="bg-slate-900">Other</option>
-                        </select>
-                        {errors.gender && (
-                          <p className="text-red-400 text-xs mt-1">{errors.gender}</p>
-                        )}
-                      </div>
-
-                      {/* Doctor */}
-                      <div>
-                        <label className="block text-sm font-medium text-gray-300 mb-1">
-                          Doctor Name
-                        </label>
-                        <input
-                          type="text"
-                          name="doctorName"
-                          value={formData.doctorName}
-                          onChange={handleChange}
-                          placeholder="Enter doctor name"
-                          autoComplete="off"
-                          className="w-full bg-slate-800/50 border border-white/10 rounded-xl px-4 py-2.5 text-white placeholder-gray-500 outline-none focus:ring-2 focus:ring-blue-500/50 transition-all"
-                        />
-                      </div>
-
-                      {/* Prescription */}
-                      <div>
-                        <label className="block text-sm font-medium text-gray-300 mb-1">
-                          Prescription Number
-                        </label>
-                        <input
-                          type="text"
-                          name="prescriptionNumber"
-                          value={formData.prescriptionNumber}
-                          onChange={handleChange}
-                          placeholder="Enter prescription"
-                          autoComplete="off"
-                          className="w-full bg-slate-800/50 border border-white/10 rounded-xl px-4 py-2.5 text-white placeholder-gray-500 outline-none focus:ring-2 focus:ring-blue-500/50 transition-all"
-                        />
-                      </div>
-
-                      {/* Address */}
-                      <div className="md:col-span-2">
-                        <label className="block text-sm font-medium text-gray-300 mb-1">
-                          Address
-                        </label>
-                        <textarea
-                          name="address"
-                          value={formData.address}
-                          onChange={handleChange}
-                          placeholder="Enter patient address"
-                          rows={2}
-                          className="w-full bg-slate-800/50 border border-white/10 rounded-xl px-4 py-2.5 text-white placeholder-gray-500 outline-none focus:ring-2 focus:ring-blue-500/50 resize-none transition-all"
-                        />
-                      </div>
-
-                      {/* Notes */}
-                      <div className="md:col-span-2">
-                        <label className="block text-sm font-medium text-gray-300 mb-1">
-                          Remark
-                        </label>
-                        <textarea
-                          name="notes"
-                          value={formData.notes}
-                          onChange={handleChange}
-                          placeholder="Enter Patient Notes"
-                          rows={2}
-                          className="w-full bg-slate-800/50 border border-white/10 rounded-xl px-4 py-2.5 text-white placeholder-gray-500 outline-none focus:ring-2 focus:ring-blue-500/50 resize-none transition-all"
-                        />
-                      </div>
-                    </div>
-
-                    {/* Reminder */}
-                    <div className="flex items-center gap-3 bg-slate-800/30 p-3.5 rounded-xl border border-white/5 group transition-colors hover:bg-slate-800/50">
-                      <input
-                        type="checkbox"
-                        name="remindersEnabled"
-                        checked={formData.remindersEnabled}
-                        onChange={handleChange}
-                        className="w-5 h-5 rounded border-white/20 bg-slate-900 text-blue-500 focus:ring-blue-500/50 cursor-pointer"
-                      />
-                      <label className="text-sm text-gray-300 font-medium cursor-pointer" onClick={() => setFormData(p => ({ ...p, remindersEnabled: !p.remindersEnabled }))}>
-                        Enable WhatsApp refill reminders
-                      </label>
-                      <BellRing size={18} className={`ml-auto mr-2 transition-colors ${formData.remindersEnabled ? 'text-blue-400' : 'text-gray-500'}`} />
-                    </div>
-
-                    {/* Buttons */}
-                    <div className="flex justify-end gap-3 pt-5 border-t border-white/10">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setShowModal(false);
-                          setEditMode(false);
-                        }}
-                        className="px-6 py-2.5 rounded-xl border border-white/10 text-gray-300 hover:bg-white/5 font-medium transition-colors"
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        type="submit"
-                        disabled={submitting}
-                        className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white px-6 py-2.5 rounded-xl flex items-center justify-center gap-2 transition-all duration-200 shadow-lg font-medium shadow-blue-500/20 disabled:opacity-50"
-                      >
-                        <UserPlus size={18} />
-                        {editMode
-                          ? submitting
-                            ? "Updating..."
-                            : "Update Patient"
-                          : submitting
-                            ? "Registering..."
-                            : "Register Patient"}
-                      </button>
-                    </div>
-                  </form>
-                </div>
-              </div>
-            </div>,
-            document.body
-          )}
-        </div>
-
-        {/* Information Panel */}
-        <div className="mt-6 bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl shadow-xl overflow-hidden">
-          <div className="bg-gradient-to-r from-blue-500/10 to-indigo-500/10 px-6 py-4 border-b border-white/10">
-            <div className="flex items-center gap-3">
-              <div className="bg-blue-500/20 p-2 rounded-xl">
-                <TrendingUp size={18} className="text-blue-400" />
-              </div>
-              <h2 className="text-lg font-semibold text-white">
-                Patient Management Features
-              </h2>
-            </div>
-          </div>
-
-          <div className="p-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
-              {[
-                "Auto-detect returning patients during billing",
-                "WhatsApp refill reminders supported",
-                "Patient records stored permanently",
-                "Search by patient name or mobile number",
-              ].map((feature, index) => (
-                <div
-                  key={index}
-                  className="border border-white/10 rounded-xl p-4 flex items-center gap-3 hover:bg-white/5 transition-colors group"
+          {/* Quick Filters */}
+          <div className="flex items-center gap-2 flex-wrap">
+            <div className="flex items-center p-1 bg-slate-100 rounded-xl border border-slate-200/70">
+              {["All", "Enabled", "Disabled"].map((status) => (
+                <button
+                  key={status}
+                  type="button"
+                  onClick={() => {
+                    setReminderFilter(status);
+                    setCurrentPage(1);
+                  }}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                    reminderFilter === status
+                      ? "bg-white text-blue-600 shadow-xs"
+                      : "text-slate-600 hover:text-slate-900"
+                  }`}
                 >
-                  <div className="w-1.5 h-1.5 rounded-full bg-blue-400 group-hover:scale-150 transition-transform"></div>
-                  <p className="text-gray-300 text-sm">{feature}</p>
-                </div>
+                  {status === "All" ? "All Patients" : `Reminders ${status}`}
+                </button>
               ))}
             </div>
+
+            {(search || reminderFilter !== "All") && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSearch("");
+                  setReminderFilter("All");
+                  setCurrentPage(1);
+                }}
+                className="inline-flex items-center gap-1 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-xs font-semibold transition-colors"
+                title="Reset filters"
+              >
+                <RotateCcw size={13} />
+                <span>Reset</span>
+              </button>
+            )}
           </div>
         </div>
       </div>
+
+      {/* 4. PATIENTS TABLE CARD */}
+      <div className="bg-white rounded-2xl border border-slate-200/90 shadow-xs overflow-hidden">
+        <div className="p-4 sm:p-5 flex items-center justify-between border-b border-slate-100">
+          <div>
+            <h3 className="text-base font-bold text-slate-900">
+              Registered Patients List
+            </h3>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Showing {filteredPatients.length} patient records
+            </p>
+          </div>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse min-w-[950px]">
+            <thead>
+              <tr className="border-b border-slate-100 text-[11px] font-semibold text-slate-400 uppercase tracking-wider bg-slate-50/60">
+                <th className="py-3 px-4">Patient Profile</th>
+                <th className="py-3 px-4">Contact</th>
+                <th className="py-3 px-4">Prescription & Doctor</th>
+                <th className="py-3 px-4">Address</th>
+                <th className="py-3 px-4">Remarks</th>
+                <th className="py-3 px-4 text-center">Refill Reminders</th>
+                <th className="py-3 px-4 text-center w-28">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 text-sm">
+              {paginatedPatients.map((patient) => (
+                <tr
+                  key={patient.patient_id}
+                  className="hover:bg-slate-50/60 transition-colors"
+                >
+                  <td className="py-3.5 px-4">
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 border border-blue-100 font-bold flex items-center justify-center text-xs shrink-0">
+                        {patient.patient_name
+                          ? patient.patient_name.charAt(0).toUpperCase()
+                          : "P"}
+                      </div>
+                      <div>
+                        <div className="font-semibold text-slate-900">
+                          {patient.patient_name}
+                        </div>
+                        <div className="text-xs text-slate-400 mt-0.5">
+                          {patient.age ? `${patient.age} yrs` : "Age not specified"}{" "}
+                          {patient.gender ? `• ${patient.gender}` : ""}
+                        </div>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="py-3.5 px-4">
+                    <div className="flex items-center gap-1.5 text-slate-700 font-medium">
+                      <Phone size={13} className="text-slate-400" />
+                      <span>{patient.mobile_number}</span>
+                    </div>
+                  </td>
+                  <td className="py-3.5 px-4">
+                    <div className="font-medium text-slate-800 text-xs">
+                      {patient.prescription_number ? (
+                        <span className="font-mono bg-slate-100 px-1.5 py-0.5 rounded text-slate-700">
+                          Rx: {patient.prescription_number}
+                        </span>
+                      ) : (
+                        <span className="text-slate-400">No Rx #</span>
+                      )}
+                    </div>
+                    {patient.doctor_name && (
+                      <div className="text-xs text-slate-400 mt-1 flex items-center gap-1">
+                        <Stethoscope size={12} />
+                        <span>Dr. {patient.doctor_name}</span>
+                      </div>
+                    )}
+                  </td>
+                  <td className="py-3.5 px-4 text-slate-600 text-xs max-w-[200px] truncate">
+                    {patient.address ? (
+                      <div className="flex items-center gap-1 truncate" title={patient.address}>
+                        <MapPin size={13} className="text-slate-400 shrink-0" />
+                        <span className="truncate">{patient.address}</span>
+                      </div>
+                    ) : (
+                      <span className="text-slate-400">—</span>
+                    )}
+                  </td>
+                  <td className="py-3.5 px-4 text-slate-600 text-xs max-w-[160px] truncate">
+                    {patient.notes ? (
+                      <span className="truncate block" title={patient.notes}>
+                        {patient.notes}
+                      </span>
+                    ) : (
+                      <span className="text-slate-400">—</span>
+                    )}
+                  </td>
+                  <td className="py-3.5 px-4 text-center">
+                    {patient.reminders_enabled ? (
+                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-100">
+                        <CheckCircle2 size={12} />
+                        <span>Enabled</span>
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-600 border border-slate-200">
+                        <XCircle size={12} />
+                        <span>Disabled</span>
+                      </span>
+                    )}
+                  </td>
+                  <td className="py-3.5 px-4 text-center">
+                    <div className="flex items-center justify-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => editPatient(patient)}
+                        className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                        title="Edit Patient Details"
+                      >
+                        <Edit size={15} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => deletePatient(patient)}
+                        className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                        title="Delete Patient Record"
+                      >
+                        <Trash2 size={15} />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+
+          {filteredPatients.length === 0 && (
+            <div className="text-center py-14 px-4 space-y-2">
+              <div className="w-12 h-12 rounded-2xl bg-slate-100 text-slate-400 mx-auto flex items-center justify-center">
+                <Users size={24} />
+              </div>
+              <p className="text-sm font-semibold text-slate-700">
+                No patients found
+              </p>
+              <p className="text-xs text-slate-400 max-w-sm mx-auto">
+                {search || reminderFilter !== "All"
+                  ? "No matching records found. Try clearing your filters."
+                  : "Start registering patients to build your customer profile register."}
+              </p>
+              <button
+                type="button"
+                onClick={openNewPatientModal}
+                className="mt-2 inline-flex items-center gap-1.5 px-3.5 py-2 bg-blue-600 text-white rounded-xl text-xs font-semibold hover:bg-blue-700 transition-colors shadow-xs"
+              >
+                <UserPlus size={14} />
+                <span>Register First Patient</span>
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div className="p-4 border-t border-slate-100 flex items-center justify-between">
+            <Pagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              totalItems={filteredPatients.length}
+              itemsPerPage={itemsPerPage}
+              onPageChange={setCurrentPage}
+            />
+          </div>
+        )}
+      </div>
+
+      {/* 5. REGISTER / EDIT PATIENT MODAL */}
+      {showModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs">
+          <div
+            className="fixed inset-0"
+            onClick={() => {
+              setShowModal(false);
+              setEditMode(false);
+            }}
+          />
+          <div className="relative z-10 w-full max-w-2xl max-h-[92vh] overflow-y-auto bg-white border border-slate-200 shadow-2xl rounded-2xl p-6 space-y-5">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-blue-50 text-blue-600 border border-blue-100">
+                  <UserPlus size={18} />
+                </div>
+                <div>
+                  <h3 className="font-bold text-slate-900 text-base">
+                    {editMode ? "Edit Patient Record" : "Register New Patient"}
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    {editMode
+                      ? "Update existing contact & prescription details."
+                      : "Add patient profile for billing and automated refill tracking."}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowModal(false);
+                  setEditMode(false);
+                }}
+                className="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-100 transition-colors"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* Name */}
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
+                    Patient Name <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    name="name"
+                    value={formData.name}
+                    onChange={handleChange}
+                    placeholder="e.g. Ramesh Kumar"
+                    className={`w-full bg-slate-50/60 border rounded-xl px-3.5 py-2.5 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 transition-all ${
+                      errors.name
+                        ? "border-rose-400 focus:ring-rose-400/20"
+                        : "border-slate-200 focus:ring-blue-500/20 focus:border-blue-500"
+                    }`}
+                  />
+                  {errors.name && (
+                    <p className="text-rose-600 text-xs mt-1">{errors.name}</p>
+                  )}
+                </div>
+
+                {/* Mobile */}
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
+                    Mobile Number <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    name="mobile"
+                    maxLength={10}
+                    value={formData.mobile}
+                    onChange={handleChange}
+                    placeholder="10-digit mobile number"
+                    className={`w-full bg-slate-50/60 border rounded-xl px-3.5 py-2.5 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 transition-all ${
+                      errors.mobile
+                        ? "border-rose-400 focus:ring-rose-400/20"
+                        : "border-slate-200 focus:ring-blue-500/20 focus:border-blue-500"
+                    }`}
+                  />
+                  {errors.mobile && (
+                    <p className="text-rose-600 text-xs mt-1">{errors.mobile}</p>
+                  )}
+                </div>
+
+                {/* Age */}
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
+                    Age
+                  </label>
+                  <input
+                    type="number"
+                    name="age"
+                    min={0}
+                    max={125}
+                    value={formData.age}
+                    onChange={handleChange}
+                    placeholder="e.g. 35"
+                    className="w-full bg-slate-50/60 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                  />
+                </div>
+
+                {/* Gender */}
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
+                    Gender <span className="text-rose-500">*</span>
+                  </label>
+                  <select
+                    name="gender"
+                    value={formData.gender}
+                    onChange={handleChange}
+                    className={`w-full bg-slate-50/60 border rounded-xl px-3.5 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 transition-all ${
+                      errors.gender
+                        ? "border-rose-400 focus:ring-rose-400/20"
+                        : "border-slate-200 focus:ring-blue-500/20 focus:border-blue-500"
+                    }`}
+                  >
+                    <option value="">Select Gender</option>
+                    <option value="Male">Male</option>
+                    <option value="Female">Female</option>
+                    <option value="Other">Other</option>
+                  </select>
+                  {errors.gender && (
+                    <p className="text-rose-600 text-xs mt-1">{errors.gender}</p>
+                  )}
+                </div>
+
+                {/* Doctor */}
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
+                    Prescribing Doctor
+                  </label>
+                  <input
+                    type="text"
+                    name="doctorName"
+                    value={formData.doctorName}
+                    onChange={handleChange}
+                    placeholder="e.g. Dr. A. Sharma"
+                    className="w-full bg-slate-50/60 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                  />
+                </div>
+
+                {/* Prescription Number */}
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
+                    Prescription Number
+                  </label>
+                  <input
+                    type="text"
+                    name="prescriptionNumber"
+                    value={formData.prescriptionNumber}
+                    onChange={handleChange}
+                    placeholder="e.g. RX-2026-089"
+                    className="w-full bg-slate-50/60 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all font-mono"
+                  />
+                </div>
+
+                {/* Address */}
+                <div className="sm:col-span-2">
+                  <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
+                    Address
+                  </label>
+                  <input
+                    type="text"
+                    name="address"
+                    value={formData.address}
+                    onChange={handleChange}
+                    placeholder="Street, locality, city"
+                    className="w-full bg-slate-50/60 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                  />
+                </div>
+
+                {/* Notes */}
+                <div className="sm:col-span-2">
+                  <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
+                    Clinical Notes / Remarks
+                  </label>
+                  <textarea
+                    name="notes"
+                    rows={2}
+                    value={formData.notes}
+                    onChange={handleChange}
+                    placeholder="Allergies, chronic condition tags, or patient remarks..."
+                    className="w-full bg-slate-50/60 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 resize-none transition-all"
+                  />
+                </div>
+              </div>
+
+              {/* Refill Reminders Switch Card */}
+              <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/80 flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <div className="p-2 rounded-lg bg-emerald-50 text-emerald-600 border border-emerald-100">
+                    <BellRing size={16} />
+                  </div>
+                  <div>
+                    <span className="font-semibold text-slate-900 text-xs block">
+                      Refill Notifications
+                    </span>
+                    <span className="text-[11px] text-slate-500">
+                      Enable automated medication refill reminders for this patient.
+                    </span>
+                  </div>
+                </div>
+
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    name="remindersEnabled"
+                    checked={formData.remindersEnabled}
+                    onChange={handleChange}
+                    className="sr-only peer"
+                  />
+                  <div className="w-10 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                </label>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex items-center justify-end gap-2.5 pt-4 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowModal(false);
+                    setEditMode(false);
+                  }}
+                  className="px-4 py-2 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-xl text-xs font-semibold shadow-xs transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  className="inline-flex items-center gap-1.5 px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold shadow-xs transition-colors disabled:opacity-50"
+                >
+                  <UserPlus size={15} />
+                  <span>
+                    {submitting
+                      ? editMode
+                        ? "Updating..."
+                        : "Registering..."
+                      : editMode
+                        ? "Save Changes"
+                        : "Register Patient"}
+                  </span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

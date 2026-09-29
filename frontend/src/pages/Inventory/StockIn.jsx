@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import {
-  PackagePlus,
   Search,
   Save,
   Truck,
@@ -10,18 +10,97 @@ import {
   Building2,
   Hash,
   MapPin,
-  DollarSign,
+  IndianRupee,
   FileText,
-  User,
   TrendingUp,
-  Shield,
-  Sparkles,
-  CheckCircle,
+  CheckCircle2,
   X,
   Package,
+  RotateCcw,
+  ShieldCheck,
+  Layers,
+  Boxes,
 } from "lucide-react";
-import { Link } from "react-router-dom";
+import Swal from "sweetalert2";
 import API from "../../utils/api";
+
+const InputField = ({
+  label,
+  name,
+  type = "text",
+  placeholder,
+  required,
+  icon: Icon,
+  value,
+  onChange,
+  error,
+}) => (
+  <div className="w-full">
+    <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+      {label} {required && <span className="text-blue-500 font-bold">*</span>}
+    </label>
+    <div className="relative">
+      {Icon && (
+        <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none">
+          <Icon size={16} />
+        </div>
+      )}
+      <input
+        type={type}
+        name={name}
+        value={value}
+        onChange={onChange}
+        placeholder={placeholder}
+        className={`w-full bg-slate-50/80 border rounded-xl ${
+          Icon ? "pl-10" : "pl-3.5"
+        } pr-3.5 py-2.5 text-sm text-slate-900 placeholder-slate-400 outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all ${
+          error
+            ? "border-rose-400 focus:ring-rose-400 bg-rose-50/20"
+            : "border-slate-200 hover:border-slate-300"
+        }`}
+      />
+    </div>
+    {error && (
+      <p className="text-rose-500 text-xs mt-1 flex items-center gap-1 font-medium">
+        <AlertCircle size={12} className="shrink-0" />
+        <span>{error}</span>
+      </p>
+    )}
+  </div>
+);
+
+const TextAreaField = ({
+  label,
+  name,
+  rows = 3,
+  placeholder,
+  icon: Icon,
+  value,
+  onChange,
+}) => (
+  <div className="w-full">
+    <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+      {label}
+    </label>
+    <div className="relative">
+      {Icon && (
+        <div className="absolute left-3.5 top-3 text-slate-400 pointer-events-none">
+          <Icon size={16} />
+        </div>
+      )}
+      <textarea
+        rows={rows}
+        name={name}
+        value={value}
+        onChange={onChange}
+        placeholder={placeholder}
+        className={`w-full bg-slate-50/80 border border-slate-200 hover:border-slate-300 rounded-xl ${
+          Icon ? "pl-10" : "pl-3.5"
+        } pr-3.5 py-2.5 text-sm text-slate-900 placeholder-slate-400 outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all resize-none`}
+      />
+    </div>
+  </div>
+);
 
 const StockIn = () => {
   const [medicinesData, setMedicinesData] = useState([]);
@@ -29,6 +108,7 @@ const StockIn = () => {
   const [selectedMedicine, setSelectedMedicine] = useState(null);
   const [showResults, setShowResults] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const navigate = useNavigate();
 
   const [formData, setFormData] = useState({
     supplierName: "",
@@ -56,6 +136,7 @@ const StockIn = () => {
             currentStock: Number(medicine.quantity),
             category: medicine.category || medicine.medicine_category || "",
             unit: medicine.unit || "Unit",
+            sellingPrice: Number(medicine.selling_price || 0),
           }));
           setMedicinesData(mapped);
         }
@@ -67,14 +148,13 @@ const StockIn = () => {
     fetchMedicines();
   }, []);
 
-  // FILTER MEDICINES
   const filteredMedicines = useMemo(() => {
+    if (!search.trim()) return [];
     return medicinesData.filter((medicine) =>
-      medicine.name.toLowerCase().includes(search.toLowerCase()),
+      medicine.name.toLowerCase().includes(search.toLowerCase())
     );
-  }, [search]);
+  }, [medicinesData, search]);
 
-  // HANDLE INPUT
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({
@@ -90,12 +170,11 @@ const StockIn = () => {
     }
   };
 
-  // VALIDATION
   const validateForm = () => {
     const newErrors = {};
 
     if (!selectedMedicine) {
-      newErrors.medicine = "Please select a medicine";
+      newErrors.medicine = "Please select a medicine from catalog";
     }
 
     if (!formData.supplierName.trim()) {
@@ -104,7 +183,7 @@ const StockIn = () => {
 
     if (!formData.quantity) {
       newErrors.quantity = "Quantity is required";
-    } else if (parseInt(formData.quantity) <= 0) {
+    } else if (parseInt(formData.quantity, 10) <= 0) {
       newErrors.quantity = "Quantity must be greater than 0";
     }
 
@@ -114,7 +193,7 @@ const StockIn = () => {
       newErrors.purchasePrice = "Purchase price must be greater than 0";
     }
 
-    if (!formData.batchNumber) {
+    if (!formData.batchNumber.trim()) {
       newErrors.batchNumber = "Batch number is required";
     }
 
@@ -127,7 +206,7 @@ const StockIn = () => {
     const expiry = new Date(formData.expiryDate);
 
     if (formData.expiryDate && expiry <= today) {
-      newErrors.expiryDate = "Expiry date must be a future date";
+      newErrors.expiryDate = "Expiry date must be in the future";
     }
 
     if (formData.manufactureDate && formData.expiryDate) {
@@ -143,7 +222,6 @@ const StockIn = () => {
     return Object.keys(newErrors).length === 0;
   };
 
-  // SUBMIT
   const handleSubmit = async (e) => {
     e.preventDefault();
 
@@ -154,579 +232,583 @@ const StockIn = () => {
     const stockInData = {
       medicine_id: selectedMedicine.id,
       quantity: parseInt(formData.quantity, 10),
-      remarks: `${formData.supplierName} | Invoice: ${formData.invoiceNumber || "N/A"} | Batch: ${formData.batchNumber}`,
+      remarks: `${formData.supplierName} | Invoice: ${
+        formData.invoiceNumber || "N/A"
+      } | Batch: ${formData.batchNumber}${
+        formData.notes ? ` | Notes: ${formData.notes}` : ""
+      }`,
     };
 
     try {
       const response = await API.post("/inventory/stock-in", stockInData);
       if (response.data?.success) {
-        alert("Stock added successfully");
+        await Swal.fire({
+          icon: "success",
+          title: "Stock Received!",
+          text: `Successfully added ${formData.quantity} units to ${selectedMedicine.name}`,
+          confirmButtonColor: "#2563eb",
+        });
+
+        // Reset
+        setSelectedMedicine(null);
+        setFormData({
+          supplierName: "",
+          invoiceNumber: "",
+          quantity: "",
+          purchasePrice: "",
+          batchNumber: "",
+          manufactureDate: "",
+          expiryDate: "",
+          rackLocation: "",
+          notes: "",
+        });
+        setSearch("");
+        setShowResults(false);
       } else {
-        alert(response.data?.message || "Unable to add stock");
+        await Swal.fire({
+          icon: "error",
+          title: "Operation Failed",
+          text: response.data?.message || "Unable to add stock",
+          confirmButtonColor: "#ef4444",
+        });
       }
     } catch (error) {
       console.error("Stock in error:", error);
-      alert(error.response?.data?.message || "Error adding stock");
+      await Swal.fire({
+        icon: "error",
+        title: "Error",
+        text: error.response?.data?.message || "Failed to record stock entry",
+        confirmButtonColor: "#ef4444",
+      });
+    } finally {
+      setIsSubmitting(false);
     }
-
-    // RESET
-    setSelectedMedicine(null);
-    setFormData({
-      supplierName: "",
-      invoiceNumber: "",
-      quantity: "",
-      purchasePrice: "",
-      batchNumber: "",
-      manufactureDate: "",
-      expiryDate: "",
-      rackLocation: "",
-      notes: "",
-    });
-    setSearch("");
-    setShowResults(false);
-    setIsSubmitting(false);
   };
 
-  const handleReset = () => {
-    setSelectedMedicine(null);
-    setFormData({
-      supplierName: "",
-      invoiceNumber: "",
-      quantity: "",
-      purchasePrice: "",
-      batchNumber: "",
-      manufactureDate: "",
-      expiryDate: "",
-      rackLocation: "",
-      notes: "",
+  const handleReset = async () => {
+    const result = await Swal.fire({
+      title: "Reset Stock Entry?",
+      text: "All entered information will be cleared.",
+      icon: "warning",
+      iconColor: "#f59e0b",
+      showCancelButton: true,
+      confirmButtonColor: "#2563eb",
+      cancelButtonColor: "#64748b",
+      confirmButtonText: "Yes, Reset",
+      cancelButtonText: "Cancel",
     });
-    setSearch("");
-    setShowResults(false);
-    setErrors({});
+
+    if (result.isConfirmed) {
+      setSelectedMedicine(null);
+      setFormData({
+        supplierName: "",
+        invoiceNumber: "",
+        quantity: "",
+        purchasePrice: "",
+        batchNumber: "",
+        manufactureDate: "",
+        expiryDate: "",
+        rackLocation: "",
+        notes: "",
+      });
+      setSearch("");
+      setShowResults(false);
+      setErrors({});
+    }
   };
 
   const handleSelectMedicine = (medicine) => {
     setSelectedMedicine(medicine);
     setSearch(medicine.name);
     setShowResults(false);
-    // Auto-fill batch number from existing medicine
     setFormData((prev) => ({
       ...prev,
-      batchNumber: medicine.batch || "",
+      batchNumber: medicine.batch || prev.batchNumber,
     }));
+    if (errors.medicine) {
+      setErrors((prev) => ({ ...prev, medicine: "" }));
+    }
   };
 
-  const InputField = ({
-    label,
-    name,
-    type = "text",
-    placeholder,
-    required,
-    icon: Icon,
-  }) => (
-    <div>
-      <label className="block text-sm font-medium text-gray-300 mb-2">
-        {label} {required && <span className="text-indigo-400">*</span>}
-      </label>
-      <div className="relative">
-        {Icon && (
-          <div className="absolute left-3 top-1/2 -translate-y-1/2">
-            <Icon size={16} className="text-gray-500" />
-          </div>
-        )}
-        <input
-          type={type}
-          name={name}
-          value={formData[name]}
-          onChange={handleChange}
-          placeholder={placeholder}
-          className={`w-full bg-white/10 border rounded-lg ${Icon ? "pl-10" : "pl-4"} pr-4 py-2.5 text-white placeholder-gray-400 outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all ${
-            errors[name]
-              ? "border-red-500 focus:ring-red-500"
-              : "border-white/20 hover:border-white/30"
-          }`}
-        />
-      </div>
-      {errors[name] && (
-        <p className="text-red-400 text-sm mt-1 flex items-center gap-1">
-          <AlertCircle size={14} />
-          {errors[name]}
-        </p>
-      )}
-    </div>
-  );
+  const handleClearSelectedMedicine = () => {
+    setSelectedMedicine(null);
+    setSearch("");
+  };
 
-  const TextAreaField = ({
-    label,
-    name,
-    rows = 4,
-    placeholder,
-    icon: Icon,
-  }) => (
-    <div>
-      <label className="block text-sm font-medium text-gray-300 mb-2">
-        {label}
-      </label>
-      <div className="relative">
-        {Icon && (
-          <div className="absolute left-3 top-3">
-            <Icon size={16} className="text-gray-500" />
-          </div>
-        )}
-        <textarea
-          rows={rows}
-          name={name}
-          value={formData[name]}
-          onChange={handleChange}
-          placeholder={placeholder}
-          className={`w-full bg-white/10 border border-white/20 rounded-lg ${Icon ? "pl-10" : "pl-4"} pr-4 py-2.5 text-white placeholder-gray-400 outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all resize-none`}
-        />
-      </div>
-    </div>
-  );
+  const parsedQty = parseInt(formData.quantity, 10) || 0;
+  const parsedPrice = parseFloat(formData.purchasePrice) || 0;
+  const totalValue = parsedQty > 0 && parsedPrice > 0 ? parsedQty * parsedPrice : 0;
+  const updatedStock = selectedMedicine
+    ? selectedMedicine.currentStock + parsedQty
+    : 0;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
-      {/* Animated Background Pattern */}
-      <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-0 -left-4 w-96 h-96 bg-indigo-500/10 rounded-full filter blur-3xl"></div>
-        <div className="absolute bottom-1/4 -right-4 w-96 h-96 bg-blue-500/10 rounded-full filter blur-3xl"></div>
-        <div className="absolute inset-0 opacity-5">
-          <div className="h-full w-full bg-[linear-gradient(rgba(20,184,166,0.1)_1px,transparent_1px),linear-gradient(90deg,rgba(20,184,166,0.1)_1px,transparent_1px)] bg-[size:32px_32px]"></div>
+    <div className="p-4 sm:p-6 lg:p-8 max-w-[1600px] mx-auto space-y-6">
+      {/* 1. HEADER SECTION (no icon in header as requested) */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight flex items-center gap-2">
+            <span>Stock In</span>
+          </h1>
+          <p className="text-slate-500 text-xs sm:text-sm mt-0.5">
+            Receive and record incoming medicine inventory stock from wholesale suppliers.
+          </p>
         </div>
-      </div>
 
-      <div className="relative z-10 p-4 md:p-6">
-        {/* HEADER */}
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
-          <div>
-            <div className="flex items-center gap-3">
-              <div className="relative group">
-                <div className="absolute inset-0 bg-gradient-to-r from-indigo-400 to-blue-400 rounded-xl blur-lg opacity-75 group-hover:opacity-100 transition-opacity"></div>
-                <div className="relative bg-gradient-to-br from-indigo-500 to-blue-600 p-2 rounded-xl shadow-lg">
-                  <PackagePlus size={24} className="text-white" />
-                </div>
-              </div>
-              <div>
-                <h1 className="text-2xl font-bold bg-gradient-to-r from-indigo-400 to-blue-400 bg-clip-text text-transparent">
-                  Stock In
-                </h1>
-                <p className="text-gray-400 text-sm mt-1">
-                  Receive and update medicine inventory stock
-                </p>
-              </div>
-            </div>
-          </div>
-
+        <div className="flex items-center gap-2.5">
           <Link
             to="/inventory"
-            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-white/5 border border-white/10 text-gray-300 hover:bg-white/10 hover:text-white transition-all duration-200 w-fit group"
+            className="inline-flex items-center gap-2 px-4 py-2.5 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-xl text-sm font-semibold shadow-xs transition-colors"
           >
-            <ArrowLeft
-              size={18}
-              className="group-hover:-translate-x-1 transition-transform"
-            />
-            Back to Inventory
+            <ArrowLeft size={16} />
+            <span>Back to Inventory</span>
+          </Link>
+          <Link
+            to="/inventory/stock"
+            className="inline-flex items-center gap-2 px-4 py-2.5 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-xl text-sm font-semibold shadow-xs transition-colors"
+          >
+            <Package size={16} />
+            <span>Stock Overview</span>
           </Link>
         </div>
+      </div>
 
-        {/* SECURITY BADGE */}
-        <div className="mb-6 bg-indigo-500/10 border border-indigo-500/20 rounded-xl p-3 flex items-center gap-3">
-          <div className="bg-indigo-500/20 p-1.5 rounded-lg">
-            <Shield size={14} className="text-indigo-400" />
-          </div>
-          <div>
-            <p className="text-white text-xs font-medium">
-              Stock Receiving Protocol
-            </p>
-            <p className="text-indigo-300/70 text-xs">
-              Batch tracking • Expiry validation • Supplier verification
-            </p>
-          </div>
-          <Sparkles
-            size={14}
-            className="text-indigo-400 ml-auto animate-pulse"
-          />
-        </div>
+      {/* 2. MAIN FORM CONTENT */}
+      <form onSubmit={handleSubmit}>
+        <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 items-start">
+          {/* LEFT SECTION (xl:col-span-8): Main Stock Receipt Card */}
+          <div className="xl:col-span-8 bg-white rounded-2xl border border-slate-200/90 shadow-xs overflow-hidden">
+            {/* Card Header Banner */}
+            <div className="p-5 sm:p-6 border-b border-slate-100 flex items-center justify-between">
+              <div>
+                <h2 className="text-base font-bold text-slate-800 leading-tight">
+                  Receive Inward Stock
+                </h2>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Select a registered catalog medicine and supply receipt details.
+                </p>
+              </div>
 
-        {/* FORM */}
-        <form onSubmit={handleSubmit}>
-          <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-            {/* LEFT SECTION - Main Form */}
-            <div className="xl:col-span-2">
-              <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl overflow-hidden">
-                <div className="border-b border-white/10 p-6">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-lg bg-gradient-to-r from-indigo-500 to-blue-600">
-                      <Truck size={18} className="text-white" />
-                    </div>
-                    <div>
-                      <h2 className="text-lg font-semibold text-white">
-                        Receive New Stock
-                      </h2>
-                      <p className="text-sm text-gray-400 mt-0.5">
-                        Add incoming medicine stock from supplier
-                      </p>
-                    </div>
-                  </div>
-                </div>
+              <div className="hidden sm:flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 text-emerald-600 text-xs font-semibold">
+                <ShieldCheck size={14} />
+                <span>Verified Stock In</span>
+              </div>
+            </div>
 
-                <div className="p-6">
-                  {/* MEDICINE SEARCH */}
-                  <div className="mb-6">
-                    <label className="block text-sm font-medium text-gray-300 mb-2">
-                      Search Medicine <span className="text-indigo-400">*</span>
-                    </label>
-                    <div className="relative">
-                      <Search
-                        size={18}
-                        className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500"
-                      />
-                      <input
-                        type="text"
-                        placeholder="Search medicine by name..."
-                        value={search}
-                        onChange={(e) => {
-                          setSearch(e.target.value);
-                          setShowResults(true);
-                          if (errors.medicine) {
-                            setErrors({ ...errors, medicine: "" });
-                          }
-                        }}
-                        onFocus={() => setShowResults(true)}
-                        className={`w-full bg-white/10 border rounded-lg pl-10 pr-4 py-2.5 text-white placeholder-gray-400 outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all ${
-                          errors.medicine
-                            ? "border-red-500 focus:ring-red-500"
-                            : "border-white/20 hover:border-white/30"
-                        }`}
-                      />
-                    </div>
-
-                    {/* SEARCH RESULTS */}
-                    {showResults && search && (
-                      <div className="absolute z-20 mt-2 w-full md:w-[calc(100%-2rem)] bg-slate-800 border border-white/20 rounded-xl shadow-2xl max-h-64 overflow-y-auto">
-                        {filteredMedicines.length > 0 ? (
-                          filteredMedicines.map((medicine) => (
-                            <button
-                              type="button"
-                              key={medicine.id}
-                              onClick={() => handleSelectMedicine(medicine)}
-                              className="w-full text-left p-4 hover:bg-white/10 transition-colors border-b border-white/10 last:border-none group"
-                            >
-                              <div className="flex items-center justify-between">
-                                <div>
-                                  <h3 className="font-medium text-white group-hover:text-indigo-400 transition-colors">
-                                    {medicine.name}
-                                  </h3>
-                                  <div className="flex items-center gap-3 mt-1 text-sm">
-                                    <span className="text-gray-400">
-                                      Batch: {medicine.batch}
-                                    </span>
-                                    <span className="text-gray-400">
-                                      Stock: {medicine.currentStock}
-                                    </span>
-                                    <span className="text-gray-400">
-                                      {medicine.category}
-                                    </span>
-                                  </div>
-                                </div>
-                                <CheckCircle
-                                  size={18}
-                                  className="text-indigo-400 opacity-0 group-hover:opacity-100 transition-opacity"
-                                />
-                              </div>
-                            </button>
-                          ))
-                        ) : (
-                          <div className="p-4 text-center">
-                            <p className="text-gray-400">No medicine found</p>
-                            <Link
-                              to="/inventory/add-medicine"
-                              className="text-indigo-400 text-sm mt-2 inline-block hover:underline"
-                            >
-                              Add new medicine
-                            </Link>
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-                    {errors.medicine && (
-                      <p className="text-red-400 text-sm mt-2 flex items-center gap-1">
-                        <AlertCircle size={14} />
-                        {errors.medicine}
-                      </p>
-                    )}
-                  </div>
-
-                  {/* FORM GRID */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                    <InputField
-                      label="Supplier Name"
-                      name="supplierName"
-                      placeholder="Enter supplier name"
-                      required
-                      icon={Building2}
-                    />
-
-                    <InputField
-                      label="Invoice Number"
-                      name="invoiceNumber"
-                      placeholder="Enter invoice number"
-                      icon={FileText}
-                    />
-
-                    <InputField
-                      label="Quantity Received"
-                      name="quantity"
-                      type="number"
-                      placeholder="Enter quantity"
-                      required
-                      icon={Package}
-                    />
-
-                    <InputField
-                      label="Purchase Price"
-                      name="purchasePrice"
-                      type="number"
-                      placeholder="Enter purchase price"
-                      required
-                      icon={DollarSign}
-                    />
-
-                    <InputField
-                      label="Batch Number"
-                      name="batchNumber"
-                      placeholder="Enter batch number"
-                      required
-                      icon={Hash}
-                    />
-
-                    <InputField
-                      label="Rack Location"
-                      name="rackLocation"
-                      placeholder="Rack A-12"
-                      icon={MapPin}
-                    />
-
-                    <InputField
-                      label="Manufacturing Date"
-                      name="manufactureDate"
-                      type="date"
-                      placeholder="Select date"
-                      icon={Calendar}
-                    />
-
-                    <InputField
-                      label="Expiry Date"
-                      name="expiryDate"
-                      type="date"
-                      placeholder="Select date"
-                      required
-                      icon={Calendar}
-                    />
-                  </div>
-
-                  {/* NOTES */}
-                  <TextAreaField
-                    label="Notes"
-                    name="notes"
-                    rows={3}
-                    placeholder="Additional notes about this stock entry..."
-                    icon={FileText}
+            <div className="p-5 sm:p-6 space-y-6">
+              {/* MEDICINE SEARCH & SELECTION */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                  Select Medicine <span className="text-blue-500 font-bold">*</span>
+                </label>
+                <div className="relative">
+                  <Search
+                    size={16}
+                    className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"
                   />
-
-                  {/* BUTTONS */}
-                  <div className="flex flex-wrap gap-3 mt-6 pt-6 border-t border-white/10">
-                    <button
-                      type="submit"
-                      disabled={isSubmitting}
-                      className="bg-gradient-to-r from-indigo-500 to-blue-600 hover:from-indigo-600 hover:to-blue-700 text-white px-6 py-3 rounded-xl flex items-center gap-2 transition-all duration-200 shadow-lg shadow-indigo-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      {isSubmitting ? (
-                        <>
-                          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                          Saving...
-                        </>
-                      ) : (
-                        <>
-                          <Save size={18} />
-                          Save Stock Entry
-                        </>
-                      )}
-                    </button>
-
+                  <input
+                    type="text"
+                    placeholder="Type to search medicine by name..."
+                    value={search}
+                    onChange={(e) => {
+                      setSearch(e.target.value);
+                      setShowResults(true);
+                      if (errors.medicine) {
+                        setErrors((prev) => ({ ...prev, medicine: "" }));
+                      }
+                    }}
+                    onFocus={() => setShowResults(true)}
+                    className={`w-full bg-slate-50/80 border rounded-xl pl-10 pr-10 py-2.5 text-sm text-slate-900 placeholder-slate-400 outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all ${
+                      errors.medicine
+                        ? "border-rose-400 focus:ring-rose-400 bg-rose-50/20"
+                        : "border-slate-200 hover:border-slate-300"
+                    }`}
+                  />
+                  {selectedMedicine && (
                     <button
                       type="button"
-                      onClick={handleReset}
-                      className="bg-white/10 hover:bg-white/20 border border-white/20 text-gray-300 hover:text-white px-6 py-3 rounded-xl flex items-center gap-2 transition-all duration-200"
+                      onClick={handleClearSelectedMedicine}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1"
                     >
-                      Reset Form
+                      <X size={15} />
                     </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* RIGHT PANEL - Summary */}
-            <div className="space-y-6">
-              {/* SELECTED MEDICINE CARD */}
-              <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl overflow-hidden">
-                <div className="border-b border-white/10 p-5">
-                  <div className="flex items-center gap-3">
-                    <PackagePlus size={20} className="text-indigo-400" />
-                    <h2 className="font-semibold text-white">
-                      Selected Medicine
-                    </h2>
-                  </div>
-                </div>
-
-                <div className="p-5">
-                  {selectedMedicine ? (
-                    <div className="space-y-4">
-                      <div className="p-3 bg-white/5 rounded-xl">
-                        <p className="text-xs text-gray-400 mb-1">
-                          Medicine Name
-                        </p>
-                        <h3 className="font-semibold text-white text-lg">
-                          {selectedMedicine.name}
-                        </h3>
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-3">
-                        <div className="p-3 bg-white/5 rounded-xl">
-                          <p className="text-xs text-gray-400">Current Stock</p>
-                          <p className="text-2xl font-bold text-indigo-400">
-                            {selectedMedicine.currentStock}
-                          </p>
-                          <p className="text-xs text-gray-500 mt-1">
-                            {selectedMedicine.unit}
-                          </p>
-                        </div>
-                        <div className="p-3 bg-white/5 rounded-xl">
-                          <p className="text-xs text-gray-400">Batch Number</p>
-                          <p className="font-semibold text-white font-mono text-sm">
-                            {selectedMedicine.batch}
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="p-3 bg-white/5 rounded-xl">
-                        <p className="text-xs text-gray-400">Category</p>
-                        <p className="text-white">
-                          {selectedMedicine.category}
-                        </p>
-                      </div>
-
-                      {formData.quantity && (
-                        <div className="bg-gradient-to-r from-indigo-500/20 to-blue-500/20 border border-indigo-500/30 rounded-xl p-4">
-                          <div className="flex items-center justify-between mb-2">
-                            <p className="text-sm text-indigo-300">
-                              Updated Stock After Entry
-                            </p>
-                            <TrendingUp size={16} className="text-indigo-400" />
-                          </div>
-                          <h2 className="text-3xl font-bold text-indigo-400">
-                            {Number(selectedMedicine.currentStock) +
-                              Number(formData.quantity)}
-                          </h2>
-                          <p className="text-xs text-indigo-300/70 mt-1">
-                            +{formData.quantity} {selectedMedicine.unit} added
-                          </p>
-                        </div>
-                      )}
-
-                      {formData.purchasePrice && formData.quantity && (
-                        <div className="p-3 bg-white/5 rounded-xl">
-                          <p className="text-xs text-gray-400">
-                            Total Purchase Value
-                          </p>
-                          <p className="text-xl font-bold text-white">
-                            ₹
-                            {(
-                              parseFloat(formData.purchasePrice) *
-                              parseInt(formData.quantity)
-                            ).toLocaleString()}
-                          </p>
-                          <p className="text-xs text-gray-500 mt-1">
-                            @ ₹{formData.purchasePrice} per{" "}
-                            {selectedMedicine.unit}
-                          </p>
-                        </div>
-                      )}
-                    </div>
-                  ) : (
-                    <div className="text-center py-8">
-                      <div className="w-16 h-16 mx-auto bg-white/10 rounded-2xl flex items-center justify-center mb-4">
-                        <Truck size={32} className="text-gray-500" />
-                      </div>
-                      <p className="text-gray-400">
-                        Search and select a medicine
-                      </p>
-                      <p className="text-xs text-gray-500 mt-1">
-                        to start receiving stock
-                      </p>
-                    </div>
                   )}
                 </div>
+
+                {/* Search Results Dropdown Overlay */}
+                {showResults && search && !selectedMedicine && (
+                  <div className="relative">
+                    <div className="absolute z-30 mt-2 w-full bg-white border border-slate-200 rounded-2xl shadow-xl max-h-64 overflow-y-auto divide-y divide-slate-100">
+                      {filteredMedicines.length > 0 ? (
+                        filteredMedicines.map((medicine) => (
+                          <button
+                            type="button"
+                            key={medicine.id}
+                            onClick={() => handleSelectMedicine(medicine)}
+                            className="w-full text-left p-3.5 hover:bg-slate-50 transition-colors flex items-center justify-between group"
+                          >
+                            <div className="min-w-0">
+                              <h4 className="font-semibold text-slate-800 text-sm group-hover:text-blue-600 transition-colors truncate">
+                                {medicine.name}
+                              </h4>
+                              <p className="text-xs text-slate-400 mt-0.5">
+                                Category: {medicine.category || "General"} • Batch:{" "}
+                                {medicine.batch || "N/A"}
+                              </p>
+                            </div>
+                            <div className="shrink-0 text-right ml-3">
+                              <span className="inline-block px-2.5 py-1 rounded-lg text-xs font-bold bg-slate-100 text-slate-700">
+                                Stock: {medicine.currentStock} {medicine.unit}
+                              </span>
+                            </div>
+                          </button>
+                        ))
+                      ) : (
+                        <div className="p-5 text-center">
+                          <p className="text-xs text-slate-500">
+                            No matching medicines found in catalog.
+                          </p>
+                          <Link
+                            to="/inventory/add-medicine"
+                            className="text-xs font-semibold text-blue-600 hover:underline mt-1.5 inline-block"
+                          >
+                            + Register New Medicine
+                          </Link>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Selected Medicine Pill */}
+                {selectedMedicine && (
+                  <div className="mt-2.5 p-3 rounded-xl bg-blue-50/70 border border-blue-100 flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-7 h-7 rounded-lg bg-blue-600 text-white flex items-center justify-center font-bold text-xs shrink-0">
+                        ✓
+                      </div>
+                      <div>
+                        <p className="text-xs font-bold text-slate-800">
+                          {selectedMedicine.name}
+                        </p>
+                        <p className="text-[11px] text-slate-500">
+                          Current Stock:{" "}
+                          <span className="font-semibold text-blue-600">
+                            {selectedMedicine.currentStock} {selectedMedicine.unit}
+                          </span>{" "}
+                          • Batch: {selectedMedicine.batch || "N/A"}
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleClearSelectedMedicine}
+                      className="text-xs text-blue-600 hover:text-blue-700 font-semibold"
+                    >
+                      Change
+                    </button>
+                  </div>
+                )}
+
+                {errors.medicine && (
+                  <p className="text-rose-500 text-xs mt-1.5 flex items-center gap-1 font-medium">
+                    <AlertCircle size={12} className="shrink-0" />
+                    <span>{errors.medicine}</span>
+                  </p>
+                )}
               </div>
 
-              {/* IMPORTANT NOTES */}
-              <div className="bg-amber-500/10 border border-amber-500/20 rounded-2xl p-5">
-                <div className="flex items-start gap-3">
-                  <AlertCircle size={18} className="text-amber-400 mt-0.5" />
-                  <div>
-                    <h3 className="font-semibold text-amber-400">
-                      Important Guidelines
-                    </h3>
-                    <ul className="text-sm text-amber-300/80 mt-3 space-y-2">
-                      <li className="flex items-center gap-2">
-                        <span className="w-1.5 h-1.5 bg-amber-400 rounded-full"></span>
-                        Expired medicines cannot be added
-                      </li>
-                      <li className="flex items-center gap-2">
-                        <span className="w-1.5 h-1.5 bg-amber-400 rounded-full"></span>
-                        Verify batch number carefully
-                      </li>
-                      <li className="flex items-center gap-2">
-                        <span className="w-1.5 h-1.5 bg-amber-400 rounded-full"></span>
-                        Check supplier invoice before saving
-                      </li>
-                      <li className="flex items-center gap-2">
-                        <span className="w-1.5 h-1.5 bg-amber-400 rounded-full"></span>
-                        Stock updates automatically after save
-                      </li>
-                    </ul>
-                  </div>
+              <hr className="border-slate-100" />
+
+              {/* SUPPLIER & INVOICE */}
+              <div>
+                <div className="flex items-center gap-2 mb-3">
+                  <span className="w-2 h-2 rounded-full bg-blue-500"></span>
+                  <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                    Supplier & Purchase Bill
+                  </h3>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <InputField
+                    label="Supplier Name"
+                    name="supplierName"
+                    value={formData.supplierName}
+                    onChange={handleChange}
+                    error={errors.supplierName}
+                    placeholder="e.g. Apollo Wholesale Distributors"
+                    required
+                    icon={Building2}
+                  />
+
+                  <InputField
+                    label="Supplier Invoice / Bill No."
+                    name="invoiceNumber"
+                    value={formData.invoiceNumber}
+                    onChange={handleChange}
+                    placeholder="e.g. INV-2026-889"
+                    icon={FileText}
+                  />
                 </div>
               </div>
 
-              {/* SUPPLIER INFO TIP */}
-              {formData.supplierName && (
-                <div className="bg-white/5 border border-white/10 rounded-2xl p-4 animate-in fade-in duration-300">
-                  <div className="flex items-center gap-3">
-                    <User size={16} className="text-indigo-400" />
-                    <div>
-                      <p className="text-xs text-gray-400">Supplier</p>
-                      <p className="text-white font-medium">
-                        {formData.supplierName}
+              <hr className="border-slate-100" />
+
+              {/* STOCK QUANTITY & PRICING */}
+              <div>
+                <div className="flex items-center gap-2 mb-3">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                  <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                    Batch Stock & Pricing
+                  </h3>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <InputField
+                    label="Quantity Received"
+                    name="quantity"
+                    type="number"
+                    value={formData.quantity}
+                    onChange={handleChange}
+                    error={errors.quantity}
+                    placeholder="Number of units added"
+                    required
+                    icon={Boxes}
+                  />
+
+                  <InputField
+                    label="Purchase Price Per Unit (₹)"
+                    name="purchasePrice"
+                    type="number"
+                    value={formData.purchasePrice}
+                    onChange={handleChange}
+                    error={errors.purchasePrice}
+                    placeholder="Cost per unit"
+                    required
+                    icon={IndianRupee}
+                  />
+
+                  <InputField
+                    label="Batch Number"
+                    name="batchNumber"
+                    value={formData.batchNumber}
+                    onChange={handleChange}
+                    error={errors.batchNumber}
+                    placeholder="e.g. BATCH-7781"
+                    required
+                    icon={Hash}
+                  />
+
+                  <InputField
+                    label="Rack / Shelf Location"
+                    name="rackLocation"
+                    value={formData.rackLocation}
+                    onChange={handleChange}
+                    placeholder="e.g. Rack C-04, Shelf 1"
+                    icon={MapPin}
+                  />
+                </div>
+              </div>
+
+              <hr className="border-slate-100" />
+
+              {/* DATES */}
+              <div>
+                <div className="flex items-center gap-2 mb-3">
+                  <span className="w-2 h-2 rounded-full bg-amber-500"></span>
+                  <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                    Manufacturing & Expiry
+                  </h3>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <InputField
+                    label="Manufacturing Date"
+                    name="manufactureDate"
+                    type="date"
+                    value={formData.manufactureDate}
+                    onChange={handleChange}
+                    error={errors.manufactureDate}
+                    icon={Calendar}
+                  />
+
+                  <InputField
+                    label="Expiry Date"
+                    name="expiryDate"
+                    type="date"
+                    value={formData.expiryDate}
+                    onChange={handleChange}
+                    error={errors.expiryDate}
+                    required
+                    icon={Calendar}
+                  />
+                </div>
+              </div>
+
+              {/* NOTES */}
+              <TextAreaField
+                label="Notes / Remarks"
+                name="notes"
+                rows={2}
+                value={formData.notes}
+                onChange={handleChange}
+                placeholder="Optional notes regarding this shipment, batch packaging, or condition..."
+                icon={FileText}
+              />
+            </div>
+
+            {/* Form Footer */}
+            <div className="p-5 sm:p-6 bg-slate-50/60 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-3">
+              <div className="flex items-center gap-2 text-xs text-slate-400">
+                <CheckCircle2 size={15} className="text-emerald-500" />
+                <span>Inventory counts will automatically update upon saving.</span>
+              </div>
+
+              <div className="flex items-center gap-3 w-full sm:w-auto justify-end">
+                <button
+                  type="button"
+                  onClick={handleReset}
+                  className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-xl text-sm font-semibold shadow-xs transition-colors"
+                >
+                  <RotateCcw size={15} />
+                  <span>Reset</span>
+                </button>
+
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="inline-flex items-center justify-center gap-2 px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-semibold shadow-xs transition-colors disabled:opacity-50"
+                >
+                  {isSubmitting ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      <span>Saving Stock...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Save size={16} />
+                      <span>Save Stock Entry</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* RIGHT SECTION (xl:col-span-4): Live Stock Preview Card */}
+          <div className="xl:col-span-4 space-y-6">
+            <div className="bg-white rounded-2xl border border-slate-200/90 shadow-xs p-5 flex flex-col justify-between">
+              <div>
+                <div className="flex items-center justify-between pb-4 border-b border-slate-100">
+                  <h3 className="text-base font-bold text-slate-800 leading-tight">
+                    Stock In Preview
+                  </h3>
+                  <span className="text-xs font-semibold text-blue-600 bg-blue-50 px-2.5 py-1 rounded-full">
+                    Live Calculation
+                  </span>
+                </div>
+
+                {selectedMedicine ? (
+                  <div className="mt-4 space-y-4">
+                    {/* Medicine Identity */}
+                    <div className="p-3.5 rounded-xl bg-slate-50/80 border border-slate-100">
+                      <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
+                        Selected Medicine
+                      </span>
+                      <h4 className="text-base font-bold text-slate-800 mt-0.5">
+                        {selectedMedicine.name}
+                      </h4>
+                      <p className="text-xs text-slate-500 mt-0.5">
+                        Category: {selectedMedicine.category || "General"}
                       </p>
                     </div>
-                    {formData.invoiceNumber && (
-                      <div className="ml-auto text-right">
-                        <p className="text-xs text-gray-400">Invoice</p>
-                        <p className="text-white font-mono text-sm">
-                          {formData.invoiceNumber}
+
+                    {/* Stock Transition Card */}
+                    <div className="p-4 rounded-xl bg-blue-50/60 border border-blue-100">
+                      <div className="flex items-center justify-between text-xs font-medium text-slate-500">
+                        <span>Current Stock</span>
+                        <span className="text-blue-600 font-bold">Inward Addition</span>
+                        <span>Updated Total</span>
+                      </div>
+                      <div className="flex items-center justify-between mt-2 font-bold text-slate-900">
+                        <span className="text-lg text-slate-600">
+                          {selectedMedicine.currentStock}
+                        </span>
+                        <span className="text-base text-blue-600">
+                          +{parsedQty}
+                        </span>
+                        <span className="text-2xl text-slate-900">
+                          {updatedStock}
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-slate-400 mt-2 text-center">
+                        Total units in warehouse post entry
+                      </p>
+                    </div>
+
+                    {/* Invoice Value Summary */}
+                    {totalValue > 0 && (
+                      <div className="p-4 rounded-xl bg-emerald-50/60 border border-emerald-100">
+                        <span className="text-[10px] font-semibold text-emerald-600 uppercase tracking-wider">
+                          Inward Stock Valuation
+                        </span>
+                        <h3 className="text-2xl font-extrabold text-slate-900 mt-1">
+                          ₹
+                          {totalValue.toLocaleString("en-IN", {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2,
+                          })}
+                        </h3>
+                        <p className="text-xs text-slate-500 mt-1">
+                          {parsedQty} units @ ₹{parsedPrice.toFixed(2)} / unit
                         </p>
                       </div>
                     )}
                   </div>
-                </div>
-              )}
+                ) : (
+                  <div className="text-center py-12 px-4">
+                    <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center mx-auto mb-3">
+                      <Truck size={24} />
+                    </div>
+                    <h4 className="text-sm font-bold text-slate-700">
+                      No Medicine Selected
+                    </h4>
+                    <p className="text-xs text-slate-400 mt-1 max-w-xs mx-auto">
+                      Search and select a medicine on the left to see live stock transition calculations.
+                    </p>
+                  </div>
+                )}
+              </div>
             </div>
+
+            {/* Supplier Quick Reference Card */}
+            {formData.supplierName && (
+              <div className="bg-white rounded-2xl border border-slate-200/90 shadow-xs p-4 flex items-center justify-between gap-3 animate-in fade-in duration-200">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-slate-100 text-slate-600 flex items-center justify-center">
+                    <Building2 size={16} />
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-semibold text-slate-400 uppercase">
+                      Supplier Record
+                    </span>
+                    <p className="text-xs font-bold text-slate-800">
+                      {formData.supplierName}
+                    </p>
+                  </div>
+                </div>
+                {formData.invoiceNumber && (
+                  <div className="text-right">
+                    <span className="text-[10px] font-semibold text-slate-400 uppercase">
+                      Invoice
+                    </span>
+                    <p className="text-xs font-mono font-bold text-slate-700">
+                      {formData.invoiceNumber}
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
-        </form>
-      </div>
+        </div>
+      </form>
     </div>
   );
 };

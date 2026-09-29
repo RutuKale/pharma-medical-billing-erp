@@ -20,7 +20,7 @@ const Navbar = () => {
     };
 
     return (
-        <header className="sticky top-0 z-40 bg-slate-900/80 backdrop-blur-md border-b border-white/10 shadow-lg px-4 lg:px-8 py-4 flex items-center justify-between transition-all duration-300">
+        <header className="sticky top-0 z-40 bg-white/80 backdrop-blur-md border-b border-slate-200 shadow-sm px-4 lg:px-8 py-4 flex items-center justify-between transition-all duration-300">
 
             {/* Search Bar */}
             <div className="flex-1 max-w-md">
@@ -30,8 +30,8 @@ const Navbar = () => {
                     </div>
                     <input
                         type="text"
-                        placeholder="Search medicines, patients, bills..."
-                        className="w-full bg-slate-950/50 border border-white/10 text-white text-sm rounded-xl pl-10 pr-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all placeholder:text-gray-500"
+                        placeholder="Search medicines, patients, bills, or invoices..."
+                        className="w-full bg-slate-50 border border-slate-200 text-slate-800 text-sm rounded-xl pl-10 pr-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all placeholder:text-slate-400"
                     />
                 </div>
             </div>
@@ -39,25 +39,25 @@ const Navbar = () => {
             {/* Right Actions */}
             <div className="flex items-center gap-3 md:gap-5 ml-4">
                 {/* Notifications */}
-                <button className="relative p-2 rounded-xl text-gray-400 hover:text-white hover:bg-white/5 transition-colors">
+                <button className="relative p-2 rounded-xl text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition-colors">
                     <Bell size={20} />
                     <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full border border-slate-900 animate-pulse"></span>
                 </button>
 
                 {/* Divider */}
-                <div className="hidden sm:block w-px h-6 bg-white/10"></div>
+                <div className="hidden sm:block w-px h-6 bg-slate-200"></div>
 
                 {/* Profile Dropdown */}
                 <div className="relative">
                     <button
                         onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                        className="flex items-center gap-2 md:gap-3 p-1 pr-2 rounded-xl border border-transparent hover:border-white/10 hover:bg-white/5 transition-all group"
+                        className="flex items-center gap-2 md:gap-3 p-1 pr-2 rounded-xl border border-transparent hover:border-slate-200 hover:bg-slate-50 transition-all group"
                     >
                         <div className="relative">
                             <img
                                 src={
                                     user?.photoURL ||
-                                    `https://ui-avatars.com/api/?name=${user?.displayName || "Admin"}&background=14b8a6&color=fff`
+                                    `https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&h=100&fit=crop&crop=face`
                                 }
                                 alt="Profile"
                                 className="w-8 h-8 rounded-lg object-cover ring-2 ring-blue-500/30 group-hover:ring-blue-400 transition-all"
@@ -66,11 +66,11 @@ const Navbar = () => {
                         </div>
 
                         <div className="hidden md:block text-left relative z-10">
-                            <p className="text-sm font-semibold text-white leading-tight">
-                                {user?.displayName || "Admin"}
+                            <p className="text-sm font-semibold text-slate-800 leading-tight">
+                                {user?.displayName || "umar sk"}
                             </p>
-                            <p className="text-xs text-blue-300/70">
-                                Manage Account
+                            <p className="text-xs text-slate-500">
+                                {user?.role || "Pharmacist"}
                             </p>
                         </div>
 
@@ -86,18 +86,18 @@ const Navbar = () => {
                                 onClick={() => setIsDropdownOpen(false)}
                             ></div>
 
-                            <div className="absolute right-0 mt-3 w-56 bg-slate-900 border border-white/10 rounded-2xl shadow-xl shadow-black/50 z-50 overflow-hidden py-1 animate-in fade-in slide-in-from-top-2 duration-200">
+                            <div className="absolute right-0 mt-3 w-56 bg-white border border-slate-200 rounded-2xl shadow-lg shadow-black/5 z-50 overflow-hidden py-1 animate-in fade-in slide-in-from-top-2 duration-200">
                                 {/* Mobile Identity */}
-                                <div className="md:hidden px-4 py-3 border-b border-white/10 mb-1">
-                                    <p className="text-sm font-medium text-white">{user?.displayName || "Admin"}</p>
-                                    <p className="text-xs text-blue-300/70 truncate mt-0.5">{user?.email || "admin@pharmamed.com"}</p>
+                                <div className="md:hidden px-4 py-3 border-b border-slate-200 mb-1">
+                                    <p className="text-sm font-medium text-slate-800">{user?.displayName || "Admin"}</p>
+                                    <p className="text-xs text-slate-500 truncate mt-0.5">{user?.email || "admin@pharmamed.com"}</p>
                                 </div>
 
                                 <div className="px-2 py-1">
                                     <Link
                                         to="/settings"
                                         onClick={() => setIsDropdownOpen(false)}
-                                        className="flex items-center gap-3 px-3 py-2 text-sm text-gray-300 hover:text-white hover:bg-white/5 rounded-xl transition-colors"
+                                        className="flex items-center gap-3 px-3 py-2 text-sm text-slate-600 hover:text-slate-800 hover:bg-slate-50 rounded-xl transition-colors"
                                     >
                                         <User size={16} className="text-blue-400" />
                                         My Profile
@@ -105,14 +105,14 @@ const Navbar = () => {
                                     <Link
                                         to="/settings"
                                         onClick={() => setIsDropdownOpen(false)}
-                                        className="flex items-center gap-3 px-3 py-2 text-sm text-gray-300 hover:text-white hover:bg-white/5 rounded-xl transition-colors"
+                                        className="flex items-center gap-3 px-3 py-2 text-sm text-slate-600 hover:text-slate-800 hover:bg-slate-50 rounded-xl transition-colors"
                                     >
                                         <Settings size={16} className="text-blue-400" />
                                         Settings
                                     </Link>
                                 </div>
 
-                                <div className="px-2 pt-1 pb-1 border-t border-white/10 mt-1">
+                                <div className="px-2 pt-1 pb-1 border-t border-slate-200 mt-1">
                                     <button
                                         onClick={handleLogout}
                                         className="w-full flex items-center gap-3 px-3 py-2 text-sm text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-xl transition-colors"

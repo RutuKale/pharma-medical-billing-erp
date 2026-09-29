@@ -182,7 +182,7 @@ const Login = () => {
   };
 
   return (
-    <div className="h-screen flex bg-gradient-to-br from-slate-900 via-teal-950 to-slate-900 overflow-hidden">
+    <div className="h-screen flex bg-transparent overflow-hidden">
       {/* Left Panel - Branding & Information */}
       <div className="hidden lg:flex lg:w-1/2 xl:w-3/5 relative overflow-hidden">
         {/* Animated Background */}
@@ -206,11 +206,11 @@ const Login = () => {
               <div className="relative group flex-shrink-0">
                 <div className="absolute inset-0 bg-gradient-to-r from-teal-400 to-indigo-400 rounded-xl blur-lg opacity-75 group-hover:opacity-100 transition-opacity"></div>
                 <div className="relative bg-gradient-to-br from-teal-500 to-indigo-600 p-2.5 rounded-xl shadow-xl">
-                  <Pill size={20} className="text-white" />
+                  <Pill size={20} className="text-slate-800" />
                 </div>
               </div>
               <div>
-                <h1 className="text-xl font-bold text-white">PharmaMed</h1>
+                <h1 className="text-xl font-bold text-slate-800">PharmaMed</h1>
                 <p className="text-teal-300 text-xs tracking-wider">
                   ERP SYSTEM
                 </p>
@@ -219,7 +219,7 @@ const Login = () => {
 
             {/* Main Heading */}
             <div>
-              <h2 className="text-2xl xl:text-3xl font-bold text-white leading-tight">
+              <h2 className="text-2xl xl:text-3xl font-bold text-slate-800 leading-tight">
                 Transform Your
                 <span className="block mt-1 bg-gradient-to-r from-teal-400 to-indigo-400 bg-clip-text text-transparent">
                   Pharmacy Operations
@@ -236,7 +236,7 @@ const Login = () => {
               {features.map((feature, index) => (
                 <div
                   key={index}
-                  className="flex items-center gap-2 text-teal-100/90 group hover:text-white transition-colors"
+                  className="flex items-center gap-2 text-teal-100/90 group hover:text-slate-900 transition-colors"
                 >
                   <CheckCircle2
                     size={16}
@@ -251,7 +251,7 @@ const Login = () => {
           {/* Bottom Section */}
           <div className="flex-shrink-0">
             {/* Testimonial */}
-            <div className="bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl p-4 max-w-xl">
+            <div className="bg-white shadow-sm backdrop-blur-md border border-slate-200 rounded-2xl p-4 max-w-xl">
               <div className="flex items-start gap-1 text-yellow-400 mb-3">
                 {[...Array(5)].map((_, i) => (
                   <Star key={i} size={12} fill="currentColor" />
@@ -261,14 +261,14 @@ const Login = () => {
                 "{medicalQuotes[quoteIndex].quote}"
               </p>
               <div className="mt-3 flex items-center gap-2">
-                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-teal-400 to-indigo-500 flex items-center justify-center text-white font-bold text-xs">
+                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-teal-400 to-indigo-500 flex items-center justify-center text-slate-800 font-bold text-xs">
                   {medicalQuotes[quoteIndex].author
                     .split(" ")
                     .map((n) => n[0])
                     .join("")}
                 </div>
                 <div>
-                  <p className="text-white font-medium text-xs">
+                  <p className="text-slate-800 font-medium text-xs">
                     {medicalQuotes[quoteIndex].author}
                   </p>
                   <p className="text-teal-300 text-xs">
@@ -291,7 +291,7 @@ const Login = () => {
                     size={20}
                     className={`mx-auto ${stat.color} transition-colors`}
                   />
-                  <p className="text-white font-bold text-xs mt-1">
+                  <p className="text-slate-800 font-bold text-xs mt-1">
                     {stat.label}
                   </p>
                 </div>
@@ -299,7 +299,7 @@ const Login = () => {
             </div>
 
             {/* Time Display */}
-            <div className="mt-4 flex items-center gap-4 text-white/60 text-xs">
+            <div className="mt-4 flex items-center gap-4 text-slate-500 text-xs">
               <div className="flex items-center gap-1.5">
                 <Clock size={12} />
                 <span>{currentTime}</span>
@@ -320,17 +320,17 @@ const Login = () => {
           <div className="lg:hidden text-center mb-6">
             <div className="inline-flex items-center gap-2">
               <div className="bg-gradient-to-br from-teal-500 to-indigo-600 p-2.5 rounded-xl">
-                <Pill size={20} className="text-white" />
+                <Pill size={20} className="text-slate-800" />
               </div>
-              <h1 className="text-xl font-bold text-white">PharmaMed ERP</h1>
+              <h1 className="text-xl font-bold text-slate-800">PharmaMed ERP</h1>
             </div>
           </div>
 
           {/* Login Card */}
-          <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl shadow-2xl p-6">
+          <div className="bg-slate-50 backdrop-blur-md border border-slate-200 rounded-2xl shadow-2xl p-6">
             {/* Header */}
             <div className="text-center mb-5">
-              <h2 className="text-xl font-bold text-white">
+              <h2 className="text-xl font-bold text-slate-800">
                 {isLogin ? "Welcome Back" : "Create Account"}
               </h2>
               <p className="text-teal-200/80 text-xs mt-1">
@@ -346,7 +346,7 @@ const Login = () => {
                 <ShieldCheck size={16} className="text-indigo-400" />
               </div>
               <div>
-                <p className="text-white text-xs font-medium">
+                <p className="text-slate-800 text-xs font-medium">
                   Enterprise-Grade Security
                 </p>
                 <p className="text-indigo-300/70 text-xs">
@@ -369,7 +369,7 @@ const Login = () => {
                   <input
                     type="email"
                     placeholder="professional@pharmacy.com"
-                    className="w-full pl-10 pr-3 py-2.5 bg-white/5 border border-white/10 rounded-xl text-white text-sm placeholder-slate-400 outline-none transition-all duration-300 focus:border-teal-400/50 focus:bg-white/10 focus:shadow-lg"
+                    className="w-full pl-10 pr-3 py-2.5 bg-white shadow-sm border border-slate-200 rounded-xl text-slate-800 text-sm placeholder-slate-400 outline-none transition-all duration-300 focus:border-teal-400/50 focus:bg-slate-50 focus:shadow-lg"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     required
@@ -389,7 +389,7 @@ const Login = () => {
                   <input
                     type="password"
                     placeholder="Enter your password"
-                    className="w-full pl-10 pr-3 py-2.5 bg-white/5 border border-white/10 rounded-xl text-white text-sm placeholder-slate-400 outline-none transition-all duration-300 focus:border-teal-400/50 focus:bg-white/10 focus:shadow-lg"
+                    className="w-full pl-10 pr-3 py-2.5 bg-white shadow-sm border border-slate-200 rounded-xl text-slate-800 text-sm placeholder-slate-400 outline-none transition-all duration-300 focus:border-teal-400/50 focus:bg-slate-50 focus:shadow-lg"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     required
@@ -410,7 +410,7 @@ const Login = () => {
                     <input
                       type="text"
                       placeholder="Enter 6 digit OTP"
-                      className="w-full pl-10 pr-3 py-2.5 bg-white/5 border border-white/10 rounded-xl text-white text-sm placeholder-slate-400 outline-none transition-all duration-300 focus:border-teal-400/50 focus:bg-white/10 focus:shadow-lg"
+                      className="w-full pl-10 pr-3 py-2.5 bg-white shadow-sm border border-slate-200 rounded-xl text-slate-800 text-sm placeholder-slate-400 outline-none transition-all duration-300 focus:border-teal-400/50 focus:bg-slate-50 focus:shadow-lg"
                       value={otp}
                       onChange={(e) => setOtp(e.target.value)}
                       required
@@ -460,7 +460,7 @@ const Login = () => {
             {/* Google Login */}
             <button
               onClick={loginWithGoogle}
-              className="w-full bg-white/5 border border-white/10 hover:border-teal-400/50 hover:bg-white/10 text-white py-2.5 rounded-xl text-sm font-medium flex items-center justify-center gap-2 transition-all duration-300"
+              className="w-full bg-white shadow-sm border border-slate-200 hover:border-teal-400/50 hover:bg-slate-50 text-slate-800 py-2.5 rounded-xl text-sm font-medium flex items-center justify-center gap-2 transition-all duration-300"
             >
               <FcGoogle size={18} />
               Google Workspace
@@ -482,7 +482,7 @@ const Login = () => {
 
           {/* Trust Badge */}
           <div className="mt-4 text-center">
-            <div className="inline-flex items-center gap-1.5 bg-white/5 backdrop-blur-sm rounded-full px-3 py-1.5 border border-white/10">
+            <div className="inline-flex items-center gap-1.5 bg-white shadow-sm backdrop-blur-sm rounded-full px-3 py-1.5 border border-slate-200">
               <div className="relative flex h-1.5 w-1.5">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
                 <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-indigo-500"></span>

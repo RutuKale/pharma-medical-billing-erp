@@ -1,4 +1,6 @@
 import React, { useMemo, useState } from "react";
+import { Link } from "react-router-dom";
+import Pagination from "../../components/Pagination";
 import {
   BellRing,
   Search,
@@ -11,20 +13,26 @@ import {
   Filter,
   RotateCcw,
   MessageCircle,
-  Sparkles,
-  Shield,
   TrendingUp,
   AlertCircle,
-  ChevronLeft,
-  ChevronRight,
+  Users,
+  IndianRupee,
+  X,
+  Calendar,
+  Stethoscope,
+  Pill,
+  Shield,
+  Eye,
 } from "lucide-react";
+import Swal from "sweetalert2";
 
-const remindersData = [
+const initialRemindersData = [
   {
     id: 1,
     patientName: "Rahul Patil",
     mobile: "9876543210",
     medicine: "Metformin 500mg",
+    dosage: "1 Tab Twice Daily",
     nextRefillDate: "2026-05-12",
     status: "Pending",
     reminderType: "WhatsApp",
@@ -34,7 +42,8 @@ const remindersData = [
     id: 2,
     patientName: "Sneha Kale",
     mobile: "9090909090",
-    medicine: "BP Tablets",
+    medicine: "Telmisartan 40mg",
+    dosage: "1 Tab Morning",
     nextRefillDate: "2026-05-10",
     status: "Sent",
     reminderType: "WhatsApp",
@@ -44,7 +53,8 @@ const remindersData = [
     id: 3,
     patientName: "Ajay Verma",
     mobile: "9988776655",
-    medicine: "Vitamin D Capsules",
+    medicine: "Vitamin D3 60k",
+    dosage: "1 Weekly",
     nextRefillDate: "2026-05-09",
     status: "Failed",
     reminderType: "WhatsApp",
@@ -54,33 +64,57 @@ const remindersData = [
     id: 4,
     patientName: "Priya Deshmukh",
     mobile: "9765432109",
-    medicine: "Antibiotics",
+    medicine: "Amoxicillin 500mg",
+    dosage: "1 Tab Thrice Daily",
     nextRefillDate: "2026-05-15",
     status: "Pending",
     reminderType: "WhatsApp",
     doctorName: "Dr. Sharma",
   },
+  {
+    id: 5,
+    patientName: "Vikas Shinde",
+    mobile: "9822334455",
+    medicine: "Atorvastatin 10mg",
+    dosage: "1 Tab Night",
+    nextRefillDate: "2026-05-18",
+    status: "Pending",
+    reminderType: "WhatsApp",
+    doctorName: "Dr. Kulkarni",
+  },
+  {
+    id: 6,
+    patientName: "Sunita Joshi",
+    mobile: "9890112233",
+    medicine: "Pantoprazole 40mg",
+    dosage: "1 Tab Before Food",
+    nextRefillDate: "2026-05-08",
+    status: "Sent",
+    reminderType: "WhatsApp",
+    doctorName: "Dr. Joshi",
+  },
 ];
 
 const Reminders = () => {
+  const [reminders, setReminders] = useState(initialRemindersData);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 5;
-  const [loading, setLoading] = useState(true);
-  const [reminders, setReminders] = useState([]);
+  const [previewReminder, setPreviewReminder] = useState(null);
+  const itemsPerPage = 8;
 
   const filteredReminders = useMemo(() => {
-    return remindersData.filter((reminder) => {
+    return reminders.filter((reminder) => {
       const matchesSearch =
         reminder.patientName.toLowerCase().includes(search.toLowerCase()) ||
         reminder.mobile.includes(search) ||
-        reminder.medicine.toLowerCase().includes(search.toLowerCase());
+        reminder.medicine.toLowerCase().includes(search.toLowerCase()) ||
+        reminder.doctorName.toLowerCase().includes(search.toLowerCase());
       const matchesStatus =
         statusFilter === "All" || reminder.status === statusFilter;
       return matchesSearch && matchesStatus;
     });
-  }, [search, statusFilter]);
+  }, [reminders, search, statusFilter]);
 
   // Pagination
   const totalPages = Math.ceil(filteredReminders.length / itemsPerPage);
@@ -89,372 +123,569 @@ const Reminders = () => {
     currentPage * itemsPerPage,
   );
 
-  const stats = {
-    total: remindersData.length,
-    pending: remindersData.filter((r) => r.status === "Pending").length,
-    sent: remindersData.filter((r) => r.status === "Sent").length,
-    failed: remindersData.filter((r) => r.status === "Failed").length,
+  const stats = useMemo(() => {
+    return {
+      total: reminders.length,
+      pending: reminders.filter((r) => r.status === "Pending").length,
+      sent: reminders.filter((r) => r.status === "Sent").length,
+      failed: reminders.filter((r) => r.status === "Failed").length,
+    };
+  }, [reminders]);
+
+  const sendReminder = async (reminder) => {
+    const result = await Swal.fire({
+      title: "Send WhatsApp Reminder?",
+      text: `Dispatch refill notification for ${reminder.medicine} to ${reminder.patientName} (${reminder.mobile})?`,
+      icon: "question",
+      showCancelButton: true,
+      confirmButtonText: "Send Notification",
+      cancelButtonText: "Cancel",
+      confirmButtonColor: "#2563eb",
+      cancelButtonColor: "#64748b",
+    });
+
+    if (!result.isConfirmed) return;
+
+    // Simulate sending
+    setReminders((prev) =>
+      prev.map((r) => (r.id === reminder.id ? { ...r, status: "Sent" } : r)),
+    );
+
+    Swal.fire({
+      icon: "success",
+      title: "Reminder Dispatched",
+      text: `Refill notification sent successfully to ${reminder.patientName}!`,
+      confirmButtonColor: "#2563eb",
+    });
   };
 
-  const sendReminder = (reminder) => {
-    console.log("Send Reminder:", reminder);
-    alert("Reminder sent successfully");
+  const resendReminder = async (reminder) => {
+    const result = await Swal.fire({
+      title: "Resend Failed Reminder?",
+      text: `Retry sending reminder to ${reminder.patientName} (${reminder.mobile})?`,
+      icon: "question",
+      showCancelButton: true,
+      confirmButtonText: "Retry Sending",
+      cancelButtonText: "Cancel",
+      confirmButtonColor: "#2563eb",
+      cancelButtonColor: "#64748b",
+    });
+
+    if (!result.isConfirmed) return;
+
+    // Simulate resend
+    setReminders((prev) =>
+      prev.map((r) => (r.id === reminder.id ? { ...r, status: "Sent" } : r)),
+    );
+
+    Swal.fire({
+      icon: "success",
+      title: "Reminder Resent",
+      text: `Reminder re-queued and dispatched to ${reminder.patientName}.`,
+      confirmButtonColor: "#2563eb",
+    });
   };
 
-  const resendReminder = (reminder) => {
-    console.log("Resend Reminder:", reminder);
-    alert("Reminder resent successfully");
-  };
-
-  const getStatusBadge = (status) => {
-    switch (status) {
-      case "Sent":
-        return "bg-green-500/20 text-green-400 border-green-500/30";
-      case "Pending":
-        return "bg-yellow-500/20 text-yellow-400 border-yellow-500/30";
-      case "Failed":
-        return "bg-red-500/20 text-red-400 border-red-500/30";
-      default:
-        return "";
+  const sendAllPending = async () => {
+    const pendingList = reminders.filter((r) => r.status === "Pending");
+    if (pendingList.length === 0) {
+      return Swal.fire({
+        icon: "info",
+        title: "No Pending Reminders",
+        text: "All scheduled medication refill reminders have already been dispatched.",
+        confirmButtonColor: "#2563eb",
+      });
     }
+
+    const result = await Swal.fire({
+      title: `Send ${pendingList.length} Pending Reminders?`,
+      text: `Batch dispatch WhatsApp refill alerts to ${pendingList.length} patients?`,
+      icon: "question",
+      showCancelButton: true,
+      confirmButtonText: `Send All (${pendingList.length})`,
+      cancelButtonText: "Cancel",
+      confirmButtonColor: "#2563eb",
+      cancelButtonColor: "#64748b",
+    });
+
+    if (!result.isConfirmed) return;
+
+    setReminders((prev) =>
+      prev.map((r) => (r.status === "Pending" ? { ...r, status: "Sent" } : r)),
+    );
+
+    Swal.fire({
+      icon: "success",
+      title: "Batch Dispatch Complete",
+      text: `Successfully sent ${pendingList.length} refill reminders via WhatsApp.`,
+      confirmButtonColor: "#2563eb",
+    });
   };
 
-  const getStatusIcon = (status) => {
-    switch (status) {
-      case "Sent":
-        return <CheckCircle2 size={14} />;
-      case "Pending":
-        return <Clock3 size={14} />;
-      case "Failed":
-        return <XCircle size={14} />;
-      default:
-        return null;
-    }
+  const resetFilters = () => {
+    setSearch("");
+    setStatusFilter("All");
+    setCurrentPage(1);
   };
+
+  const hasActiveFilters = Boolean(search || statusFilter !== "All");
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-950 to-slate-900">
-      {/* Animated Background Pattern */}
-      <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-0 -left-4 w-96 h-96 bg-purple-500/20 rounded-full filter blur-3xl animate-pulse"></div>
-        <div className="absolute bottom-1/4 -right-4 w-96 h-96 bg-pink-500/20 rounded-full filter blur-3xl animate-pulse delay-1000"></div>
-        <div className="absolute inset-0 opacity-[0.03]">
-          <div className="h-full w-full bg-[linear-gradient(rgba(20,184,166,0.1)_1px,transparent_1px),linear-gradient(90deg,rgba(20,184,166,0.1)_1px,transparent_1px)] bg-[size:32px_32px]"></div>
+    <div className="p-4 sm:p-6 lg:p-8 max-w-[1600px] mx-auto space-y-6">
+      {/* 1. HEADER SECTION (No icon next to title per design standards) */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight flex items-center gap-2">
+            <span>Reminder Tracker</span>
+          </h1>
+          <p className="text-slate-500 text-xs sm:text-sm mt-0.5">
+            Automate WhatsApp refill notifications, track adherence schedules, and improve patient retention.
+          </p>
+        </div>
+
+        <div className="flex items-center gap-2.5 flex-wrap">
+          {stats.pending > 0 && (
+            <button
+              onClick={sendAllPending}
+              className="inline-flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-semibold shadow-xs transition-colors"
+            >
+              <Send size={15} />
+              <span>Send Pending ({stats.pending})</span>
+            </button>
+          )}
+          <Link
+            to="/patients"
+            className="inline-flex items-center gap-2 px-4 py-2.5 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-xl text-sm font-semibold shadow-xs transition-colors"
+          >
+            <Users size={16} className="text-slate-500" />
+            <span>Patient Register</span>
+          </Link>
+          <Link
+            to="/billing"
+            className="inline-flex items-center gap-2 px-4 py-2.5 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-xl text-sm font-semibold shadow-xs transition-colors"
+          >
+            <IndianRupee size={16} className="text-slate-500" />
+            <span>New Billing</span>
+          </Link>
         </div>
       </div>
 
-      <div className="relative z-10 p-4 md:p-6">
-        {/* Header */}
-        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-6">
-          <div>
-            <div className="flex items-center gap-3">
-              <div className="relative group">
-                <div className="absolute inset-0 bg-gradient-to-r from-purple-400 to-pink-400 rounded-xl blur-lg opacity-75 group-hover:opacity-100 transition-opacity"></div>
-                <div className="relative bg-gradient-to-br from-purple-500 to-pink-600 p-2.5 rounded-xl shadow-lg">
-                  <BellRing size={24} className="text-white" />
-                </div>
-              </div>
-              <div>
-                <h1 className="text-2xl font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
-                  Reminder Tracker
-                </h1>
-                <p className="text-purple-300/70 text-sm mt-1">
-                  Manage WhatsApp medicine refill reminders
-                </p>
-              </div>
+      {/* 2. STAT CARDS ROW */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Total Reminders */}
+        <div className="bg-white rounded-2xl p-5 border border-slate-200/90 shadow-xs hover:shadow-sm transition-all flex flex-col justify-between">
+          <div className="flex items-start justify-between">
+            <div>
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                Total Queue
+              </p>
+              <p className="text-2xl font-bold text-slate-900 mt-2">
+                {stats.total}
+              </p>
+            </div>
+            <div className="p-2.5 rounded-xl bg-blue-50 text-blue-600 border border-blue-100">
+              <BellRing size={20} />
             </div>
           </div>
-
-          <div className="bg-purple-500/10 border border-purple-500/20 rounded-xl px-4 py-3 flex items-center gap-3 backdrop-blur-sm">
-            <Shield size={18} className="text-purple-400" />
-            <p className="text-purple-300/90 text-sm">
-              Automated refill reminders improve patient retention
-            </p>
-            <Sparkles size={16} className="text-purple-400 animate-pulse" />
+          <div className="mt-4 flex items-center gap-1.5 text-xs text-slate-500 font-medium">
+            <span>Scheduled refill alerts</span>
           </div>
         </div>
 
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5 mb-6">
-          {/* Total Reminders */}
-          <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl shadow-xl p-5 hover:bg-white/10 transition-all duration-300 group">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-400">Total Reminders</p>
-                <h2 className="text-3xl font-bold mt-2 bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
-                  {stats.total}
-                </h2>
-              </div>
-              <div className="bg-purple-500/20 p-4 rounded-2xl group-hover:scale-110 transition-transform duration-300">
-                <BellRing size={24} className="text-purple-400" />
-              </div>
+        {/* Pending */}
+        <div className="bg-white rounded-2xl p-5 border border-slate-200/90 shadow-xs hover:shadow-sm transition-all flex flex-col justify-between">
+          <div className="flex items-start justify-between">
+            <div>
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                Pending Dispatch
+              </p>
+              <p className="text-2xl font-bold text-slate-900 mt-2">
+                {stats.pending}
+              </p>
+            </div>
+            <div className="p-2.5 rounded-xl bg-amber-50 text-amber-600 border border-amber-100">
+              <Clock3 size={20} />
             </div>
           </div>
-
-          {/* Pending */}
-          <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl shadow-xl p-5 hover:bg-white/10 transition-all duration-300 group">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-400">Pending</p>
-                <h2 className="text-3xl font-bold mt-2 bg-gradient-to-r from-yellow-400 to-orange-400 bg-clip-text text-transparent">
-                  {stats.pending}
-                </h2>
-              </div>
-              <div className="bg-yellow-500/20 p-4 rounded-2xl group-hover:scale-110 transition-transform duration-300">
-                <Clock3 size={24} className="text-yellow-400" />
-              </div>
-            </div>
-          </div>
-
-          {/* Sent */}
-          <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl shadow-xl p-5 hover:bg-white/10 transition-all duration-300 group">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-400">Sent</p>
-                <h2 className="text-3xl font-bold mt-2 bg-gradient-to-r from-green-400 to-emerald-400 bg-clip-text text-transparent">
-                  {stats.sent}
-                </h2>
-              </div>
-              <div className="bg-green-500/20 p-4 rounded-2xl group-hover:scale-110 transition-transform duration-300">
-                <CheckCircle2 size={24} className="text-green-400" />
-              </div>
-            </div>
-          </div>
-
-          {/* Failed */}
-          <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl shadow-xl p-5 hover:bg-white/10 transition-all duration-300 group">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-400">Failed</p>
-                <h2 className="text-3xl font-bold mt-2 bg-gradient-to-r from-red-400 to-rose-400 bg-clip-text text-transparent">
-                  {stats.failed}
-                </h2>
-              </div>
-              <div className="bg-red-500/20 p-4 rounded-2xl group-hover:scale-110 transition-transform duration-300">
-                <XCircle size={24} className="text-red-400" />
-              </div>
-            </div>
+          <div className="mt-4 flex items-center gap-1.5 text-xs text-amber-600 font-medium">
+            <span>Due for notification</span>
           </div>
         </div>
 
-        {/* Filters */}
-        <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl shadow-xl p-5 mb-6">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-            {/* Search */}
-            <div className="relative lg:col-span-2">
-              <Search
-                size={18}
-                className="absolute left-3 top-3 text-gray-400"
-              />
-              <input
-                type="text"
-                placeholder="Search patient, medicine or mobile..."
-                value={search}
-                onChange={(e) => {
-                  setSearch(e.target.value);
-                  setCurrentPage(1);
-                }}
-                className="w-full bg-slate-800/50 border border-white/10 rounded-xl pl-10 pr-4 py-3 text-white placeholder-gray-400 outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-transparent transition-all"
-              />
+        {/* Sent */}
+        <div className="bg-white rounded-2xl p-5 border border-slate-200/90 shadow-xs hover:shadow-sm transition-all flex flex-col justify-between">
+          <div className="flex items-start justify-between">
+            <div>
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                Delivered
+              </p>
+              <p className="text-2xl font-bold text-slate-900 mt-2">
+                {stats.sent}
+              </p>
             </div>
+            <div className="p-2.5 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-100">
+              <CheckCircle2 size={20} />
+            </div>
+          </div>
+          <div className="mt-4 flex items-center gap-1.5 text-xs text-emerald-600 font-medium">
+            <span>Successfully dispatched</span>
+          </div>
+        </div>
 
-            {/* Status Filter */}
-            <div className="relative">
-              <Filter
-                size={18}
-                className="absolute left-3 top-3 text-gray-400"
-              />
-              <select
-                value={statusFilter}
-                onChange={(e) => {
-                  setStatusFilter(e.target.value);
-                  setCurrentPage(1);
-                }}
-                className="w-full bg-slate-800/50 border border-white/10 rounded-xl pl-10 pr-4 py-3 text-white outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-transparent transition-all"
+        {/* Failed */}
+        <div className="bg-white rounded-2xl p-5 border border-slate-200/90 shadow-xs hover:shadow-sm transition-all flex flex-col justify-between">
+          <div className="flex items-start justify-between">
+            <div>
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                Failed Delivery
+              </p>
+              <p className="text-2xl font-bold text-slate-900 mt-2">
+                {stats.failed}
+              </p>
+            </div>
+            <div className="p-2.5 rounded-xl bg-rose-50 text-rose-600 border border-rose-100">
+              <XCircle size={20} />
+            </div>
+          </div>
+          <div className="mt-4 flex items-center gap-1.5 text-xs text-rose-600 font-medium">
+            <span>Requires manual retry</span>
+          </div>
+        </div>
+      </div>
+
+      {/* 3. SEARCH & QUICK FILTER BAR */}
+      <div className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200/90 shadow-xs space-y-3">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          {/* Search Bar */}
+          <div className="relative flex-1">
+            <Search
+              size={16}
+              className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"
+            />
+            <input
+              type="text"
+              placeholder="Search by patient name, medicine, or mobile..."
+              value={search}
+              onChange={(e) => {
+                setSearch(e.target.value);
+                setCurrentPage(1);
+              }}
+              className="w-full bg-slate-50/60 border border-slate-200 rounded-xl pl-10 pr-10 py-2.5 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all font-medium"
+            />
+            {search && (
+              <button
+                type="button"
+                onClick={() => setSearch("")}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1"
               >
-                <option className="bg-slate-900">All</option>
-                <option className="bg-slate-900">Pending</option>
-                <option className="bg-slate-900">Sent</option>
-                <option className="bg-slate-900">Failed</option>
-              </select>
-            </div>
-          </div>
-        </div>
-
-        {/* Reminders Table */}
-        <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl shadow-xl overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[1200px]">
-              <thead className="bg-slate-800/50 border-b border-white/10">
-                <tr>
-                  <th className="text-left p-4 text-sm font-semibold text-gray-300">
-                    Patient
-                  </th>
-                  <th className="text-left p-4 text-sm font-semibold text-gray-300">
-                    Mobile
-                  </th>
-                  <th className="text-left p-4 text-sm font-semibold text-gray-300">
-                    Medicine
-                  </th>
-                  <th className="text-left p-4 text-sm font-semibold text-gray-300">
-                    Doctor
-                  </th>
-                  <th className="text-left p-4 text-sm font-semibold text-gray-300">
-                    Next Refill
-                  </th>
-                  <th className="text-left p-4 text-sm font-semibold text-gray-300">
-                    Type
-                  </th>
-                  <th className="text-left p-4 text-sm font-semibold text-gray-300">
-                    Status
-                  </th>
-                  <th className="text-left p-4 text-sm font-semibold text-gray-300">
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {paginatedReminders.map((reminder) => (
-                  <tr
-                    key={reminder.id}
-                    className="border-b border-white/5 hover:bg-white/5 transition-colors"
-                  >
-                    <td className="p-4">
-                      <h3 className="font-semibold text-white">
-                        {reminder.patientName}
-                      </h3>
-                    </td>
-                    <td className="p-4">
-                      <div className="flex items-center gap-2 text-gray-300">
-                        <Phone size={16} className="text-gray-500" />
-                        {reminder.mobile}
-                      </div>
-                    </td>
-                    <td className="p-4 text-gray-300">{reminder.medicine}</td>
-                    <td className="p-4 text-gray-300">{reminder.doctorName}</td>
-                    <td className="p-4">
-                      <div className="flex items-center gap-2 text-gray-300">
-                        <CalendarClock size={16} className="text-gray-500" />
-                        {reminder.nextRefillDate}
-                      </div>
-                    </td>
-                    <td className="p-4">
-                      <span className="bg-green-500/20 text-green-400 px-3 py-1 rounded-full text-xs flex items-center gap-1 w-fit border border-green-500/30">
-                        <MessageCircle size={14} />
-                        {reminder.reminderType}
-                      </span>
-                    </td>
-                    <td className="p-4">
-                      <span
-                        className={`px-3 py-1 rounded-full text-xs font-semibold flex items-center gap-1 w-fit border ${getStatusBadge(
-                          reminder.status,
-                        )}`}
-                      >
-                        {getStatusIcon(reminder.status)}
-                        {reminder.status}
-                      </span>
-                    </td>
-                    <td className="p-4">
-                      <div className="flex flex-wrap gap-2">
-                        {reminder.status === "Pending" && (
-                          <button
-                            onClick={() => sendReminder(reminder)}
-                            className="bg-purple-500/20 hover:bg-purple-500/30 text-purple-400 p-2 rounded-lg transition-all duration-200 hover:scale-110"
-                          >
-                            <Send size={16} />
-                          </button>
-                        )}
-                        {reminder.status === "Failed" && (
-                          <button
-                            onClick={() => resendReminder(reminder)}
-                            className="bg-orange-500/20 hover:bg-orange-500/30 text-orange-400 p-2 rounded-lg transition-all duration-200 hover:scale-110"
-                          >
-                            <RotateCcw size={16} />
-                          </button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-
-            {filteredReminders.length === 0 && (
-              <div className="text-center py-12">
-                <AlertCircle className="mx-auto text-gray-400 mb-3" size={48} />
-                <p className="text-gray-400">No reminders found.</p>
-              </div>
+                <X size={15} />
+              </button>
             )}
           </div>
 
-          {/* Pagination */}
-          {filteredReminders.length > 0 && (
-            <div className="border-t border-white/10 px-6 py-4 flex items-center justify-between">
-              <p className="text-sm text-gray-400">
-                Showing {(currentPage - 1) * itemsPerPage + 1} to{" "}
-                {Math.min(currentPage * itemsPerPage, filteredReminders.length)}{" "}
-                of {filteredReminders.length} entries
-              </p>
-              <div className="flex gap-2">
+          {/* Quick Status Tabs */}
+          <div className="flex items-center gap-2 flex-wrap">
+            <div className="flex items-center p-1 bg-slate-100 rounded-xl border border-slate-200/70">
+              {["All", "Pending", "Sent", "Failed"].map((status) => (
                 <button
-                  onClick={() =>
-                    setCurrentPage((prev) => Math.max(prev - 1, 1))
-                  }
-                  disabled={currentPage === 1}
-                  className="p-2 rounded-lg bg-slate-800/50 border border-white/10 text-white hover:bg-white/5 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  key={status}
+                  type="button"
+                  onClick={() => {
+                    setStatusFilter(status);
+                    setCurrentPage(1);
+                  }}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                    statusFilter === status
+                      ? "bg-white text-blue-600 shadow-xs"
+                      : "text-slate-600 hover:text-slate-900"
+                  }`}
                 >
-                  <ChevronLeft size={18} />
+                  {status}
                 </button>
-                <span className="px-4 py-2 rounded-lg bg-purple-500/20 text-purple-400 border border-purple-500/30">
-                  {currentPage}
-                </span>
-                <button
-                  onClick={() =>
-                    setCurrentPage((prev) => Math.min(prev + 1, totalPages))
-                  }
-                  disabled={currentPage === totalPages}
-                  className="p-2 rounded-lg bg-slate-800/50 border border-white/10 text-white hover:bg-white/5 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              ))}
+            </div>
+
+            {hasActiveFilters && (
+              <button
+                type="button"
+                onClick={resetFilters}
+                className="inline-flex items-center gap-1 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-xs font-semibold transition-colors"
+                title="Reset filters"
+              >
+                <RotateCcw size={13} />
+                <span>Reset</span>
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* 4. REMINDERS DATA TABLE */}
+      <div className="bg-white rounded-2xl border border-slate-200/90 shadow-xs overflow-hidden">
+        <div className="p-4 sm:p-5 flex items-center justify-between border-b border-slate-100">
+          <div>
+            <h3 className="text-base font-bold text-slate-900">
+              Refill Schedule Queue
+            </h3>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Showing {filteredReminders.length} scheduled patient notifications
+            </p>
+          </div>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse min-w-[950px]">
+            <thead>
+              <tr className="border-b border-slate-100 text-[11px] font-semibold text-slate-400 uppercase tracking-wider bg-slate-50/60">
+                <th className="py-3 px-4">Patient Profile</th>
+                <th className="py-3 px-4">Contact</th>
+                <th className="py-3 px-4">Prescribed Medicine</th>
+                <th className="py-3 px-4">Doctor</th>
+                <th className="py-3 px-4">Refill Due Date</th>
+                <th className="py-3 px-4">Channel</th>
+                <th className="py-3 px-4">Status</th>
+                <th className="py-3 px-4 text-center w-28">Action</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 text-sm">
+              {paginatedReminders.map((reminder) => (
+                <tr
+                  key={reminder.id}
+                  className="hover:bg-slate-50/60 transition-colors"
                 >
-                  <ChevronRight size={18} />
-                </button>
+                  <td className="py-3.5 px-4">
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 border border-blue-100 font-bold flex items-center justify-center text-xs shrink-0">
+                        {reminder.patientName
+                          ? reminder.patientName.charAt(0).toUpperCase()
+                          : "P"}
+                      </div>
+                      <div>
+                        <div className="font-semibold text-slate-900">
+                          {reminder.patientName}
+                        </div>
+                        <span className="text-[11px] text-slate-400">
+                          Refill Target
+                        </span>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="py-3.5 px-4">
+                    <div className="flex items-center gap-1.5 text-slate-700 font-medium">
+                      <Phone size={13} className="text-slate-400" />
+                      <span>{reminder.mobile}</span>
+                    </div>
+                  </td>
+                  <td className="py-3.5 px-4">
+                    <div className="font-semibold text-slate-800 flex items-center gap-1.5">
+                      <Pill size={14} className="text-blue-500" />
+                      <span>{reminder.medicine}</span>
+                    </div>
+                    {reminder.dosage && (
+                      <div className="text-xs text-slate-400 mt-0.5">
+                        {reminder.dosage}
+                      </div>
+                    )}
+                  </td>
+                  <td className="py-3.5 px-4 text-slate-600 text-xs">
+                    <div className="flex items-center gap-1">
+                      <Stethoscope size={12} className="text-slate-400" />
+                      <span>{reminder.doctorName}</span>
+                    </div>
+                  </td>
+                  <td className="py-3.5 px-4">
+                    <div className="flex items-center gap-1.5 text-slate-700 font-medium text-xs">
+                      <CalendarClock size={13} className="text-slate-400" />
+                      <span>
+                        {new Date(reminder.nextRefillDate).toLocaleDateString(
+                          "en-IN",
+                          {
+                            day: "2-digit",
+                            month: "short",
+                            year: "numeric",
+                          },
+                        )}
+                      </span>
+                    </div>
+                  </td>
+                  <td className="py-3.5 px-4">
+                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-100">
+                      <MessageCircle size={12} />
+                      <span>{reminder.reminderType}</span>
+                    </span>
+                  </td>
+                  <td className="py-3.5 px-4">
+                    <span
+                      className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold ${
+                        reminder.status === "Sent"
+                          ? "bg-emerald-50 text-emerald-700 border border-emerald-100"
+                          : reminder.status === "Pending"
+                            ? "bg-amber-50 text-amber-700 border border-amber-100"
+                            : "bg-rose-50 text-rose-700 border border-rose-100"
+                      }`}
+                    >
+                      {reminder.status === "Sent" ? (
+                        <CheckCircle2 size={12} />
+                      ) : reminder.status === "Pending" ? (
+                        <Clock3 size={12} />
+                      ) : (
+                        <XCircle size={12} />
+                      )}
+                      <span>{reminder.status}</span>
+                    </span>
+                  </td>
+                  <td className="py-3.5 px-4 text-center">
+                    <div className="flex items-center justify-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => setPreviewReminder(reminder)}
+                        className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                        title="View reminder template"
+                      >
+                        <Eye size={15} />
+                      </button>
+                      {reminder.status === "Pending" && (
+                        <button
+                          type="button"
+                          onClick={() => sendReminder(reminder)}
+                          className="p-1.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
+                          title="Send notification now"
+                        >
+                          <Send size={15} />
+                        </button>
+                      )}
+                      {reminder.status === "Failed" && (
+                        <button
+                          type="button"
+                          onClick={() => resendReminder(reminder)}
+                          className="p-1.5 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors"
+                          title="Retry failed dispatch"
+                        >
+                          <RotateCcw size={15} />
+                        </button>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+
+          {filteredReminders.length === 0 && (
+            <div className="text-center py-14 px-4 space-y-2">
+              <div className="w-12 h-12 rounded-2xl bg-slate-100 text-slate-400 mx-auto flex items-center justify-center">
+                <BellRing size={24} />
               </div>
+              <p className="text-sm font-semibold text-slate-700">
+                No reminders found
+              </p>
+              <p className="text-xs text-slate-400 max-w-sm mx-auto">
+                {hasActiveFilters
+                  ? "Try resetting your search query or status filter."
+                  : "All patient medication refill reminders have been processed."}
+              </p>
+              {hasActiveFilters && (
+                <button
+                  type="button"
+                  onClick={resetFilters}
+                  className="mt-2 inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-blue-50 text-blue-600 rounded-xl text-xs font-semibold hover:bg-blue-100 transition-colors"
+                >
+                  <RotateCcw size={13} />
+                  <span>Reset Filters</span>
+                </button>
+              )}
             </div>
           )}
         </div>
 
-        {/* Information Panel */}
-        <div className="mt-6 bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl shadow-xl overflow-hidden">
-          <div className="bg-gradient-to-r from-purple-500/10 to-pink-500/10 px-6 py-4 border-b border-white/10">
-            <div className="flex items-center gap-3">
-              <div className="bg-purple-500/20 p-2 rounded-xl">
-                <TrendingUp size={18} className="text-purple-400" />
-              </div>
-              <h2 className="text-lg font-semibold text-white">
-                Reminder System Features
-              </h2>
-            </div>
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div className="p-4 border-t border-slate-100 flex items-center justify-between">
+            <Pagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              totalItems={filteredReminders.length}
+              itemsPerPage={itemsPerPage}
+              onPageChange={setCurrentPage}
+            />
           </div>
+        )}
+      </div>
 
-          <div className="p-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
-              {[
-                "Automated WhatsApp refill reminders",
-                "Track sent, pending, and failed reminders",
-                "Manual resend support for failed reminders",
-                "Reminder scheduling based on medicine usage",
-              ].map((feature, index) => (
-                <div
-                  key={index}
-                  className="border border-white/10 rounded-xl p-4 flex items-center gap-3 hover:bg-white/5 transition-colors group"
-                >
-                  <div className="w-1.5 h-1.5 rounded-full bg-purple-400 group-hover:scale-150 transition-transform"></div>
-                  <p className="text-gray-300 text-sm">{feature}</p>
+      {/* 5. PREVIEW MESSAGE MODAL */}
+      {previewReminder && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs">
+          <div
+            className="fixed inset-0"
+            onClick={() => setPreviewReminder(null)}
+          />
+          <div className="relative z-10 w-full max-w-md bg-white border border-slate-200 shadow-2xl rounded-2xl p-6 space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2">
+                <div className="p-2 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-100">
+                  <MessageCircle size={18} />
                 </div>
-              ))}
+                <div>
+                  <h3 className="font-bold text-slate-900 text-sm">
+                    WhatsApp Message Preview
+                  </h3>
+                  <p className="text-[11px] text-slate-400">
+                    To: {previewReminder.patientName} ({previewReminder.mobile})
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setPreviewReminder(null)}
+                className="text-slate-400 hover:text-slate-600 p-1"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Mock WhatsApp Bubble */}
+            <div className="p-4 rounded-xl bg-emerald-50/60 border border-emerald-200/80 text-xs text-slate-800 space-y-2 leading-relaxed font-sans">
+              <p className="font-semibold text-emerald-900">
+                Dear {previewReminder.patientName},
+              </p>
+              <p>
+                This is a friendly refill reminder from your pharmacy. Your prescription for{" "}
+                <strong>{previewReminder.medicine}</strong> ({previewReminder.dosage || "prescribed dosage"}) is due for refill on{" "}
+                <strong>{new Date(previewReminder.nextRefillDate).toLocaleDateString("en-IN")}</strong>.
+              </p>
+              <p>
+                Please contact or visit us to collect your fresh batch and ensure uninterrupted therapy.
+              </p>
+              <p className="text-[11px] text-slate-400 pt-1 border-t border-emerald-200/60">
+                Prescribed by: {previewReminder.doctorName}
+              </p>
+            </div>
+
+            <div className="flex items-center justify-end gap-2.5 pt-2">
+              <button
+                type="button"
+                onClick={() => setPreviewReminder(null)}
+                className="px-4 py-2 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-xl text-xs font-semibold transition-colors"
+              >
+                Close
+              </button>
+              {previewReminder.status !== "Sent" && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    sendReminder(previewReminder);
+                    setPreviewReminder(null);
+                  }}
+                  className="inline-flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold shadow-xs transition-colors"
+                >
+                  <Send size={14} />
+                  <span>Send WhatsApp</span>
+                </button>
+              )}
             </div>
           </div>
         </div>
-      </div>
+      )}
     </div>
   );
 };

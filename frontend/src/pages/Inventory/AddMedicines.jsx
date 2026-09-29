@@ -10,15 +10,16 @@ import {
   Calendar,
   Hash,
   MapPin,
-  DollarSign,
+  IndianRupee,
   Percent,
   Boxes,
   Layers,
-  Sparkles,
-  Shield,
-  ChevronRight,
-  Menu,
-  X,
+  ChevronDown,
+  RotateCcw,
+  CheckCircle2,
+  TrendingUp,
+  ShieldCheck,
+  Calculator,
 } from "lucide-react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import Swal from "sweetalert2";
@@ -37,13 +38,13 @@ const InputField = ({
   error,
 }) => (
   <div className="w-full">
-    <label className="block text-xs sm:text-sm font-medium text-gray-300 mb-1.5 sm:mb-2">
-      {label} {required && <span className="text-blue-400">*</span>}
+    <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+      {label} {required && <span className="text-blue-500 font-bold">*</span>}
     </label>
     <div className="relative">
       {Icon && (
-        <div className="absolute left-3 top-1/2 -translate-y-1/2">
-          <Icon size={16} className="text-gray-500" />
+        <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none">
+          <Icon size={16} />
         </div>
       )}
       <input
@@ -52,17 +53,17 @@ const InputField = ({
         value={value}
         onChange={onChange}
         placeholder={placeholder}
-        className={`w-full bg-white/10 border rounded-lg ${Icon ? "pl-10" : "pl-4"} pr-3 sm:pr-4 py-2 sm:py-2.5 text-sm sm:text-base text-white placeholder-gray-400 outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all ${
-          error
-            ? "border-red-500 focus:ring-red-500"
-            : "border-white/20 hover:border-white/30"
-        }`}
+        className={`w-full bg-slate-50/80 border rounded-xl ${Icon ? "pl-10" : "pl-3.5"
+          } pr-3.5 py-2.5 text-sm text-slate-900 placeholder-slate-400 outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all ${error
+            ? "border-rose-400 focus:ring-rose-400 bg-rose-50/20"
+            : "border-slate-200 hover:border-slate-300"
+          }`}
       />
     </div>
     {error && (
-      <p className="text-red-400 text-xs sm:text-sm mt-1 flex items-center gap-1">
-        <AlertCircle size={12} />
-        {error}
+      <p className="text-rose-500 text-xs mt-1 flex items-center gap-1 font-medium">
+        <AlertCircle size={12} className="shrink-0" />
+        <span>{error}</span>
       </p>
     )}
   </div>
@@ -80,39 +81,43 @@ const SelectField = ({
   error,
 }) => (
   <div className="w-full">
-    <label className="block text-xs sm:text-sm font-medium text-gray-300 mb-1.5 sm:mb-2">
-      {label} {required && <span className="text-blue-400">*</span>}
+    <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+      {label} {required && <span className="text-blue-500 font-bold">*</span>}
     </label>
     <div className="relative">
       {Icon && (
-        <div className="absolute left-3 top-1/2 -translate-y-1/2 z-10">
-          <Icon size={16} className="text-gray-500" />
+        <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none z-10">
+          <Icon size={16} />
         </div>
       )}
       <select
         name={name}
         value={value}
         onChange={onChange}
-        className={`w-full bg-white/10 border rounded-lg ${Icon ? "pl-10" : "pl-4"} pr-3 sm:pr-4 py-2 sm:py-2.5 text-sm sm:text-base text-white outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all cursor-pointer ${
-          error
-            ? "border-red-500 focus:ring-red-500"
-            : "border-white/20 hover:border-white/30"
-        }`}
+        className={`w-full bg-slate-50/80 border rounded-xl ${Icon ? "pl-10" : "pl-3.5"
+          } pr-9 py-2.5 text-sm font-medium text-slate-700 outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all cursor-pointer appearance-none ${error
+            ? "border-rose-400 focus:ring-rose-400 bg-rose-50/20"
+            : "border-slate-200 hover:border-slate-300"
+          }`}
       >
-        <option value="" className="bg-slate-800">
+        <option value="" className="bg-white text-slate-400">
           {placeholder}
         </option>
         {options.map((option, index) => (
-          <option key={index} value={option} className="bg-slate-800">
+          <option key={index} value={option} className="bg-white text-slate-800">
             {option}
           </option>
         ))}
       </select>
+      <ChevronDown
+        size={14}
+        className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"
+      />
     </div>
     {error && (
-      <p className="text-red-400 text-xs sm:text-sm mt-1 flex items-center gap-1">
-        <AlertCircle size={12} />
-        {error}
+      <p className="text-rose-500 text-xs mt-1 flex items-center gap-1 font-medium">
+        <AlertCircle size={12} className="shrink-0" />
+        <span>{error}</span>
       </p>
     )}
   </div>
@@ -137,12 +142,47 @@ const AddMedicines = () => {
     minStock: "",
     quantity: "",
   });
+  const [totalTabletQty, setTotalTabletQty] = useState("");
+  const [totalPackPrice, setTotalPackPrice] = useState("");
   const [errors, setErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
   const editMode = location.state?.editMode || false;
   const medicineData = location.state?.medicineData;
+
+  const handleTabletQtyChange = (val) => {
+    setTotalTabletQty(val);
+    const qty = parseFloat(val);
+    const packPrice = parseFloat(totalPackPrice);
+    if (qty > 0 && packPrice > 0) {
+      const perTab = (packPrice / qty).toFixed(2);
+      setFormData((prev) => ({
+        ...prev,
+        sellingPrice: perTab,
+        packSize: prev.packSize || `${qty} Tablets/Pack`,
+      }));
+      if (errors.sellingPrice) {
+        setErrors((prev) => ({ ...prev, sellingPrice: "" }));
+      }
+    }
+  };
+
+  const handleTotalPackPriceChange = (val) => {
+    setTotalPackPrice(val);
+    const packPrice = parseFloat(val);
+    const qty = parseFloat(totalTabletQty);
+    if (qty > 0 && packPrice > 0) {
+      const perTab = (packPrice / qty).toFixed(2);
+      setFormData((prev) => ({
+        ...prev,
+        sellingPrice: perTab,
+      }));
+      if (errors.sellingPrice) {
+        setErrors((prev) => ({ ...prev, sellingPrice: "" }));
+      }
+    }
+  };
 
   useEffect(() => {
     if (editMode && medicineData) {
@@ -180,6 +220,8 @@ const AddMedicines = () => {
     "Vitamin",
     "Pain Relief",
     "OTC",
+    "Ointment",
+    "Drops",
   ];
 
   const units = [
@@ -190,6 +232,7 @@ const AddMedicines = () => {
     "Box",
     "Tube",
     "Injection",
+    "Vial",
   ];
 
   const handleChange = (e) => {
@@ -253,7 +296,7 @@ const AddMedicines = () => {
     const expiry = new Date(formData.expiryDate);
 
     if (formData.expiryDate && expiry <= today) {
-      newErrors.expiryDate = "Expiry date must be greater than today";
+      newErrors.expiryDate = "Expiry date must be in the future";
     }
 
     if (formData.manufactureDate) {
@@ -298,68 +341,48 @@ const AddMedicines = () => {
         unit: formData.unit,
         purchase_price: Number(formData.purchasePrice),
         selling_price: Number(formData.sellingPrice),
-        gst: Number(formData.gst),
+        gst: Number(formData.gst || 0),
         batch_number: formData.batchNumber,
-        manufacture_date: formData.manufactureDate,
+        manufacture_date: formData.manufactureDate || null,
         expiry_date: formData.expiryDate,
         quantity: Number(formData.quantity),
         rack_location: formData.rackLocation,
-        min_stock: Number(formData.minStock),
+        min_stock: Number(formData.minStock || 0),
         status: "ACTIVE",
       };
 
-      let response;
-
-      // EDIT MODE → PUT
       if (editMode) {
-        response = await apiClient.put(
+        await apiClient.put(
           `/medicines/${medicineData.medicine_id}`,
-          medicinePayload,
+          medicinePayload
         );
 
         await Swal.fire({
           icon: "success",
-          iconColor: "#00ff00",
           title: "Medicine Updated",
-          text: "Medicine updated successfully",
-          background: "#fff",
-          color: "#000",
-          confirmButtonColor: "#3b82f6",
+          text: "Medicine records updated successfully",
+          confirmButtonColor: "#2563eb",
         });
-      }
-
-      // CREATE MODE → POST
-      else {
-        response = await apiClient.post("/medicines", medicinePayload);
+      } else {
+        await apiClient.post("/medicines", medicinePayload);
 
         await Swal.fire({
           icon: "success",
-          iconColor: "#00ff00",
           title: "Medicine Added",
-          text: "Medicine added successfully",
-          background: "#fff",
-          color: "#000",
-          confirmButtonColor: "#3b82f6",
+          text: "Medicine added to inventory catalog successfully",
+          confirmButtonColor: "#2563eb",
         });
       }
 
       navigate("/inventory");
     } catch (error) {
       console.error(error);
-
-      if (error.response) {
-        console.log(error.response.data);
-      }
-
       await Swal.fire({
         icon: "error",
         title: "Operation Failed",
         text:
           error.response?.data?.message ||
           "Something went wrong while saving medicine",
-        background: "#fff",
-        iconColor: "#ff0000",
-        color: "#000",
         confirmButtonColor: "#ef4444",
       });
     } finally {
@@ -370,15 +393,14 @@ const AddMedicines = () => {
   const handleReset = async () => {
     const result = await Swal.fire({
       title: "Reset Form?",
-      text: "All entered data will be cleared.",
+      text: "All entered information will be cleared.",
       icon: "warning",
-      iconColor: "#ffe600",
+      iconColor: "#f59e0b",
       showCancelButton: true,
-      confirmButtonColor: "#3b82f6",
-      cancelButtonColor: "#ef4444",
-      confirmButtonText: "Yes, Reset",
-      background: "#1e293b",
-      color: "#fff",
+      confirmButtonColor: "#2563eb",
+      cancelButtonColor: "#64748b",
+      confirmButtonText: "Yes, Reset Form",
+      cancelButtonText: "Cancel",
     });
 
     if (result.isConfirmed) {
@@ -400,156 +422,115 @@ const AddMedicines = () => {
         minStock: "",
         quantity: "",
       });
-
       setErrors({});
-
-      Swal.fire({
-        icon: "success",
-        title: "Form Reset",
-        text: "Form cleared successfully",
-        timer: 1500,
-        showConfirmButton: false,
-        background: "#fff",
-        iconColor: "#00ff00",
-        color: "#000",
-      });
     }
   };
 
+  // Profitability calculations
+  const purchaseNum = parseFloat(formData.purchasePrice) || 0;
+  const sellingNum = parseFloat(formData.sellingPrice) || 0;
+  const profitPerUnit = sellingNum > purchaseNum ? sellingNum - purchaseNum : 0;
+  const marginPercentage =
+    purchaseNum > 0 && sellingNum > purchaseNum
+      ? ((profitPerUnit / purchaseNum) * 100).toFixed(2)
+      : 0;
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 overflow-x-hidden">
-      {/* Animated Background Pattern - Optimized for mobile */}
-      <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-0 -left-4 w-48 sm:w-72 md:w-96 h-48 sm:h-72 md:h-96 bg-blue-500/10 rounded-full filter blur-3xl"></div>
-        <div className="absolute bottom-1/4 -right-4 w-48 sm:w-72 md:w-96 h-48 sm:h-72 md:h-96 bg-indigo-500/10 rounded-full filter blur-3xl"></div>
-        <div className="absolute inset-0 opacity-5 hidden sm:block">
-          <div className="h-full w-full bg-[linear-gradient(rgba(20,184,166,0.1)_1px,transparent_1px),linear-gradient(90deg,rgba(20,184,166,0.1)_1px,transparent_1px)] bg-[size:32px_32px]"></div>
+    <div className="p-4 sm:p-6 lg:p-8 max-w-[1600px] mx-auto space-y-6">
+      {/* 1. HEADER SECTION */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight flex items-center gap-2">
+              <span>{editMode ? "Edit Medicine" : "Add Medicine"}</span>
+            </h1>
+            <p className="text-slate-500 text-xs sm:text-sm mt-0.5">
+              {editMode
+                ? "Update medicine specifications and catalog details."
+                : "Register a new medicine into your inventory catalog."}
+            </p>
+          </div>
         </div>
+
+        <Link
+          to="/inventory"
+          className="inline-flex items-center gap-2 px-4 py-2.5 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-xl text-sm font-semibold shadow-xs transition-colors w-fit"
+        >
+          <ArrowLeft size={16} />
+          <span>Back to Inventory</span>
+        </Link>
       </div>
 
-      <div className="relative z-10 p-3 sm:p-4 md:p-6 lg:p-8">
-        {/* HEADER - Fully Responsive */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4 sm:mb-6">
-          <div className="flex items-start sm:items-center gap-3">
-            <div className="relative group flex-shrink-0">
-              <div className="absolute inset-0 bg-gradient-to-r from-blue-400 to-indigo-400 rounded-xl blur-lg opacity-75 group-hover:opacity-100 transition-opacity"></div>
-              <div className="relative bg-gradient-to-br from-blue-500 to-indigo-600 p-2 rounded-xl shadow-lg">
-                <Pill className="sm:size-6 md:size-8 text-white" />
+      {/* 2. MAIN FORM CARD */}
+      <form onSubmit={handleSubmit} className="space-y-6">
+        <div className="bg-white rounded-2xl border border-slate-200/90 shadow-xs overflow-hidden">
+          {/* Card Top Title Banner */}
+          <div className="p-5 sm:p-6 border-b border-slate-100 flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <div>
+                <h2 className="text-base font-bold text-slate-800 leading-tight">
+                  Medicine Specifications
+                </h2>
+                <p className="text-xs text-slate-400">
+                  Fields marked with an asterisk (<span className="text-blue-500 font-bold">*</span>) are mandatory.
+                </p>
               </div>
             </div>
+
+            <div className="hidden sm:flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 text-emerald-600 text-xs font-semibold">
+              <ShieldCheck size={14} />
+              <span>GST & Batch Tracking</span>
+            </div>
+          </div>
+
+          <div className="p-5 sm:p-6 space-y-6">
+            {/* SECTION A: General Information */}
             <div>
-              <h1 className="text-xl sm:text-2xl md:text-3xl font-bold bg-gradient-to-r from-blue-400 to-indigo-400 bg-clip-text text-transparent">
-                {editMode ? "Edit Medicine" : "Add Medicine"}
-              </h1>
-              <p className="text-gray-400 text-xs sm:text-sm mt-0.5 sm:mt-1">
-                {editMode
-                  ? "Update medicine inventory details"
-                  : "Add new medicine stock to inventory system"}
-              </p>
-            </div>
-          </div>
-
-          <Link
-            to="/inventory"
-            className="flex items-center justify-center gap-2 px-3 sm:px-4 py-2 rounded-lg bg-white/5 border border-white/10 text-gray-300 hover:bg-white/10 hover:text-white transition-all duration-200 w-full sm:w-auto group"
-          >
-            <ArrowLeft
-              size={16}
-              className="sm:size-[18px] group-hover:-translate-x-1 transition-transform"
-            />
-            <span className="text-sm sm:text-base">Back to Inventory</span>
-          </Link>
-        </div>
-
-        {/* SECURITY BADGE - Responsive */}
-        <div className="mb-4 sm:mb-6 bg-indigo-500/10 border border-indigo-500/20 rounded-xl p-2.5 sm:p-3">
-          <div className="flex items-center gap-2 sm:gap-3">
-            <div className="bg-indigo-500/20 p-1.5 rounded-lg flex-shrink-0">
-              <Shield size={12} className="sm:size-[14px] text-indigo-400" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-white text-xs sm:text-sm font-medium truncate">
-                Secure Medicine Registration
-              </p>
-              <p className="text-indigo-300/70 text-[10px] sm:text-xs truncate sm:whitespace-normal">
-                All fields are validated • Batch tracking enabled • GST
-                compliant
-              </p>
-            </div>
-            <Sparkles
-              size={12}
-              className="sm:size-[14px] text-indigo-400 animate-pulse flex-shrink-0"
-            />
-          </div>
-        </div>
-
-        {/* FORM - Fully Responsive */}
-        <form onSubmit={handleSubmit}>
-          <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-xl sm:rounded-2xl overflow-hidden">
-            {/* SECTION TITLE - Responsive */}
-            <div className="border-b border-white/10 p-4 sm:p-5 md:p-6">
-              <div className="flex items-center gap-2 sm:gap-3">
-                <div className="p-1.5 sm:p-2 rounded-lg bg-gradient-to-r from-blue-500 to-indigo-600 flex-shrink-0">
-                  <Package size={14} className="sm:size-[18px] text-white" />
-                </div>
-                <div className="min-w-0">
-                  <h2 className="text-base sm:text-lg md:text-xl font-semibold text-white truncate sm:whitespace-normal">
-                    Medicine Information
-                  </h2>
-                  <p className="text-xs sm:text-sm text-gray-400 mt-0.5 sm:mt-1 hidden sm:block">
-                    Fill all medicine details carefully. Fields marked with *
-                    are required.
-                  </p>
-                </div>
+              <div className="flex items-center gap-2 mb-3">
+                <span className="w-2 h-2 rounded-full bg-blue-500"></span>
+                <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                  Basic Medicine Information
+                </h3>
               </div>
-            </div>
-
-            {/* GRID - Responsive Breakpoints */}
-            <div className="p-4 sm:p-5 md:p-6">
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 md:gap-5">
-                {/* Medicine Name */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 <InputField
                   label="Medicine Name"
                   name="medicineName"
                   value={formData.medicineName}
                   onChange={handleChange}
                   error={errors.medicineName}
-                  placeholder="Enter medicine name"
+                  placeholder="e.g. Paracetamol 500mg"
                   required
                   icon={Pill}
                 />
 
-                {/* Salt Name */}
                 <InputField
                   label="Generic / Salt Name"
                   name="saltName"
                   value={formData.saltName}
                   onChange={handleChange}
-                  placeholder="Enter salt name"
+                  placeholder="e.g. Acetaminophen"
                   icon={Tag}
                 />
 
-                {/* Brand Name */}
                 <InputField
                   label="Brand Name"
                   name="brandName"
                   value={formData.brandName}
                   onChange={handleChange}
-                  placeholder="Enter brand name"
+                  placeholder="e.g. Crocin"
                   icon={Tag}
                 />
 
-                {/* Manufacturer */}
                 <InputField
                   label="Manufacturer"
                   name="manufacturer"
                   value={formData.manufacturer}
                   onChange={handleChange}
-                  placeholder="Enter manufacturer"
+                  placeholder="e.g. Cipla Healthcare"
                   icon={Building2}
                 />
 
-                {/* Category */}
                 <SelectField
                   label="Category"
                   name="category"
@@ -562,19 +543,17 @@ const AddMedicines = () => {
                   icon={Layers}
                 />
 
-                {/* Pack Size */}
                 <InputField
                   label="Pack Size"
                   name="packSize"
                   value={formData.packSize}
                   onChange={handleChange}
-                  placeholder="Example: Strip of 10"
+                  placeholder="e.g. Strip of 10 Tablets"
                   icon={Package}
                 />
 
-                {/* Unit */}
                 <SelectField
-                  label="Unit"
+                  label="Unit of Measurement"
                   name="unit"
                   value={formData.unit}
                   onChange={handleChange}
@@ -582,58 +561,189 @@ const AddMedicines = () => {
                   placeholder="Select Unit"
                   icon={Boxes}
                 />
+              </div>
+            </div>
 
-                {/* Purchase Price */}
-                <InputField
-                  label="Purchase Price"
-                  name="purchasePrice"
-                  type="number"
-                  value={formData.purchasePrice}
-                  onChange={handleChange}
-                  error={errors.purchasePrice}
-                  placeholder="Enter purchase price"
-                  required
-                  icon={DollarSign}
-                />
+            <hr className="border-slate-100" />
 
-                {/* Selling Price */}
+            {/* SECTION B: Pricing & Taxation */}
+            <div>
+              <div className="flex items-center gap-2 mb-3">
+                <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                  Pricing & Taxation
+                </h3>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div className="w-full">
+                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                    Total Tablet Quantity (in Pack/Strip)
+                  </label>
+                  <div className="relative">
+                    <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none">
+                      <Calculator size={16} />
+                    </div>
+                    <input
+                      type="number"
+                      min="1"
+                      value={totalTabletQty}
+                      onChange={(e) => handleTabletQtyChange(e.target.value)}
+                      placeholder="e.g. 10 (tablets in strip)"
+                      className="w-full bg-slate-50/80 border border-slate-200 rounded-xl pl-10 pr-3.5 py-2.5 text-sm text-slate-900 placeholder-slate-400 outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                    />
+                  </div>
+                </div>
+
+                <div className="w-full">
+                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                    Total Pack / Strip Price (₹)
+                  </label>
+                  <div className="relative">
+                    <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none">
+                      <IndianRupee size={16} />
+                    </div>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={totalPackPrice}
+                      onChange={(e) => handleTotalPackPriceChange(e.target.value)}
+                      placeholder="e.g. 150.00"
+                      className="w-full bg-slate-50/80 border border-slate-200 rounded-xl pl-10 pr-3.5 py-2.5 text-sm text-slate-900 placeholder-slate-400 outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                    />
+                  </div>
+                </div>
+
                 <InputField
-                  label="Selling Price (MRP)"
+                  label="Selling Price (Per Tablet / Unit)"
                   name="sellingPrice"
                   type="number"
+                  step="0.01"
                   value={formData.sellingPrice}
                   onChange={handleChange}
                   error={errors.sellingPrice}
-                  placeholder="Enter selling price"
+                  placeholder="Auto-calculated or enter rate"
                   required
-                  icon={DollarSign}
+                  icon={IndianRupee}
                 />
 
-                {/* GST */}
                 <InputField
-                  label="GST %"
+                  label="Purchase Cost (Per Unit)"
+                  name="purchasePrice"
+                  type="number"
+                  step="0.01"
+                  value={formData.purchasePrice}
+                  onChange={handleChange}
+                  error={errors.purchasePrice}
+                  placeholder="Cost price per unit"
+                  required
+                  icon={IndianRupee}
+                />
+
+                <InputField
+                  label="GST Rate (%)"
                   name="gst"
                   type="number"
                   value={formData.gst}
                   onChange={handleChange}
                   error={errors.gst}
-                  placeholder="Enter GST percentage"
+                  placeholder="e.g. 5, 12, or 18"
                   icon={Percent}
                 />
 
-                {/* Batch Number */}
+                {/* Per-Tablet Calculation Banner */}
+                <div className="sm:col-span-2 lg:col-span-3 p-3.5 rounded-xl bg-blue-50/70 border border-blue-200/80 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                  <div className="flex items-center gap-2.5">
+                    <div className="p-2 rounded-lg bg-blue-600 text-white shrink-0">
+                      <Calculator size={16} />
+                    </div>
+                    <div>
+                      <span className="text-xs font-bold text-slate-800">
+                        Per-Tablet Price Calculation:
+                      </span>
+                      <p className="text-[11px] text-slate-600 mt-0.5">
+                        {totalTabletQty && totalPackPrice ? (
+                          <>
+                            Total Price (₹{Number(totalPackPrice).toFixed(2)}) ÷ Total Quantity ({totalTabletQty} tablets) ={" "}
+                            <span className="font-bold text-blue-700">₹{(Number(totalPackPrice) / Number(totalTabletQty)).toFixed(2)} per tablet</span>
+                          </>
+                        ) : (
+                          "Enter total tablet quantity and total pack price to automatically calculate the per-tablet selling rate for billing."
+                        )}
+                      </p>
+                    </div>
+                  </div>
+                  {formData.sellingPrice && (
+                    <div className="text-right sm:text-right w-full sm:w-auto bg-white px-3 py-1.5 rounded-lg border border-blue-200 shrink-0">
+                      <span className="text-[10px] uppercase font-bold text-slate-400 block">Rate / Tablet</span>
+                      <span className="text-sm font-extrabold text-blue-700">₹{Number(formData.sellingPrice).toFixed(2)}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Profitability Live Summary */}
+              {purchaseNum > 0 && sellingNum > 0 && (
+                <div className="mt-4 p-4 rounded-xl bg-slate-50/80 border border-slate-200/90 grid grid-cols-2 sm:grid-cols-4 gap-4">
+                  <div>
+                    <span className="text-[11px] font-medium text-slate-400">
+                      Purchase Cost
+                    </span>
+                    <p className="text-base font-bold text-slate-800 mt-0.5">
+                      ₹{purchaseNum.toFixed(2)}
+                    </p>
+                  </div>
+                  <div>
+                    <span className="text-[11px] font-medium text-slate-400">
+                      Selling MRP
+                    </span>
+                    <p className="text-base font-bold text-slate-800 mt-0.5">
+                      ₹{sellingNum.toFixed(2)}
+                    </p>
+                  </div>
+                  <div>
+                    <span className="text-[11px] font-medium text-slate-400">
+                      Profit Margin
+                    </span>
+                    <p className="text-base font-bold text-emerald-600 mt-0.5 flex items-center gap-1">
+                      <TrendingUp size={14} />
+                      {marginPercentage}%
+                    </p>
+                  </div>
+                  <div>
+                    <span className="text-[11px] font-medium text-slate-400">
+                      Net Gain / Unit
+                    </span>
+                    <p className="text-base font-bold text-emerald-600 mt-0.5">
+                      ₹{profitPerUnit.toFixed(2)}
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <hr className="border-slate-100" />
+
+            {/* SECTION C: Batch & Expiry Management */}
+            <div>
+              <div className="flex items-center gap-2 mb-3">
+                <span className="w-2 h-2 rounded-full bg-amber-500"></span>
+                <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                  Batch & Expiry Dates
+                </h3>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 <InputField
                   label="Batch Number"
                   name="batchNumber"
                   value={formData.batchNumber}
                   onChange={handleChange}
                   error={errors.batchNumber}
-                  placeholder="Enter batch number"
+                  placeholder="e.g. BT-98421"
                   required
                   icon={Hash}
                 />
 
-                {/* Manufacturing Date */}
                 <InputField
                   label="Manufacturing Date"
                   name="manufactureDate"
@@ -641,11 +751,9 @@ const AddMedicines = () => {
                   value={formData.manufactureDate}
                   onChange={handleChange}
                   error={errors.manufactureDate}
-                  placeholder="Select date"
                   icon={Calendar}
                 />
 
-                {/* Expiry Date */}
                 <InputField
                   label="Expiry Date"
                   name="expiryDate"
@@ -653,34 +761,23 @@ const AddMedicines = () => {
                   value={formData.expiryDate}
                   onChange={handleChange}
                   error={errors.expiryDate}
-                  placeholder="Select date"
                   required
                   icon={Calendar}
                 />
+              </div>
+            </div>
 
-                {/* Rack Location */}
-                <InputField
-                  label="Rack / Shelf Location"
-                  name="rackLocation"
-                  value={formData.rackLocation}
-                  onChange={handleChange}
-                  placeholder="Example: Rack A-12"
-                  icon={MapPin}
-                />
+            <hr className="border-slate-100" />
 
-                {/* Minimum Stock */}
-                <InputField
-                  label="Minimum Stock Alert"
-                  name="minStock"
-                  type="number"
-                  value={formData.minStock}
-                  onChange={handleChange}
-                  error={errors.minStock}
-                  placeholder="Enter minimum stock"
-                  icon={AlertCircle}
-                />
-
-                {/* Quantity */}
+            {/* SECTION D: Stock & Location */}
+            <div>
+              <div className="flex items-center gap-2 mb-3">
+                <span className="w-2 h-2 rounded-full bg-purple-500"></span>
+                <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                  Stock & Storage Location
+                </h3>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 <InputField
                   label="Initial Stock Quantity"
                   name="quantity"
@@ -688,101 +785,73 @@ const AddMedicines = () => {
                   value={formData.quantity}
                   onChange={handleChange}
                   error={errors.quantity}
-                  placeholder="Enter stock quantity"
+                  placeholder="Current stock quantity"
                   required
                   icon={Boxes}
                 />
-              </div>
 
-              {/* PREVIEW SECTION - Fully Responsive */}
-              {formData.purchasePrice && formData.sellingPrice && (
-                <div className="mt-4 sm:mt-6 p-3 sm:p-4 bg-gradient-to-r from-blue-500/10 to-indigo-500/10 border border-blue-500/20 rounded-xl">
-                  <h3 className="text-xs sm:text-sm font-semibold text-blue-400 mb-2 sm:mb-3 flex items-center gap-2">
-                    <ChevronRight size={12} className="sm:size-[14px]" />
-                    Price Summary
-                  </h3>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-4">
-                    <div className="min-w-0">
-                      <p className="text-[10px] sm:text-xs text-gray-400">
-                        Purchase Price
-                      </p>
-                      <p className="text-sm sm:text-base md:text-lg text-white font-semibold break-words">
-                        ₹{formData.purchasePrice}
-                      </p>
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-[10px] sm:text-xs text-gray-400">
-                        Selling Price
-                      </p>
-                      <p className="text-sm sm:text-base md:text-lg text-white font-semibold break-words">
-                        ₹{formData.sellingPrice}
-                      </p>
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-[10px] sm:text-xs text-gray-400">
-                        Margin
-                      </p>
-                      <p className="text-xs sm:text-sm md:text-base text-indigo-400 font-semibold break-words">
-                        {(
-                          ((parseFloat(formData.sellingPrice) -
-                            parseFloat(formData.purchasePrice)) /
-                            parseFloat(formData.purchasePrice)) *
-                          100
-                        ).toFixed(2)}
-                        %
-                      </p>
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-[10px] sm:text-xs text-gray-400">
-                        Profit per unit
-                      </p>
-                      <p className="text-xs sm:text-sm md:text-base text-indigo-400 font-semibold break-words">
-                        ₹
-                        {(
-                          parseFloat(formData.sellingPrice) -
-                          parseFloat(formData.purchasePrice)
-                        ).toFixed(2)}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              )}
+                <InputField
+                  label="Minimum Stock Alert Limit"
+                  name="minStock"
+                  type="number"
+                  value={formData.minStock}
+                  onChange={handleChange}
+                  error={errors.minStock}
+                  placeholder="Alert threshold (e.g. 10)"
+                  icon={AlertCircle}
+                />
 
-              {/* BUTTONS - Fully Responsive */}
-              <div className="flex flex-col sm:flex-row gap-3 mt-6 sm:mt-8 pt-4 sm:pt-6 border-t border-white/10">
-                <button
-                  type="submit"
-                  disabled={isSubmitting}
-                  className="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white px-4 sm:px-6 py-2.5 sm:py-3 rounded-xl flex items-center justify-center gap-2 transition-all duration-200 shadow-lg shadow-blue-500/20 disabled:opacity-50 disabled:cursor-not-allowed text-sm sm:text-base"
-                >
-                  {isSubmitting ? (
-                    <ButtonLoader
-                      text={
-                        editMode ? "Updating Medicine..." : "Saving Medicine..."
-                      }
-                    />
-                  ) : (
-                    <>
-                      <Save size={16} className="sm:size-[18px]" />
-                      <span>
-                        {editMode ? "Update Medicine" : "Save Medicine"}
-                      </span>
-                    </>
-                  )}
-                </button>
-
-                <button
-                  type="button"
-                  onClick={handleReset}
-                  className="bg-white/10 hover:bg-white/20 border border-white/20 text-gray-300 hover:text-white px-4 sm:px-6 py-2.5 sm:py-3 rounded-xl flex items-center justify-center gap-2 transition-all duration-200 text-sm sm:text-base"
-                >
-                  Reset Form
-                </button>
+                <InputField
+                  label="Shelf / Rack Location"
+                  name="rackLocation"
+                  value={formData.rackLocation}
+                  onChange={handleChange}
+                  placeholder="e.g. Rack B-3, Shelf 2"
+                  icon={MapPin}
+                />
               </div>
             </div>
           </div>
-        </form>
-      </div>
+
+          {/* Form Action Footer */}
+          <div className="p-5 sm:p-6 bg-slate-50/60 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-3">
+            <div className="flex items-center gap-2 text-xs text-slate-400">
+              <CheckCircle2 size={15} className="text-emerald-500" />
+              <span>Ensure all mandatory details are verified before saving.</span>
+            </div>
+
+            <div className="flex items-center gap-3 w-full sm:w-auto justify-end">
+              <button
+                type="button"
+                onClick={handleReset}
+                className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-xl text-sm font-semibold shadow-xs transition-colors"
+              >
+                <RotateCcw size={15} />
+                <span>Reset</span>
+              </button>
+
+              <button
+                type="submit"
+                disabled={isSubmitting}
+                className="inline-flex items-center justify-center gap-2 px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-semibold shadow-xs transition-colors disabled:opacity-50"
+              >
+                {isSubmitting ? (
+                  <ButtonLoader
+                    text={
+                      editMode ? "Updating Medicine..." : "Saving Medicine..."
+                    }
+                  />
+                ) : (
+                  <>
+                    <Save size={16} />
+                    <span>{editMode ? "Update Medicine" : "Save Medicine"}</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      </form>
     </div>
   );
 };

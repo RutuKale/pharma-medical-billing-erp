@@ -92,3 +92,50 @@ exports.writeOffMedicine = async (medicine_id, remarks) => {
 
   return result;
 };
+
+// PROCESS RETURN BILL TO MANUFACTURER
+exports.processReturnBill = async ({ manufacturer, items, reason, returnNoteNumber }) => {
+  const connection = await pool.getConnection();
+  try {
+    await connection.beginTransaction();
+
+    for (const item of items) {
+      const returnQty = Number(item.returnQuantity || 0);
+      const medicineId = item.medicine_id || item.id;
+      if (returnQty > 0 && medicineId) {
+        await connection.query(
+          `UPDATE medicines 
+           SET quantity = GREATEST(0, quantity - ?) 
+           WHERE medicine_id = ?`,
+          [returnQty, medicineId]
+        );
+
+        try {
+          await connection.query(
+            `INSERT INTO expiry_logs (
+                medicine_id,
+                expiry_status,
+                days_remaining,
+                action_taken,
+                remarks
+            ) VALUES (?, 'RETURNED', 0, 'RETURN_BILL', ?)`,
+            [
+              medicineId,
+              `Returned ${returnQty} units to manufacturer ${manufacturer || 'Supplier'}. Note: ${returnNoteNumber || '-'}. Reason: ${reason || 'Expiry return'}`
+            ]
+          );
+        } catch (logErr) {
+          console.warn("Could not insert expiry log:", logErr.message);
+        }
+      }
+    }
+
+    await connection.commit();
+    return { success: true, count: items.length };
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
+  }
+};

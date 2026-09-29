@@ -13,6 +13,9 @@ router.get("/:id", billingController.getBill);
 // CREATE BILL
 router.post("/", billingController.createBill);
 
+// UPDATE BILL
+router.put("/:id", billingController.updateBill);
+
 // DELETE BILL
 router.delete("/:id", billingController.deleteBill);
 

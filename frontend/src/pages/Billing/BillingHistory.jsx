@@ -1,7 +1,8 @@
 import React, { useMemo, useState, useEffect } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import Pagination from "../../components/Pagination";
 import {
   Search,
-  Receipt,
   Calendar,
   Download,
   Printer,
@@ -9,13 +10,22 @@ import {
   XCircle,
   IndianRupee,
   Filter,
-  Sparkles,
-  Shield,
   TrendingUp,
   AlertCircle,
-  ChevronLeft,
-  ChevronRight,
+  Plus,
+  Users,
+  X,
+  Clock,
+  RotateCcw,
+  CheckCircle2,
+  Phone,
+  FileText,
+  Stethoscope,
+  Banknote,
+  Shield,
+  Edit,
 } from "lucide-react";
+import Swal from "sweetalert2";
 import apiClient from "../../utils/apiClient";
 import {
   printBill as utilityPrintBill,
@@ -27,19 +37,20 @@ const BillingHistory = () => {
   const [statusFilter, setStatusFilter] = useState("All");
   const [dateFilter, setDateFilter] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 5;
+  const itemsPerPage = 8;
+  const navigate = useNavigate();
 
   const [bills, setBills] = useState([]);
   const [loading, setLoading] = useState(true);
   const [viewingBill, setViewingBill] = useState(null);
   const [viewingItems, setViewingItems] = useState([]);
+  const [modalLoading, setModalLoading] = useState(false);
 
   const fetchBills = async () => {
     setLoading(true);
     try {
       const res = await apiClient.get(`/bills`);
       if (res.data?.success) {
-        // map backend fields to front-end friendly shape if needed
         const mapped = res.data.data.map((b) => ({
           id: b.bill_id,
           billNumber: b.bill_number || b.billNumber || "-",
@@ -53,18 +64,28 @@ const BillingHistory = () => {
           amount: b.grand_total || b.amount || 0,
           paymentMode: b.payment_mode || "-",
           status: b.payment_status || "Completed",
+          doctorName: b.doctor_name || "-",
+          prescriptionNumber: b.prescription_number || "-",
         }));
         setBills(mapped);
       }
     } catch (error) {
       console.error("Failed to load bills:", error);
+      Swal.fire({
+        icon: "error",
+        title: "Error Loading Invoices",
+        text: "Unable to retrieve billing records from database.",
+        confirmButtonColor: "#2563eb",
+      });
     } finally {
       setLoading(false);
     }
   };
+
   useEffect(() => {
     fetchBills();
   }, []);
+
   const filteredBills = useMemo(() => {
     return bills.filter((bill) => {
       const matchesSearch =
@@ -85,29 +106,47 @@ const BillingHistory = () => {
     currentPage * itemsPerPage,
   );
 
-  const stats = {
-    totalBills: bills.length,
-    totalSales: bills
-      .filter((bill) => bill.status === "Completed")
-      .reduce((acc, bill) => acc + Number(bill.amount || 0), 0),
-    cancelledBills: bills.filter((bill) => bill.status === "Cancelled").length,
-    todayBills: bills.filter(
-      (bill) => bill.date === new Date().toISOString().slice(0, 10),
-    ).length,
-  };
+  const stats = useMemo(() => {
+    const totalBills = bills.length;
+    const completedBills = bills.filter((b) => b.status === "Completed");
+    const totalSales = completedBills.reduce(
+      (acc, bill) => acc + Number(bill.amount || 0),
+      0,
+    );
+    const cancelledBills = bills.filter((b) => b.status === "Cancelled").length;
+    const todayStr = new Date().toISOString().slice(0, 10);
+    const todayBills = bills.filter((b) => b.date === todayStr).length;
+
+    return { totalBills, totalSales, cancelledBills, todayBills };
+  }, [bills]);
 
   const viewBill = async (bill) => {
+    setModalLoading(true);
+    setViewingBill(bill);
+    setViewingItems([]);
     try {
       const res = await apiClient.get(`/bills/${bill.id}`);
       if (res.data?.success) {
         setViewingBill(res.data.bill || res.data.data || bill);
         setViewingItems(res.data.items || []);
       } else {
-        alert(res.data?.message || "Unable to fetch bill details");
+        Swal.fire({
+          icon: "error",
+          title: "Unable to Load Invoice",
+          text: res.data?.message || "Could not fetch details for this bill.",
+          confirmButtonColor: "#2563eb",
+        });
       }
     } catch (error) {
       console.error("Error fetching bill details:", error);
-      alert("Error fetching bill details");
+      Swal.fire({
+        icon: "error",
+        title: "Error",
+        text: "Failed to load complete bill items.",
+        confirmButtonColor: "#2563eb",
+      });
+    } finally {
+      setModalLoading(false);
     }
   };
 
@@ -163,7 +202,12 @@ const BillingHistory = () => {
     if (billData) {
       utilityPrintBill(billData);
     } else {
-      alert("Failed to retrieve bill details for printing");
+      Swal.fire({
+        icon: "error",
+        title: "Print Failed",
+        text: "Failed to retrieve invoice details for printing.",
+        confirmButtonColor: "#2563eb",
+      });
     }
   };
 
@@ -172,274 +216,261 @@ const BillingHistory = () => {
     if (billData) {
       utilityDownloadBillPDF(billData);
     } else {
-      alert("Failed to retrieve bill details for download");
+      Swal.fire({
+        icon: "error",
+        title: "Download Failed",
+        text: "Failed to retrieve invoice details for PDF export.",
+        confirmButtonColor: "#2563eb",
+      });
     }
   };
 
   const cancelBill = async (bill) => {
-    const reason = prompt("Enter cancellation reason:");
+    const { value: reason } = await Swal.fire({
+      title: "Cancel / Void Bill",
+      text: `Enter reason for cancelling bill #${bill.billNumber}:`,
+      input: "text",
+      inputPlaceholder: "e.g. Returned items, Customer changed mind",
+      showCancelButton: true,
+      confirmButtonText: "Confirm Cancellation",
+      cancelButtonText: "Dismiss",
+      confirmButtonColor: "#e11d48",
+      cancelButtonColor: "#64748b",
+      inputValidator: (value) => {
+        if (!value || !value.trim()) {
+          return "Cancellation reason is required.";
+        }
+      },
+    });
+
     if (!reason) return;
+
     try {
       const res = await apiClient.delete(`/bills/${bill.id}`, {
         data: { reason },
       });
       if (res.data?.success) {
-        alert("Bill deleted successfully");
+        Swal.fire({
+          icon: "success",
+          title: "Bill Cancelled",
+          text: "Invoice status updated to Cancelled and medicine stock has been restored.",
+          confirmButtonColor: "#2563eb",
+        });
         fetchBills();
       } else {
-        alert(res.data?.message || "Unable to delete bill");
+        Swal.fire({
+          icon: "error",
+          title: "Cancellation Failed",
+          text: res.data?.message || "Unable to cancel bill.",
+          confirmButtonColor: "#2563eb",
+        });
       }
     } catch (error) {
       console.error("Error deleting bill:", error);
-      alert(error.response?.data?.message || "Error deleting bill");
+      Swal.fire({
+        icon: "error",
+        title: "Error",
+        text: error.response?.data?.message || "Failed to process cancellation.",
+        confirmButtonColor: "#2563eb",
+      });
     }
   };
 
+  const handleEditBill = (bill) => {
+    if (bill.status === "Cancelled") {
+      Swal.fire({
+        icon: "warning",
+        title: "Cannot Edit Cancelled Bill",
+        text: "This bill has been cancelled/voided and cannot be edited.",
+        confirmButtonColor: "#2563eb",
+      });
+      return;
+    }
+    navigate(`/billing?editBillId=${bill.id}`);
+  };
+
+  const resetFilters = () => {
+    setSearch("");
+    setStatusFilter("All");
+    setDateFilter("");
+    setCurrentPage(1);
+  };
+
+  const hasActiveFilters = Boolean(
+    search || statusFilter !== "All" || dateFilter,
+  );
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-950 to-slate-900">
-      {/* Animated Background Pattern */}
-      <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-0 -left-4 w-96 h-96 bg-blue-500/20 rounded-full filter blur-3xl animate-pulse"></div>
-        <div className="absolute bottom-1/4 -right-4 w-96 h-96 bg-indigo-500/20 rounded-full filter blur-3xl animate-pulse delay-1000"></div>
-        <div className="absolute inset-0 opacity-[0.03]">
-          <div className="h-full w-full bg-[linear-gradient(rgba(20,184,166,0.1)_1px,transparent_1px),linear-gradient(90deg,rgba(20,184,166,0.1)_1px,transparent_1px)] bg-[size:32px_32px]"></div>
+    <div className="p-4 sm:p-6 lg:p-8 max-w-[1600px] mx-auto space-y-6">
+      {/* 1. HEADER SECTION (No icon next to title per design standards) */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight flex items-center gap-2">
+            <span>Billing History</span>
+          </h1>
+          <p className="text-slate-500 text-xs sm:text-sm mt-0.5">
+            Audit pharmacy transactions, view customer receipts, and manage invoice status.
+          </p>
+        </div>
+
+        <div className="flex items-center gap-2.5 flex-wrap">
+          <Link
+            to="/billing"
+            className="inline-flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-semibold shadow-xs transition-colors"
+          >
+            <Plus size={16} />
+            <span>New Billing</span>
+          </Link>
+          <Link
+            to="/patients"
+            className="inline-flex items-center gap-2 px-4 py-2.5 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-xl text-sm font-semibold shadow-xs transition-colors"
+          >
+            <Users size={16} className="text-slate-500" />
+            <span>Patients</span>
+          </Link>
         </div>
       </div>
-      {/* Bill Details Modal */}
-      {viewingBill && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-          <div className="bg-slate-900 w-[92%] md:w-3/4 lg:w-2/3 rounded-2xl border border-white/10 shadow-xl overflow-hidden">
-            <div className="p-4 border-b border-white/10 flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-white">
-                Bill Details -{" "}
-                {viewingBill.bill_number || viewingBill.billNumber}
-              </h3>
+
+      {/* 2. STAT CARDS ROW */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Total Bills */}
+        <div className="bg-white rounded-2xl p-5 border border-slate-200/90 shadow-xs hover:shadow-sm transition-all flex flex-col justify-between">
+          <div className="flex items-start justify-between">
+            <div>
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                Total Invoices
+              </p>
+              <p className="text-2xl font-bold text-slate-900 mt-2">
+                {stats.totalBills}
+              </p>
+            </div>
+            <div className="p-2.5 rounded-xl bg-blue-50 text-blue-600 border border-blue-100">
+              <IndianRupee size={20} />
+            </div>
+          </div>
+          <div className="mt-4 flex items-center gap-1.5 text-xs text-slate-500 font-medium">
+            <span>All recorded pharmacy bills</span>
+          </div>
+        </div>
+
+        {/* Total Sales */}
+        <div className="bg-white rounded-2xl p-5 border border-slate-200/90 shadow-xs hover:shadow-sm transition-all flex flex-col justify-between">
+          <div className="flex items-start justify-between">
+            <div>
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                Total Revenue
+              </p>
+              <p className="text-2xl font-bold text-slate-900 mt-2">
+                ₹
+                {stats.totalSales.toLocaleString("en-IN", {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                })}
+              </p>
+            </div>
+            <div className="p-2.5 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-100">
+              <TrendingUp size={20} />
+            </div>
+          </div>
+          <div className="mt-4 flex items-center gap-1.5 text-xs text-emerald-600 font-medium">
+            <CheckCircle2 size={13} />
+            <span>Completed sales only</span>
+          </div>
+        </div>
+
+        {/* Today's Bills */}
+        <div className="bg-white rounded-2xl p-5 border border-slate-200/90 shadow-xs hover:shadow-sm transition-all flex flex-col justify-between">
+          <div className="flex items-start justify-between">
+            <div>
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                Today's Bills
+              </p>
+              <p className="text-2xl font-bold text-slate-900 mt-2">
+                {stats.todayBills}
+              </p>
+            </div>
+            <div className="p-2.5 rounded-xl bg-purple-50 text-purple-600 border border-purple-100">
+              <Calendar size={20} />
+            </div>
+          </div>
+          <div className="mt-4 flex items-center gap-1.5 text-xs text-slate-500 font-medium">
+            <Clock size={13} className="text-purple-500" />
+            <span>Generated today</span>
+          </div>
+        </div>
+
+        {/* Cancelled Bills */}
+        <div className="bg-white rounded-2xl p-5 border border-slate-200/90 shadow-xs hover:shadow-sm transition-all flex flex-col justify-between">
+          <div className="flex items-start justify-between">
+            <div>
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                Cancelled Bills
+              </p>
+              <p className="text-2xl font-bold text-slate-900 mt-2">
+                {stats.cancelledBills}
+              </p>
+            </div>
+            <div className="p-2.5 rounded-xl bg-rose-50 text-rose-600 border border-rose-100">
+              <XCircle size={20} />
+            </div>
+          </div>
+          <div className="mt-4 flex items-center gap-1.5 text-xs text-slate-500 font-medium">
+            <span>Voided transactions</span>
+          </div>
+        </div>
+      </div>
+
+      {/* 3. SEARCH & FILTERS CARD */}
+      <div className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200/90 shadow-xs space-y-3">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+          {/* Search Bar */}
+          <div className="relative flex-1">
+            <Search
+              size={16}
+              className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"
+            />
+            <input
+              type="text"
+              placeholder="Search by Bill #, Patient name, or Mobile..."
+              value={search}
+              onChange={(e) => {
+                setSearch(e.target.value);
+                setCurrentPage(1);
+              }}
+              className="w-full bg-slate-50/60 border border-slate-200 rounded-xl pl-10 pr-10 py-2.5 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all font-medium"
+            />
+            {search && (
               <button
-                onClick={() => {
-                  setViewingBill(null);
-                  setViewingItems([]);
-                }}
-                className="text-gray-400 hover:text-white"
+                type="button"
+                onClick={() => setSearch("")}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1"
               >
-                Close
+                <X size={15} />
               </button>
-            </div>
-            <div className="p-4">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-                <div>
-                  <p className="text-xs text-gray-400">Patient</p>
-                  <p className="text-white font-medium">
-                    {viewingBill.patient_name || viewingBill.patientName || "-"}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs text-gray-400">Mobile</p>
-                  <p className="text-white font-medium">
-                    {viewingBill.mobile_number || viewingBill.mobile || "-"}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs text-gray-400">Date</p>
-                  <p className="text-white font-medium">
-                    {viewingBill.bill_date
-                      ? new Date(viewingBill.bill_date).toLocaleString()
-                      : viewingBill.created_at
-                        ? new Date(viewingBill.created_at).toLocaleString()
-                        : viewingBill.date || "-"}
-                  </p>
-                </div>
-              </div>
-
-              <div className="overflow-x-auto">
-                <table className="w-full min-w-[600px]">
-                  <thead className="bg-slate-800/50 border-b border-white/10">
-                    <tr>
-                      <th className="text-left p-3 text-sm text-gray-400">
-                        Medicine
-                      </th>
-                      <th className="text-left p-3 text-sm text-gray-400">
-                        Qty
-                      </th>
-                      <th className="text-left p-3 text-sm text-gray-400">
-                        Price
-                      </th>
-                      <th className="text-left p-3 text-sm text-gray-400">
-                        Total
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {viewingItems.length > 0 ? (
-                      viewingItems.map((it) => (
-                        <tr
-                          key={it.bill_item_id || it.id}
-                          className="border-b border-white/5"
-                        >
-                          <td className="p-3 text-white">
-                            {it.medicine_name || it.name || it.medicine_id}
-                          </td>
-                          <td className="p-3 text-white">{it.quantity}</td>
-                          <td className="p-3 text-white">₹{it.price}</td>
-                          <td className="p-3 text-white">₹{it.total}</td>
-                        </tr>
-                      ))
-                    ) : (
-                      <tr>
-                        <td className="p-3 text-gray-400" colSpan={4}>
-                          No items available
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-
-              <div className="mt-4 flex items-center justify-end gap-3">
-                <div className="text-right">
-                  <p className="text-xs text-gray-400">Total</p>
-                  <p className="text-xl font-bold text-white">
-                    ₹{viewingBill.grand_total || viewingBill.amount || 0}
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      <div className="relative z-10 p-4 md:p-6">
-        {/* Header */}
-        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-6">
-          <div>
-            <div className="flex items-center gap-3">
-              <div className="relative group">
-                <div className="absolute inset-0 bg-gradient-to-r from-blue-400 to-indigo-400 rounded-xl blur-lg opacity-75 group-hover:opacity-100 transition-opacity"></div>
-                <div className="relative bg-gradient-to-br from-blue-500 to-indigo-600 p-2.5 rounded-xl shadow-lg">
-                  <Receipt size={24} className="text-white" />
-                </div>
-              </div>
-              <div>
-                <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-400 to-indigo-400 bg-clip-text text-transparent">
-                  Billing History
-                </h1>
-                <p className="text-blue-300/70 text-sm mt-1">
-                  View and manage all pharmacy billing records
-                </p>
-              </div>
-            </div>
+            )}
           </div>
 
-          <div className="bg-indigo-500/10 border border-indigo-500/20 rounded-xl px-4 py-3 flex items-center gap-3 backdrop-blur-sm">
-            <Shield size={18} className="text-indigo-400" />
-            <p className="text-indigo-300/90 text-sm">
-              Bills are permanently stored and can be reprinted anytime
-            </p>
-            <Sparkles size={16} className="text-indigo-400 animate-pulse" />
-          </div>
-        </div>
-
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5 mb-6">
-          {/* Total Bills */}
-          <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl shadow-xl p-5 hover:bg-white/10 transition-all duration-300 group">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-400">Total Bills</p>
-                <h2 className="text-3xl font-bold mt-2 bg-gradient-to-r from-blue-400 to-indigo-400 bg-clip-text text-transparent">
-                  {stats.totalBills}
-                </h2>
-              </div>
-              <div className="bg-blue-500/20 p-4 rounded-2xl group-hover:scale-110 transition-transform duration-300">
-                <Receipt size={24} className="text-blue-400" />
-              </div>
-            </div>
-          </div>
-
-          {/* Total Sales */}
-          <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl shadow-xl p-5 hover:bg-white/10 transition-all duration-300 group">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-400">Total Sales</p>
-                <h2 className="text-3xl font-bold mt-2 bg-gradient-to-r from-green-400 to-emerald-400 bg-clip-text text-transparent">
-                  ₹{stats.totalSales}
-                </h2>
-              </div>
-              <div className="bg-green-500/20 p-4 rounded-2xl group-hover:scale-110 transition-transform duration-300">
-                <IndianRupee size={24} className="text-green-400" />
-              </div>
-            </div>
-          </div>
-
-          {/* Cancelled Bills */}
-          <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl shadow-xl p-5 hover:bg-white/10 transition-all duration-300 group">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-400">Cancelled Bills</p>
-                <h2 className="text-3xl font-bold mt-2 bg-gradient-to-r from-red-400 to-rose-400 bg-clip-text text-transparent">
-                  {stats.cancelledBills}
-                </h2>
-              </div>
-              <div className="bg-red-500/20 p-4 rounded-2xl group-hover:scale-110 transition-transform duration-300">
-                <XCircle size={24} className="text-red-400" />
-              </div>
-            </div>
-          </div>
-
-          {/* Today's Bills */}
-          <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl shadow-xl p-5 hover:bg-white/10 transition-all duration-300 group">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-400">Today's Bills</p>
-                <h2 className="text-3xl font-bold mt-2 bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
-                  {stats.todayBills}
-                </h2>
-              </div>
-              <div className="bg-purple-500/20 p-4 rounded-2xl group-hover:scale-110 transition-transform duration-300">
-                <Calendar size={24} className="text-purple-400" />
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Filters */}
-        <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl shadow-xl p-5 mb-6">
-          <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
-            {/* Search */}
-            <div className="relative lg:col-span-2">
-              <Search
-                size={18}
-                className="absolute left-3 top-3 text-gray-400"
-              />
-              <input
-                type="text"
-                placeholder="Search bill no, patient or mobile..."
-                value={search}
-                onChange={(e) => {
-                  setSearch(e.target.value);
-                  setCurrentPage(1);
-                }}
-                className="w-full bg-slate-800/50 border border-white/10 rounded-xl pl-10 pr-4 py-3 text-white placeholder-gray-400 outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-transparent transition-all"
-              />
-            </div>
-
-            {/* Status Filter */}
-            <div className="relative">
-              <Filter
-                size={18}
-                className="absolute left-3 top-3 text-gray-400"
-              />
-              <select
-                value={statusFilter}
-                onChange={(e) => {
-                  setStatusFilter(e.target.value);
-                  setCurrentPage(1);
-                }}
-                className="w-full bg-slate-800/50 border border-white/10 rounded-xl pl-10 pr-4 py-3 text-white outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-transparent transition-all"
-              >
-                <option className="bg-slate-900">All</option>
-                <option className="bg-slate-900">Completed</option>
-                <option className="bg-slate-900">Cancelled</option>
-              </select>
+          {/* Quick Filters */}
+          <div className="flex items-center gap-2.5 flex-wrap">
+            {/* Status Tabs */}
+            <div className="flex items-center p-1 bg-slate-100 rounded-xl border border-slate-200/70">
+              {["All", "Completed", "Cancelled"].map((status) => (
+                <button
+                  key={status}
+                  type="button"
+                  onClick={() => {
+                    setStatusFilter(status);
+                    setCurrentPage(1);
+                  }}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                    statusFilter === status
+                      ? "bg-white text-blue-600 shadow-xs"
+                      : "text-slate-600 hover:text-slate-900"
+                  }`}
+                >
+                  {status}
+                </button>
+              ))}
             </div>
 
             {/* Date Filter */}
@@ -451,186 +482,423 @@ const BillingHistory = () => {
                   setDateFilter(e.target.value);
                   setCurrentPage(1);
                 }}
-                className="w-full bg-slate-800/50 border border-white/10 rounded-xl px-4 py-3 text-white outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-transparent transition-all"
+                className="bg-white border border-slate-200 rounded-xl px-3 py-1.5 text-xs text-slate-700 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
               />
             </div>
+
+            {/* Reset Filters */}
+            {hasActiveFilters && (
+              <button
+                type="button"
+                onClick={resetFilters}
+                className="inline-flex items-center gap-1 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-xs font-semibold transition-colors"
+                title="Reset all filters"
+              >
+                <RotateCcw size={13} />
+                <span>Reset</span>
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* 4. BILLS TABLE CARD */}
+      <div className="bg-white rounded-2xl border border-slate-200/90 shadow-xs overflow-hidden">
+        <div className="p-4 sm:p-5 flex items-center justify-between border-b border-slate-100">
+          <div>
+            <h3 className="text-base font-bold text-slate-900">
+              Invoices List
+            </h3>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Showing {filteredBills.length} recorded transactions
+            </p>
           </div>
         </div>
 
-        {/* Bills Table */}
-        <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl shadow-xl overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[1200px]">
-              <thead className="bg-slate-800/50 border-b border-white/10">
-                <tr>
-                  <th className="text-left p-4 text-sm font-semibold text-gray-300">
-                    Bill No
-                  </th>
-                  <th className="text-left p-4 text-sm font-semibold text-gray-300">
-                    Patient
-                  </th>
-                  <th className="text-left p-4 text-sm font-semibold text-gray-300">
-                    Mobile
-                  </th>
-                  <th className="text-left p-4 text-sm font-semibold text-gray-300">
-                    Date
-                  </th>
-                  <th className="text-left p-4 text-sm font-semibold text-gray-300">
-                    Amount
-                  </th>
-                  <th className="text-left p-4 text-sm font-semibold text-gray-300">
-                    Payment
-                  </th>
-                  <th className="text-left p-4 text-sm font-semibold text-gray-300">
-                    Status
-                  </th>
-                  <th className="text-left p-4 text-sm font-semibold text-gray-300">
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {paginatedBills.map((bill) => (
-                  <tr
-                    key={bill.id}
-                    className="border-b border-white/5 hover:bg-white/5 transition-colors"
-                  >
-                    <td className="p-4 font-semibold text-blue-400">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse min-w-[950px]">
+            <thead>
+              <tr className="border-b border-slate-100 text-[11px] font-semibold text-slate-400 uppercase tracking-wider bg-slate-50/60">
+                <th className="py-3 px-4">Bill #</th>
+                <th className="py-3 px-4">Patient</th>
+                <th className="py-3 px-4">Mobile</th>
+                <th className="py-3 px-4">Date</th>
+                <th className="py-3 px-4">Payment</th>
+                <th className="py-3 px-4">Status</th>
+                <th className="py-3 px-4 text-right">Amount</th>
+                <th className="py-3 px-4 text-center w-36">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 text-sm">
+              {paginatedBills.map((bill) => (
+                <tr
+                  key={bill.id}
+                  className="hover:bg-slate-50/60 transition-colors"
+                >
+                  <td className="py-3.5 px-4">
+                    <span className="font-mono text-xs font-semibold px-2.5 py-1 rounded-md bg-blue-50 text-blue-700 border border-blue-100">
                       {bill.billNumber}
-                    </td>
-                    <td className="p-4 text-white">{bill.patientName}</td>
-                    <td className="p-4 text-gray-300">{bill.mobile}</td>
-                    <td className="p-4 text-gray-300">{bill.date}</td>
-                    <td className="p-4 font-semibold text-white">
-                      ₹{bill.amount}
-                    </td>
-                    <td className="p-4">
-                      <span className="bg-blue-500/20 text-blue-400 px-3 py-1 rounded-full text-xs border border-blue-500/30">
-                        {bill.paymentMode}
-                      </span>
-                    </td>
-                    <td className="p-4">
-                      <span
-                        className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                          bill.status === "Completed"
-                            ? "bg-green-500/20 text-green-400 border border-green-500/30"
-                            : "bg-red-500/20 text-red-400 border border-red-500/30"
-                        }`}
-                      >
-                        {bill.status}
-                      </span>
-                    </td>
-                    <td className="p-4">
-                      <div className="flex flex-wrap gap-2">
-                        <button
-                          onClick={() => viewBill(bill)}
-                          className="bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 p-2 rounded-lg transition-all duration-200 hover:scale-110"
-                        >
-                          <Eye size={16} />
-                        </button>
-                        <button
-                          onClick={() => printBill(bill)}
-                          className="bg-green-500/20 hover:bg-green-500/30 text-green-400 p-2 rounded-lg transition-all duration-200 hover:scale-110"
-                        >
-                          <Printer size={16} />
-                        </button>
-                        <button
-                          onClick={() => downloadBill(bill)}
-                          className="bg-purple-500/20 hover:bg-purple-500/30 text-purple-400 p-2 rounded-lg transition-all duration-200 hover:scale-110"
-                        >
-                          <Download size={16} />
-                        </button>
-                        {bill.status !== "Cancelled" && (
-                          <button
-                            onClick={() => cancelBill(bill)}
-                            className="bg-red-500/20 hover:bg-red-500/30 text-red-400 p-2 rounded-lg transition-all duration-200 hover:scale-110"
-                          >
-                            <XCircle size={16} />
-                          </button>
-                        )}
+                    </span>
+                  </td>
+                  <td className="py-3.5 px-4">
+                    <div className="font-semibold text-slate-900">
+                      {bill.patientName}
+                    </div>
+                    {bill.doctorName && bill.doctorName !== "-" && (
+                      <div className="text-xs text-slate-400 mt-0.5 flex items-center gap-1">
+                        <Stethoscope size={12} />
+                        <span>Dr. {bill.doctorName}</span>
                       </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                    )}
+                  </td>
+                  <td className="py-3.5 px-4 text-slate-600 font-medium">
+                    {bill.mobile}
+                  </td>
+                  <td className="py-3.5 px-4 text-slate-600 text-xs">
+                    {bill.date && !isNaN(new Date(bill.date).getTime())
+                      ? new Date(bill.date).toLocaleDateString("en-IN", {
+                          day: "2-digit",
+                          month: "short",
+                          year: "numeric",
+                        })
+                      : bill.date}
+                  </td>
+                  <td className="py-3.5 px-4">
+                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-700">
+                      <Banknote size={12} className="text-slate-400" />
+                      {bill.paymentMode}
+                    </span>
+                  </td>
+                  <td className="py-3.5 px-4">
+                    <span
+                      className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold ${
+                        bill.status === "Completed"
+                          ? "bg-emerald-50 text-emerald-700 border border-emerald-100"
+                          : "bg-rose-50 text-rose-700 border border-rose-100"
+                      }`}
+                    >
+                      {bill.status === "Completed" ? (
+                        <CheckCircle2 size={12} />
+                      ) : (
+                        <XCircle size={12} />
+                      )}
+                      {bill.status}
+                    </span>
+                  </td>
+                  <td className="py-3.5 px-4 text-right font-extrabold text-slate-900">
+                    ₹{Number(bill.amount || 0).toFixed(2)}
+                  </td>
+                  <td className="py-3.5 px-4 text-center">
+                    <div className="flex items-center justify-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => viewBill(bill)}
+                        className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                        title="View details"
+                      >
+                        <Eye size={15} />
+                      </button>
+                      {bill.status !== "Cancelled" && (
+                        <button
+                          type="button"
+                          onClick={() => handleEditBill(bill)}
+                          className="p-1.5 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors"
+                          title="Edit Bill"
+                        >
+                          <Edit size={15} />
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => printBill(bill)}
+                        className="p-1.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
+                        title="Print receipt"
+                      >
+                        <Printer size={15} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => downloadBill(bill)}
+                        className="p-1.5 text-slate-400 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
+                        title="Download PDF"
+                      >
+                        <Download size={15} />
+                      </button>
+                      {bill.status !== "Cancelled" && (
+                        <button
+                          type="button"
+                          onClick={() => cancelBill(bill)}
+                          className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                          title="Void / Cancel bill"
+                        >
+                          <XCircle size={15} />
+                        </button>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
 
-            {filteredBills.length === 0 && (
-              <div className="text-center py-12">
-                <AlertCircle className="mx-auto text-gray-400 mb-3" size={48} />
-                <p className="text-gray-400">No bills found.</p>
+          {filteredBills.length === 0 && (
+            <div className="text-center py-14 px-4 space-y-2">
+              <div className="w-12 h-12 rounded-2xl bg-slate-100 text-slate-400 mx-auto flex items-center justify-center">
+                <IndianRupee size={24} />
               </div>
-            )}
-          </div>
-
-          {/* Pagination */}
-          {filteredBills.length > 0 && (
-            <div className="border-t border-white/10 px-6 py-4 flex items-center justify-between">
-              <p className="text-sm text-gray-400">
-                Showing {(currentPage - 1) * itemsPerPage + 1} to{" "}
-                {Math.min(currentPage * itemsPerPage, filteredBills.length)} of{" "}
-                {filteredBills.length} entries
+              <p className="text-sm font-semibold text-slate-700">
+                No billing records found
               </p>
-              <div className="flex gap-2">
+              <p className="text-xs text-slate-400 max-w-sm mx-auto">
+                {hasActiveFilters
+                  ? "Try resetting your search query or status filters."
+                  : "Start creating bills in the New Billing POS to record invoices here."}
+              </p>
+              {hasActiveFilters && (
                 <button
-                  onClick={() =>
-                    setCurrentPage((prev) => Math.max(prev - 1, 1))
-                  }
-                  disabled={currentPage === 1}
-                  className="p-2 rounded-lg bg-slate-800/50 border border-white/10 text-white hover:bg-white/5 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  type="button"
+                  onClick={resetFilters}
+                  className="mt-2 inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-blue-50 text-blue-600 rounded-xl text-xs font-semibold hover:bg-blue-100 transition-colors"
                 >
-                  <ChevronLeft size={18} />
+                  <RotateCcw size={13} />
+                  <span>Reset Filters</span>
                 </button>
-                <span className="px-4 py-2 rounded-lg bg-blue-500/20 text-blue-400 border border-blue-500/30">
-                  {currentPage}
-                </span>
-                <button
-                  onClick={() =>
-                    setCurrentPage((prev) => Math.min(prev + 1, totalPages))
-                  }
-                  disabled={currentPage === totalPages}
-                  className="p-2 rounded-lg bg-slate-800/50 border border-white/10 text-white hover:bg-white/5 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <ChevronRight size={18} />
-                </button>
-              </div>
+              )}
             </div>
           )}
         </div>
 
-        {/* Information Panel */}
-        <div className="mt-6 bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl shadow-xl overflow-hidden">
-          <div className="bg-gradient-to-r from-blue-500/10 to-indigo-500/10 px-6 py-4 border-b border-white/10">
-            <div className="flex items-center gap-3">
-              <div className="bg-blue-500/20 p-2 rounded-xl">
-                <TrendingUp size={18} className="text-blue-400" />
-              </div>
-              <h2 className="text-lg font-semibold text-white">
-                Billing History Features
-              </h2>
-            </div>
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div className="p-4 border-t border-slate-100 flex items-center justify-between">
+            <Pagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              totalItems={filteredBills.length}
+              itemsPerPage={itemsPerPage}
+              onPageChange={setCurrentPage}
+            />
           </div>
+        )}
+      </div>
 
-          <div className="p-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
-              {[
-                "Search bills by patient, mobile, or bill number",
-                "Download PDF invoice anytime",
-                "Print bills directly from system",
-                "Cancelled bills restore stock automatically",
-              ].map((feature, index) => (
-                <div
-                  key={index}
-                  className="border border-white/10 rounded-xl p-4 flex items-center gap-3 hover:bg-white/5 transition-colors group"
-                >
-                  <div className="w-1.5 h-1.5 rounded-full bg-blue-400 group-hover:scale-150 transition-transform"></div>
-                  <p className="text-gray-300 text-sm">{feature}</p>
+      {/* 5. BILL DETAILS MODAL */}
+      {viewingBill && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs">
+          <div
+            className="fixed inset-0"
+            onClick={() => {
+              setViewingBill(null);
+              setViewingItems([]);
+            }}
+          />
+          <div className="relative z-10 bg-white w-full max-w-2xl rounded-2xl border border-slate-200 shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
+            {/* Modal Header */}
+            <div className="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-blue-50 text-blue-600 border border-blue-100">
+                  <IndianRupee size={18} />
                 </div>
-              ))}
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-bold text-slate-900 text-base">
+                      Invoice Details
+                    </h3>
+                    <span className="font-mono text-xs font-semibold px-2 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-100">
+                      {viewingBill.bill_number || viewingBill.billNumber}
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    {viewingBill.bill_date
+                      ? new Date(viewingBill.bill_date).toLocaleString("en-IN")
+                      : viewingBill.created_at
+                        ? new Date(viewingBill.created_at).toLocaleString("en-IN")
+                        : viewingBill.date || "—"}
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setViewingBill(null);
+                  setViewingItems([]);
+                }}
+                className="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-100 transition-colors"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-5 overflow-y-auto space-y-4">
+              {/* Patient Info Grid */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 p-3.5 rounded-xl bg-slate-50 border border-slate-100 text-xs">
+                <div>
+                  <span className="text-slate-400 block font-medium">Patient</span>
+                  <span className="font-bold text-slate-800 mt-0.5 block truncate">
+                    {viewingBill.patient_name || viewingBill.patientName || "—"}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-slate-400 block font-medium">Mobile</span>
+                  <span className="font-semibold text-slate-800 mt-0.5 block">
+                    {viewingBill.mobile_number || viewingBill.mobile || "—"}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-slate-400 block font-medium">Payment Mode</span>
+                  <span className="font-semibold text-slate-800 mt-0.5 block">
+                    {viewingBill.payment_mode || viewingBill.paymentMode || "—"}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-slate-400 block font-medium">Status</span>
+                  <span
+                    className={`font-bold mt-0.5 block ${
+                      (viewingBill.payment_status || viewingBill.status) ===
+                      "Completed"
+                        ? "text-emerald-600"
+                        : "text-rose-600"
+                    }`}
+                  >
+                    {viewingBill.payment_status || viewingBill.status}
+                  </span>
+                </div>
+              </div>
+
+              {/* Items List */}
+              <div className="border border-slate-200/90 rounded-xl overflow-hidden">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-slate-50 border-b border-slate-100 text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
+                    <tr>
+                      <th className="py-2.5 px-3">Medicine</th>
+                      <th className="py-2.5 px-3 text-center">Qty</th>
+                      <th className="py-2.5 px-3 text-right">Price</th>
+                      <th className="py-2.5 px-3 text-right">Total</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {modalLoading ? (
+                      <tr>
+                        <td colSpan={4} className="py-6 text-center text-slate-400">
+                          Loading line items...
+                        </td>
+                      </tr>
+                    ) : viewingItems.length > 0 ? (
+                      viewingItems.map((item, idx) => (
+                        <tr key={idx} className="hover:bg-slate-50/50">
+                          <td className="py-2.5 px-3">
+                            <div className="font-semibold text-slate-800">
+                              {item.medicine_name || item.name || item.medicine_id}
+                            </div>
+                            {item.batch_number && (
+                              <div className="text-[10px] text-slate-400 font-mono">
+                                Batch: {item.batch_number}
+                              </div>
+                            )}
+                          </td>
+                          <td className="py-2.5 px-3 text-center font-bold text-slate-700">
+                            {item.quantity}
+                          </td>
+                          <td className="py-2.5 px-3 text-right text-slate-600">
+                            ₹{Number(item.price || 0).toFixed(2)}
+                          </td>
+                          <td className="py-2.5 px-3 text-right font-bold text-slate-900">
+                            ₹{Number(item.total || 0).toFixed(2)}
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan={4} className="py-6 text-center text-slate-400">
+                          No line items found.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Summary Breakdown */}
+              <div className="p-3.5 rounded-xl bg-slate-50/70 border border-slate-100 space-y-1.5 text-xs">
+                {viewingBill.subtotal !== undefined && (
+                  <div className="flex justify-between text-slate-500">
+                    <span>Subtotal</span>
+                    <span className="font-medium text-slate-700">
+                      ₹{Number(viewingBill.subtotal || 0).toFixed(2)}
+                    </span>
+                  </div>
+                )}
+                {viewingBill.total_discount !== undefined && Number(viewingBill.total_discount) > 0 && (
+                  <div className="flex justify-between text-rose-600">
+                    <span>Discount</span>
+                    <span className="font-medium">
+                      -₹{Number(viewingBill.total_discount || 0).toFixed(2)}
+                    </span>
+                  </div>
+                )}
+                {viewingBill.total_gst !== undefined && Number(viewingBill.total_gst) > 0 && (
+                  <div className="flex justify-between text-slate-500">
+                    <span>GST Tax</span>
+                    <span className="font-medium text-slate-700">
+                      +₹{Number(viewingBill.total_gst || 0).toFixed(2)}
+                    </span>
+                  </div>
+                )}
+                <div className="pt-2 border-t border-slate-200 flex justify-between items-baseline">
+                  <span className="font-bold text-slate-800 text-sm">
+                    Grand Total
+                  </span>
+                  <span className="font-extrabold text-slate-900 text-base">
+                    ₹{Number(viewingBill.grand_total || viewingBill.amount || 0).toFixed(2)}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-4 border-t border-slate-100 flex items-center justify-end gap-2.5 bg-slate-50/40">
+              {viewingBill.status !== "Cancelled" && (
+                <button
+                  type="button"
+                  onClick={() => handleEditBill(viewingBill)}
+                  className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-amber-50 hover:bg-amber-100 border border-amber-200 text-amber-800 rounded-xl text-xs font-semibold shadow-xs transition-colors"
+                >
+                  <Edit size={14} />
+                  <span>Edit Bill</span>
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => printBill(viewingBill)}
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-xl text-xs font-semibold shadow-xs transition-colors"
+              >
+                <Printer size={14} />
+                <span>Print Bill</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => downloadBill(viewingBill)}
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-xl text-xs font-semibold shadow-xs transition-colors"
+              >
+                <Download size={14} />
+                <span>Download PDF</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setViewingBill(null);
+                  setViewingItems([]);
+                }}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold shadow-xs transition-colors"
+              >
+                Close
+              </button>
             </div>
           </div>
         </div>
-      </div>
+      )}
     </div>
   );
 };

@@ -70,3 +70,34 @@ exports.writeOffMedicine = async (req, res) => {
     });
   }
 };
+
+// PROCESS RETURN BILL
+exports.processReturnBill = async (req, res) => {
+  try {
+    const { manufacturer, items, reason, returnNoteNumber } = req.body;
+    if (!items || !items.length) {
+      return res.status(400).json({
+        success: false,
+        message: "No medicine items specified for return",
+      });
+    }
+
+    const result = await Expiry.processReturnBill({
+      manufacturer,
+      items,
+      reason,
+      returnNoteNumber,
+    });
+
+    res.status(200).json({
+      success: true,
+      message: "Return bill processed and stock deducted successfully",
+      data: result,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};

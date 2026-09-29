@@ -2,7 +2,7 @@ import { Pill } from "lucide-react";
 
 const AppLoader = () => {
   return (
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-gradient-to-br from-slate-900 via-blue-950 to-slate-900">
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-transparent">
       <div className="text-center">
         <div className="relative inline-flex">
           <div className="absolute inset-0 animate-ping rounded-full bg-blue-500 opacity-30" />
@@ -16,9 +16,9 @@ const AppLoader = () => {
           PharmaMed
         </h1>
 
-        <p className="mt-2 text-blue-300/70">Loading Medical ERP...</p>
+        <p className="mt-2 text-slate-500">Loading Medical ERP...</p>
 
-        <div className="w-64 h-2 mx-auto mt-6 bg-white/10 rounded-full overflow-hidden">
+        <div className="w-64 h-2 mx-auto mt-6 bg-slate-50 rounded-full overflow-hidden">
           <div className="h-full w-full animate-loader bg-gradient-to-r from-blue-500 to-indigo-500" />
         </div>
       </div>

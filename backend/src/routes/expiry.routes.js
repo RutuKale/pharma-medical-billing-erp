@@ -16,4 +16,7 @@ router.get("/safe", expiryController.getSafeMedicines);
 // WRITE OFF
 router.put("/write-off/:medicine_id", expiryController.writeOffMedicine);
 
+// RETURN BILL TO MANUFACTURER
+router.post("/return-bill", expiryController.processReturnBill);
+
 module.exports = router;
