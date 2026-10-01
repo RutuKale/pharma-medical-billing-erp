@@ -1,6 +1,7 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import Swal from "sweetalert2";
+import apiClient from "../utils/apiClient";
 import {
   Building2,
   IndianRupee,
@@ -62,6 +63,23 @@ const Settings = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [logoPreview, setLogoPreview] = useState(null);
 
+  useEffect(() => {
+    const fetchSettings = async () => {
+      try {
+        const res = await apiClient.get("/settings");
+        if (res.data?.data) {
+          setSettings((prev) => ({
+            ...prev,
+            ...res.data.data,
+          }));
+        }
+      } catch (err) {
+        console.error("Error loading settings from Firestore:", err);
+      }
+    };
+    fetchSettings();
+  }, []);
+
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
     setSettings((prev) => ({
@@ -90,19 +108,37 @@ const Settings = () => {
 
   const handleSave = async () => {
     setIsSaving(true);
-    // Simulate network save
-    await new Promise((resolve) => setTimeout(resolve, 800));
-    setIsSaving(false);
+    try {
+      await apiClient.post("/settings", settings);
 
-    Swal.fire({
-      icon: "success",
-      title: "Settings Saved",
-      text: "Pharmacy profile, GST rules, and alert thresholds updated successfully.",
-      confirmButtonColor: "#2563eb",
-      timer: 2500,
-      timerProgressBar: true,
-    });
+      // Also sync key billing details to localStorage for invoice generator
+      if (settings.pharmacyName) localStorage.setItem("pharmacy_name", settings.pharmacyName);
+      if (settings.address) localStorage.setItem("pharmacy_address", settings.address);
+      if (settings.mobile) localStorage.setItem("pharmacy_phone", settings.mobile);
+      if (settings.gstNumber) localStorage.setItem("pharmacy_gst", settings.gstNumber);
+      if (settings.drugLicenseNumber) localStorage.setItem("pharmacy_dl", settings.drugLicenseNumber);
+
+      Swal.fire({
+        icon: "success",
+        title: "Settings Saved to Firebase",
+        text: "Pharmacy profile, GST rules, and alert thresholds synced with Firestore successfully.",
+        confirmButtonColor: "#2563eb",
+        timer: 2500,
+        timerProgressBar: true,
+      });
+    } catch (err) {
+      console.error("Failed to save settings to Firestore:", err);
+      Swal.fire({
+        icon: "error",
+        title: "Save Failed",
+        text: "Could not save settings to Firebase. Please try again.",
+        confirmButtonColor: "#ef4444",
+      });
+    } finally {
+      setIsSaving(false);
+    }
   };
+
 
   const handleReset = () => {
     Swal.fire({

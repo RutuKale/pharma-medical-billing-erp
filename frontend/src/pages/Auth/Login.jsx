@@ -4,520 +4,496 @@ import {
   ShieldCheck,
   Mail,
   Lock,
-  Heart,
-  Activity,
-  Stethoscope,
-  Syringe,
-  Calendar,
-  Clock,
-  Fingerprint,
-  Smartphone,
-  CheckCircle2,
+  KeyRound,
+  Eye,
+  EyeOff,
   ArrowRight,
-  Building2,
-  Users,
-  Award,
-  Star,
-  Hospital,
-  ClipboardCheck,
-  TrendingUp,
+  AlertCircle,
+  CheckCircle2,
+  Sparkles,
 } from "lucide-react";
 import { FcGoogle } from "react-icons/fc";
 import { useAuth } from "../../context/AuthContext";
 import { Navigate } from "react-router-dom";
 import ButtonLoader from "../../components/ButtonLoader";
+import apiClient from "../../utils/apiClient";
 
 const Login = () => {
-  const { user, loginWithGoogle, loginWithEmail, registerWithEmail } =
-    useAuth();
+  const { user, loginWithGoogle, loginWithEmail, registerWithEmail } = useAuth();
 
-  const [isLogin, setIsLogin] = useState(true);
+  // Mode: 'otp' | 'password'
+  const [authMode, setAuthMode] = useState("otp");
+  const [isLogin, setIsLogin] = useState(true); // for password mode
+
   const [email, setEmail] = useState("");
-  // const [password, setPassword] = useState("");
+  const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [otp, setOtp] = useState("");
   const [otpSent, setOtpSent] = useState(false);
+  const [resendTimer, setResendTimer] = useState(0);
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [currentTime, setCurrentTime] = useState("");
-  const [currentDate, setCurrentDate] = useState("");
-  const [activeStat, setActiveStat] = useState(0);
+  const [successMsg, setSuccessMsg] = useState("");
 
-  // Medical quotes rotation
-  const medicalQuotes = [
-    {
-      quote: "Precision medicine starts with intelligent pharmacy management.",
-      author: "Dr. Sarah Chen",
-      role: "Chief Medical Officer",
-    },
-    {
-      quote: "Every prescription tells a story of patient care and trust.",
-      author: "Dr. James Rodriguez",
-      role: "Director of Pharmacy",
-    },
-    {
-      quote:
-        "Innovation in pharmaceuticals saves lives and transforms futures.",
-      author: "Dr. Emily Watson",
-      role: "Head of Research",
-    },
-  ];
-  const [quoteIndex, setQuoteIndex] = useState(0);
-
-  // Stats for left panel
-  const stats = [
-    { icon: Hospital, label: "500+ Hospitals", color: "text-indigo-400" },
-    { icon: Users, label: "50K+ Healthcare Pros", color: "text-teal-400" },
-    {
-      icon: ClipboardCheck,
-      label: "1M+ Prescriptions",
-      color: "text-cyan-400",
-    },
-    { icon: Award, label: "99.9% Accuracy", color: "text-green-400" },
-  ];
-
-  // Features list
-  const features = [
-    "Real-time inventory tracking",
-    "Automated prescription verification",
-    "Multi-currency billing system",
-    "Advanced analytics dashboard",
-    "Multi-location management",
-    "Secure patient records",
-  ];
-
+  // Countdown timer for OTP resend
   useEffect(() => {
-    // Update time and date
-    const updateDateTime = () => {
-      const now = new Date();
-      setCurrentTime(
-        now.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }),
-      );
-      setCurrentDate(
-        now.toLocaleDateString("en-US", {
-          weekday: "long",
-          year: "numeric",
-          month: "long",
-          day: "numeric",
-        }),
-      );
-    };
-    updateDateTime();
-    const interval = setInterval(updateDateTime, 60000);
+    let timer;
+    if (resendTimer > 0) {
+      timer = setTimeout(() => setResendTimer((prev) => prev - 1), 1000);
+    }
+    return () => clearTimeout(timer);
+  }, [resendTimer]);
 
-    // Rotate quotes
-    const quoteInterval = setInterval(() => {
-      setQuoteIndex((prev) => (prev + 1) % medicalQuotes.length);
-    }, 8000);
-
-    // Rotate stats
-    const statInterval = setInterval(() => {
-      setActiveStat((prev) => (prev + 1) % stats.length);
-    }, 3000);
-
-    return () => {
-      clearInterval(interval);
-      clearInterval(quoteInterval);
-      clearInterval(statInterval);
-    };
-  }, []);
-
-  if (user) {
+  // Check if authenticated
+  const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+  if (user || token) {
     return <Navigate to="/" replace />;
   }
 
+  // Handle Send OTP
   const sendOtp = async () => {
+    setError("");
+    setSuccessMsg("");
+
+    if (!email || !email.includes("@")) {
+      setError("Please enter a valid email address");
+      return;
+    }
+
     try {
       setLoading(true);
-
-      const res = await fetch(`${import.meta.env.VITE_API_BASE_URL}/auth/send-otp`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ email }),
+      const res = await apiClient.post("/auth/send-otp", {
+        email: email.trim().toLowerCase(),
       });
 
-      const data = await res.json();
+      const data = res.data;
 
       if (data.success) {
         setOtpSent(true);
+        if (data.devOtp) {
+          setSuccessMsg(`Firebase verification code is: ${data.devOtp}`);
+          setOtp(data.devOtp);
+        } else {
+          setSuccessMsg(`Verification code sent for ${email}`);
+        }
+        setResendTimer(60);
       } else {
-        setError(data.message);
+        setError(data.message || "Failed to generate verification code");
       }
     } catch (err) {
-      setError("Failed to send OTP");
+      setError(err?.response?.data?.message || "Unable to generate verification code. Please check your connection.");
+    } finally {
+      setLoading(false);
     }
-
-    setLoading(false);
   };
 
-  const handleSubmit = async (e) => {
+  // Handle OTP Submit
+  const handleOtpSubmit = async (e) => {
     e.preventDefault();
+    setError("");
+    setSuccessMsg("");
+
+    if (!otp || otp.trim().length < 4) {
+      setError("Please enter the complete 6-digit verification code");
+      return;
+    }
+
     try {
       setLoading(true);
-      const res = await fetch(
-        `${import.meta.env.VITE_API_BASE_URL}/auth/verify-otp`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            email,
-            otp,
-          }),
-        },
-      );
-      const data = await res.json();
+      const res = await apiClient.post("/auth/verify-otp", {
+        email: email.trim().toLowerCase(),
+        otp: otp.trim(),
+      });
+
+      const data = res.data;
       if (!data.success) {
-        setError(data.message);
+        setError(data.message || "Invalid or expired verification code");
+        setLoading(false);
         return;
       }
+
       localStorage.setItem("token", data.token);
       window.location.href = "/";
     } catch (err) {
-      setError("OTP verification failed");
+      setError(err?.response?.data?.message || "Verification failed. Please check the code and try again.");
+      setLoading(false);
     }
-    setLoading(false);
+  };
+
+
+  // Handle Password Submit (Email + Password)
+  const handlePasswordSubmit = async (e) => {
+    e.preventDefault();
+    setError("");
+    setSuccessMsg("");
+
+    if (!email || !password) {
+      setError("Please provide both email and password");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      let result;
+      if (isLogin) {
+        result = await loginWithEmail(email.trim(), password);
+      } else {
+        result = await registerWithEmail(email.trim(), password);
+      }
+
+      if (!result.success) {
+        setError(result.message || "Authentication failed");
+        setLoading(false);
+        return;
+      }
+    } catch (err) {
+      setError(err.message || "An unexpected error occurred");
+      setLoading(false);
+    }
+  };
+
+  // Google Login
+  const handleGoogleLogin = async () => {
+    setError("");
+    setSuccessMsg("");
+    setLoading(true);
+    try {
+      const result = await loginWithGoogle();
+      if (!result.success) {
+        setError(result.message || "Google sign-in was canceled or failed");
+      }
+    } catch (err) {
+      setError("Google authentication error");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
-    <div className="h-screen flex bg-transparent overflow-hidden">
-      {/* Left Panel - Branding & Information */}
-      <div className="hidden lg:flex lg:w-1/2 xl:w-3/5 relative overflow-hidden">
-        {/* Animated Background */}
-        <div className="absolute inset-0">
-          <div className="absolute top-0 -left-4 w-96 h-96 bg-teal-500/20 rounded-full mix-blend-screen filter blur-[100px] animate-blob"></div>
-          <div className="absolute top-0 -right-4 w-96 h-96 bg-indigo-500/20 rounded-full mix-blend-screen filter blur-[100px] animate-blob animation-delay-2000"></div>
-          <div className="absolute -bottom-8 left-20 w-96 h-96 bg-cyan-500/20 rounded-full mix-blend-screen filter blur-[100px] animate-blob animation-delay-4000"></div>
-
-          {/* Grid Pattern */}
-          <div className="absolute inset-0 opacity-10">
-            <div className="h-full w-full bg-[linear-gradient(rgba(20,184,166,0.1)_1px,transparent_1px),linear-gradient(90deg,rgba(20,184,166,0.1)_1px,transparent_1px)] bg-[size:64px_64px]"></div>
-          </div>
-        </div>
-
-        {/* Content */}
-        <div className="relative z-10 flex flex-col justify-between p-6 lg:p-8 xl:p-12 w-full h-full">
-          {/* Top Section */}
-          <div className="flex-1 flex flex-col justify-center">
-            {/* Logo */}
-            <div className="flex items-center gap-3 mb-6">
-              <div className="relative group flex-shrink-0">
-                <div className="absolute inset-0 bg-gradient-to-r from-teal-400 to-indigo-400 rounded-xl blur-lg opacity-75 group-hover:opacity-100 transition-opacity"></div>
-                <div className="relative bg-gradient-to-br from-teal-500 to-indigo-600 p-2.5 rounded-xl shadow-xl">
-                  <Pill size={20} className="text-slate-800" />
-                </div>
-              </div>
-              <div>
-                <h1 className="text-xl font-bold text-slate-800">PharmaMed</h1>
-                <p className="text-teal-300 text-xs tracking-wider">
-                  ERP SYSTEM
-                </p>
-              </div>
-            </div>
-
-            {/* Main Heading */}
-            <div>
-              <h2 className="text-2xl xl:text-3xl font-bold text-slate-800 leading-tight">
-                Transform Your
-                <span className="block mt-1 bg-gradient-to-r from-teal-400 to-indigo-400 bg-clip-text text-transparent">
-                  Pharmacy Operations
-                </span>
-              </h2>
-              <p className="mt-2 text-teal-100/80 text-sm leading-relaxed max-w-lg">
-                Streamline inventory, automate billing, and deliver exceptional
-                patient care with our intelligent pharmacy management platform.
-              </p>
-            </div>
-
-            {/* Features Grid */}
-            <div className="mt-6 grid grid-cols-2 gap-2 max-w-lg">
-              {features.map((feature, index) => (
-                <div
-                  key={index}
-                  className="flex items-center gap-2 text-teal-100/90 group hover:text-slate-900 transition-colors"
-                >
-                  <CheckCircle2
-                    size={16}
-                    className="text-indigo-400 flex-shrink-0"
-                  />
-                  <span className="text-xs xl:text-sm">{feature}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Bottom Section */}
-          <div className="flex-shrink-0">
-            {/* Testimonial */}
-            <div className="bg-white shadow-sm backdrop-blur-md border border-slate-200 rounded-2xl p-4 max-w-xl">
-              <div className="flex items-start gap-1 text-yellow-400 mb-3">
-                {[...Array(5)].map((_, i) => (
-                  <Star key={i} size={12} fill="currentColor" />
-                ))}
-              </div>
-              <p className="text-white/90 text-sm italic leading-relaxed">
-                "{medicalQuotes[quoteIndex].quote}"
-              </p>
-              <div className="mt-3 flex items-center gap-2">
-                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-teal-400 to-indigo-500 flex items-center justify-center text-slate-800 font-bold text-xs">
-                  {medicalQuotes[quoteIndex].author
-                    .split(" ")
-                    .map((n) => n[0])
-                    .join("")}
-                </div>
-                <div>
-                  <p className="text-slate-800 font-medium text-xs">
-                    {medicalQuotes[quoteIndex].author}
-                  </p>
-                  <p className="text-teal-300 text-xs">
-                    {medicalQuotes[quoteIndex].role}
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            {/* Stats */}
-            <div className="mt-4 grid grid-cols-4 gap-3 max-w-lg">
-              {stats.map((stat, index) => (
-                <div
-                  key={index}
-                  className={`text-center transition-all duration-500 ${
-                    index === activeStat ? "scale-110" : "opacity-60"
-                  }`}
-                >
-                  <stat.icon
-                    size={20}
-                    className={`mx-auto ${stat.color} transition-colors`}
-                  />
-                  <p className="text-slate-800 font-bold text-xs mt-1">
-                    {stat.label}
-                  </p>
-                </div>
-              ))}
-            </div>
-
-            {/* Time Display */}
-            <div className="mt-4 flex items-center gap-4 text-slate-500 text-xs">
-              <div className="flex items-center gap-1.5">
-                <Clock size={12} />
-                <span>{currentTime}</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <Calendar size={12} />
-                <span>{currentDate}</span>
-              </div>
-            </div>
-          </div>
-        </div>
+    <div className="min-h-screen bg-slate-50 flex flex-col justify-center items-center p-4 sm:p-6 lg:p-8">
+      {/* Background Decorative Circles */}
+      <div className="fixed top-0 left-1/2 -translate-x-1/2 w-full max-w-7xl h-96 overflow-hidden pointer-events-none -z-10">
+        <div className="absolute top-10 left-1/4 w-80 h-80 bg-blue-500/5 rounded-full blur-3xl" />
+        <div className="absolute top-20 right-1/4 w-80 h-80 bg-indigo-500/5 rounded-full blur-3xl" />
       </div>
 
-      {/* Right Panel - Login Form */}
-      <div className="w-full lg:w-1/2 xl:w-2/5 flex items-center justify-center p-4 sm:p-6 lg:p-8">
-        <div className="w-full max-w-sm">
-          {/* Mobile Logo (Visible only on small screens) */}
-          <div className="lg:hidden text-center mb-6">
-            <div className="inline-flex items-center gap-2">
-              <div className="bg-gradient-to-br from-teal-500 to-indigo-600 p-2.5 rounded-xl">
-                <Pill size={20} className="text-slate-800" />
+      <div className="w-full max-w-md space-y-6">
+        {/* Brand Header */}
+        <div className="text-center space-y-2">
+          <div className="inline-flex items-center justify-center">
+            <div className="relative group">
+              <div className="absolute inset-0 bg-gradient-to-r from-blue-400 to-indigo-400 rounded-2xl blur-md opacity-60 group-hover:opacity-100 transition-opacity" />
+              <div className="relative bg-gradient-to-br from-blue-500 to-indigo-600 p-3 rounded-2xl shadow-md text-white">
+                <Pill size={28} className="stroke-[2.5]" />
               </div>
-              <h1 className="text-xl font-bold text-slate-800">PharmaMed ERP</h1>
             </div>
           </div>
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
+              PharmaMed <span className="bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">ERP</span>
+            </h1>
+            <p className="text-xs sm:text-sm text-slate-500 font-medium mt-1">
+              Pharmacy Billing & Inventory Management System
+            </p>
+          </div>
+        </div>
 
-          {/* Login Card */}
-          <div className="bg-slate-50 backdrop-blur-md border border-slate-200 rounded-2xl shadow-2xl p-6">
-            {/* Header */}
-            <div className="text-center mb-5">
-              <h2 className="text-xl font-bold text-slate-800">
-                {isLogin ? "Welcome Back" : "Create Account"}
-              </h2>
-              <p className="text-teal-200/80 text-xs mt-1">
-                {isLogin
-                  ? "Access your pharmacy dashboard"
-                  : "Start managing your pharmacy smarter"}
-              </p>
+        {/* Main Card */}
+        <div className="bg-white rounded-2xl border border-slate-200/90 shadow-xs hover:shadow-sm transition-all p-6 sm:p-8 space-y-5">
+          {/* Card Title */}
+          <div className="border-b border-slate-100 pb-4">
+            <h2 className="text-lg font-bold text-slate-900">
+              {authMode === "password" && !isLogin ? "Register Account" : "Sign In to Portal"}
+            </h2>
+            <p className="text-xs text-slate-500 mt-0.5">
+              {authMode === "otp"
+                ? "Enter your registered email to receive a login verification code."
+                : isLogin
+                ? "Enter your pharmacy account credentials to continue."
+                : "Create new administrative credentials for the pharmacy portal."}
+            </p>
+          </div>
+
+          {/* Authentication Method Tabs */}
+          <div className="flex p-1 bg-slate-100 rounded-xl border border-slate-200/80">
+            <button
+              type="button"
+              onClick={() => {
+                setAuthMode("otp");
+                setError("");
+                setSuccessMsg("");
+              }}
+              className={`flex-1 py-2 text-xs font-semibold rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                authMode === "otp"
+                  ? "bg-white text-blue-600 shadow-xs"
+                  : "text-slate-600 hover:text-slate-900"
+              }`}
+            >
+              <KeyRound size={14} />
+              <span>Email OTP</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setAuthMode("password");
+                setError("");
+                setSuccessMsg("");
+              }}
+              className={`flex-1 py-2 text-xs font-semibold rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                authMode === "password"
+                  ? "bg-white text-blue-600 shadow-xs"
+                  : "text-slate-600 hover:text-slate-900"
+              }`}
+            >
+              <Lock size={14} />
+              <span>Email & Password</span>
+            </button>
+          </div>
+
+          {/* Feedback Messages */}
+          {error && (
+            <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-start gap-2.5 font-medium animate-in fade-in duration-200">
+              <AlertCircle size={16} className="text-rose-500 shrink-0 mt-0.5" />
+              <span className="flex-1">{error}</span>
             </div>
+          )}
 
-            {/* Security Badge */}
-            <div className="bg-indigo-500/10 border border-indigo-500/30 rounded-lg p-2.5 mb-4 flex items-center gap-2">
-              <div className="bg-indigo-500/20 p-1.5 rounded-lg flex-shrink-0">
-                <ShieldCheck size={16} className="text-indigo-400" />
-              </div>
-              <div>
-                <p className="text-slate-800 text-xs font-medium">
-                  Enterprise-Grade Security
-                </p>
-                <p className="text-indigo-300/70 text-xs">
-                  HIPAA & GDPR Compliant
-                </p>
-              </div>
+          {successMsg && (
+            <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs flex items-start gap-2.5 font-medium animate-in fade-in duration-200">
+              <CheckCircle2 size={16} className="text-emerald-500 shrink-0 mt-0.5" />
+              <span className="flex-1">{successMsg}</span>
             </div>
+          )}
 
-            {/* Form */}
-            <form onSubmit={handleSubmit} className="space-y-3">
+          {/* 1. OTP AUTHENTICATION */}
+          {authMode === "otp" && (
+            <form
+              onSubmit={otpSent ? handleOtpSubmit : (e) => { e.preventDefault(); sendOtp(); }}
+              className="space-y-4"
+            >
               <div>
-                <label className="block text-teal-200 text-xs mb-1.5 ml-1">
-                  Email Address
-                </label>
-                <div className="relative group">
-                  <Mail
-                    size={16}
-                    className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-teal-400 transition-colors"
-                  />
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-xs font-semibold text-slate-700">
+                    Email Address <span className="text-blue-500 font-bold">*</span>
+                  </label>
+                  {otpSent && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setOtpSent(false);
+                        setOtp("");
+                        setSuccessMsg("");
+                      }}
+                      className="text-xs text-blue-600 hover:text-blue-700 font-semibold cursor-pointer"
+                    >
+                      Change Email
+                    </button>
+                  )}
+                </div>
+                <div className="relative">
+                  <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none">
+                    <Mail size={16} />
+                  </div>
                   <input
                     type="email"
-                    placeholder="professional@pharmacy.com"
-                    className="w-full pl-10 pr-3 py-2.5 bg-white shadow-sm border border-slate-200 rounded-xl text-slate-800 text-sm placeholder-slate-400 outline-none transition-all duration-300 focus:border-teal-400/50 focus:bg-slate-50 focus:shadow-lg"
+                    disabled={otpSent || loading}
+                    placeholder="pharmacist@hospital.com"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     required
+                    className="w-full bg-slate-50/80 disabled:bg-slate-100 disabled:text-slate-500 border border-slate-200 hover:border-slate-300 rounded-xl pl-10 pr-3.5 py-2.5 text-sm text-slate-900 placeholder-slate-400 outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                   />
                 </div>
               </div>
 
-              {/* <div>
-                <label className="block text-teal-200 text-xs mb-1.5 ml-1">
-                  Password
-                </label>
-                <div className="relative group">
-                  <Lock
-                    size={16}
-                    className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-teal-400 transition-colors"
-                  />
-                  <input
-                    type="password"
-                    placeholder="Enter your password"
-                    className="w-full pl-10 pr-3 py-2.5 bg-white shadow-sm border border-slate-200 rounded-xl text-slate-800 text-sm placeholder-slate-400 outline-none transition-all duration-300 focus:border-teal-400/50 focus:bg-slate-50 focus:shadow-lg"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    required
-                  />
-                </div>
-              </div> */}
-
               {otpSent && (
-                <div>
-                  <label className="block text-teal-200 text-xs mb-1.5 ml-1">
-                    OTP
-                  </label>
-                  <div className="relative group">
-                    <Lock
-                      size={16}
-                      className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-teal-400 transition-colors"
-                    />
+                <div className="space-y-1.5 pt-1">
+                  <div className="flex items-center justify-between">
+                    <label className="block text-xs font-semibold text-slate-700">
+                      6-Digit Verification Code <span className="text-blue-500 font-bold">*</span>
+                    </label>
+                    {resendTimer > 0 ? (
+                      <span className="text-[11px] text-slate-400 font-medium">
+                        Resend in {resendTimer}s
+                      </span>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={sendOtp}
+                        disabled={loading}
+                        className="text-xs text-blue-600 hover:text-blue-700 font-semibold cursor-pointer disabled:opacity-50"
+                      >
+                        Resend Code
+                      </button>
+                    )}
+                  </div>
+                  <div className="relative">
+                    <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none">
+                      <KeyRound size={16} />
+                    </div>
                     <input
                       type="text"
-                      placeholder="Enter 6 digit OTP"
-                      className="w-full pl-10 pr-3 py-2.5 bg-white shadow-sm border border-slate-200 rounded-xl text-slate-800 text-sm placeholder-slate-400 outline-none transition-all duration-300 focus:border-teal-400/50 focus:bg-slate-50 focus:shadow-lg"
+                      maxLength={6}
+                      placeholder="• • • • • •"
                       value={otp}
-                      onChange={(e) => setOtp(e.target.value)}
+                      onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))}
+                      autoFocus
                       required
+                      className="w-full bg-slate-50/80 border border-slate-200 hover:border-slate-300 rounded-xl pl-10 pr-3.5 py-2.5 text-base font-semibold tracking-widest text-slate-900 placeholder:font-normal placeholder:tracking-normal placeholder-slate-400 outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-center"
                     />
                   </div>
                 </div>
               )}
 
-              <button
-                type="button"
-                disabled={!email || loading}
-                onClick={sendOtp}
-                className="w-full bg-gradient-to-r from-teal-500 to-indigo-500 hover:from-teal-600 hover:to-indigo-600 text-white py-2.5 rounded-xl text-sm font-medium transition-all duration-300 flex items-center justify-center gap-1.5 group disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Send OTP
-              </button>
+              {!otpSent ? (
+                <button
+                  type="button"
+                  onClick={sendOtp}
+                  disabled={!email || loading}
+                  className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-semibold shadow-xs transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  {loading ? (
+                    <ButtonLoader text="Sending Code..." />
+                  ) : (
+                    <>
+                      <span>Send Login Code</span>
+                      <ArrowRight size={16} />
+                    </>
+                  )}
+                </button>
+              ) : (
+                <button
+                  type="submit"
+                  disabled={loading || otp.length < 4}
+                  className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-semibold shadow-xs transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  {loading ? (
+                    <ButtonLoader text="Verifying Code..." />
+                  ) : (
+                    <>
+                      <span>Verify & Sign In</span>
+                      <ArrowRight size={16} />
+                    </>
+                  )}
+                </button>
+              )}
+            </form>
+          )}
+
+          {/* 2. PASSWORD AUTHENTICATION */}
+          {authMode === "password" && (
+            <form onSubmit={handlePasswordSubmit} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                  Email Address <span className="text-blue-500 font-bold">*</span>
+                </label>
+                <div className="relative">
+                  <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none">
+                    <Mail size={16} />
+                  </div>
+                  <input
+                    type="email"
+                    placeholder="admin@pharmamed.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                    className="w-full bg-slate-50/80 border border-slate-200 hover:border-slate-300 rounded-xl pl-10 pr-3.5 py-2.5 text-sm text-slate-900 placeholder-slate-400 outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                  Password <span className="text-blue-500 font-bold">*</span>
+                </label>
+                <div className="relative">
+                  <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none">
+                    <Lock size={16} />
+                  </div>
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    placeholder="••••••••••••"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                    className="w-full bg-slate-50/80 border border-slate-200 hover:border-slate-300 rounded-xl pl-10 pr-10 py-2.5 text-sm text-slate-900 placeholder-slate-400 outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors p-0.5 cursor-pointer"
+                  >
+                    {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
+              </div>
 
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full bg-gradient-to-r from-teal-500 to-indigo-500 hover:from-teal-600 hover:to-indigo-600 text-white py-2.5 rounded-xl text-sm font-medium transition-all duration-300 flex items-center justify-center gap-1.5 group disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-semibold shadow-xs transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
               >
-                {/* {loading ? (
-                  <ButtonLoader
-                    text={isLogin ? "Signing In..." : "Creating Account..."}
-                  />
+                {loading ? (
+                  <ButtonLoader text={isLogin ? "Signing In..." : "Creating Account..."} />
                 ) : (
                   <>
-                    {isLogin ? "Sign In" : "Create Account"}
-                    <ArrowRight
-                      size={16}
-                      className="group-hover:translate-x-1 transition-transform"
-                    />
+                    <span>{isLogin ? "Sign In" : "Register Account"}</span>
+                    <ArrowRight size={16} />
                   </>
-                )} */}
-                Verify OTP
+                )}
               </button>
-            </form>
 
-            {/* Divider */}
-            <div className="flex items-center gap-3 my-4">
-              <div className="h-px bg-white/20 flex-1"></div>
-              <span className="text-slate-400 text-xs">or</span>
-              <div className="h-px bg-white/20 flex-1"></div>
-            </div>
-
-            {/* Google Login */}
-            <button
-              onClick={loginWithGoogle}
-              className="w-full bg-white shadow-sm border border-slate-200 hover:border-teal-400/50 hover:bg-slate-50 text-slate-800 py-2.5 rounded-xl text-sm font-medium flex items-center justify-center gap-2 transition-all duration-300"
-            >
-              <FcGoogle size={18} />
-              Google Workspace
-            </button>
-
-            {/* Switch Mode */}
-            <div className="text-center mt-4">
-              <span className="text-slate-400 text-xs">
-                {isLogin ? "New to PharmaMed?" : "Already have an account?"}
-              </span>
-              <button
-                onClick={() => setIsLogin(!isLogin)}
-                className="text-teal-400 hover:text-teal-300 ml-1.5 text-xs font-medium transition-colors"
-              >
-                {isLogin ? "Create account" : "Sign in"}
-              </button>
-            </div>
-          </div>
-
-          {/* Trust Badge */}
-          <div className="mt-4 text-center">
-            <div className="inline-flex items-center gap-1.5 bg-white shadow-sm backdrop-blur-sm rounded-full px-3 py-1.5 border border-slate-200">
-              <div className="relative flex h-1.5 w-1.5">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-indigo-500"></span>
+              <div className="text-center pt-1">
+                <span className="text-xs text-slate-500">
+                  {isLogin ? "Need a new staff account?" : "Already registered?"}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsLogin(!isLogin);
+                    setError("");
+                    setSuccessMsg("");
+                  }}
+                  className="ml-1.5 text-xs text-blue-600 hover:text-blue-700 font-semibold cursor-pointer"
+                >
+                  {isLogin ? "Create account" : "Sign in here"}
+                </button>
               </div>
-              <span className="text-slate-300 text-xs">
-                Trusted by 500+ Medical Institutions
-              </span>
-            </div>
+            </form>
+          )}
+
+          {/* Divider */}
+          <div className="relative flex items-center justify-center pt-1">
+            <div className="border-t border-slate-200 w-full" />
+            <span className="bg-white px-3 text-xs text-slate-400 font-medium uppercase tracking-wider absolute">
+              or
+            </span>
           </div>
+
+          {/* Google Workspace Button */}
+          <button
+            type="button"
+            onClick={handleGoogleLogin}
+            disabled={loading}
+            className="w-full inline-flex items-center justify-center gap-2.5 px-4 py-2.5 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-xl text-sm font-semibold shadow-xs transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+          >
+            <FcGoogle size={18} />
+            <span>Continue with Google</span>
+          </button>
+        </div>
+
+        {/* System & Security Footer */}
+        <div className="text-center space-y-1">
+          <div className="inline-flex items-center gap-1.5 text-xs text-slate-500 font-medium">
+            <ShieldCheck size={14} className="text-emerald-600" />
+            <span>Secured with 256-bit SSL • HIPAA Compliant</span>
+          </div>
+          <p className="text-[11px] text-slate-400">
+            PharmaMed Enterprise v2.4.0 • Authorized Pharmacy Personnel Only
+          </p>
         </div>
       </div>
-
-      <style>{`
-        @keyframes blob {
-          0%,
-          100% {
-            transform: translate(0px, 0px) scale(1);
-          }
-          33% {
-            transform: translate(30px, -50px) scale(1.1);
-          }
-          66% {
-            transform: translate(-20px, 20px) scale(0.9);
-          }
-        }
-        .animate-blob {
-          animation: blob 7s infinite;
-        }
-        .animation-delay-2000 {
-          animation-delay: 2s;
-        }
-        .animation-delay-4000 {
-          animation-delay: 4s;
-        }
-      `}</style>
     </div>
   );
 };

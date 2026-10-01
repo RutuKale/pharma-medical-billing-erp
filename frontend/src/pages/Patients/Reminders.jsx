@@ -25,6 +25,8 @@ import {
   Eye,
 } from "lucide-react";
 import Swal from "sweetalert2";
+import apiClient from "../../utils/apiClient";
+import { useEffect } from "react";
 
 const initialRemindersData = [
   {
@@ -103,6 +105,20 @@ const Reminders = () => {
   const [previewReminder, setPreviewReminder] = useState(null);
   const itemsPerPage = 8;
 
+  useEffect(() => {
+    const fetchReminders = async () => {
+      try {
+        const res = await apiClient.get("/reminders");
+        if (res.data?.data && res.data.data.length > 0) {
+          setReminders(res.data.data);
+        }
+      } catch (err) {
+        console.error("Error loading reminders from Firestore:", err);
+      }
+    };
+    fetchReminders();
+  }, []);
+
   const filteredReminders = useMemo(() => {
     return reminders.filter((reminder) => {
       const matchesSearch =
@@ -146,17 +162,29 @@ const Reminders = () => {
 
     if (!result.isConfirmed) return;
 
-    // Simulate sending
-    setReminders((prev) =>
-      prev.map((r) => (r.id === reminder.id ? { ...r, status: "Sent" } : r)),
-    );
+    try {
+      if (reminder.id) {
+        await apiClient.put(`/reminders/${reminder.id}`, { status: "Sent" });
+      }
+      setReminders((prev) =>
+        prev.map((r) => (r.id === reminder.id ? { ...r, status: "Sent" } : r)),
+      );
 
-    Swal.fire({
-      icon: "success",
-      title: "Reminder Dispatched",
-      text: `Refill notification sent successfully to ${reminder.patientName}!`,
-      confirmButtonColor: "#2563eb",
-    });
+      Swal.fire({
+        icon: "success",
+        title: "Reminder Dispatched",
+        text: `Refill notification sent and updated in Firestore for ${reminder.patientName}!`,
+        confirmButtonColor: "#2563eb",
+      });
+    } catch (err) {
+      console.error("Failed to update reminder in Firestore:", err);
+      Swal.fire({
+        icon: "error",
+        title: "Update Failed",
+        text: "Could not update reminder status in database.",
+        confirmButtonColor: "#ef4444",
+      });
+    }
   };
 
   const resendReminder = async (reminder) => {
@@ -173,17 +201,23 @@ const Reminders = () => {
 
     if (!result.isConfirmed) return;
 
-    // Simulate resend
-    setReminders((prev) =>
-      prev.map((r) => (r.id === reminder.id ? { ...r, status: "Sent" } : r)),
-    );
+    try {
+      if (reminder.id) {
+        await apiClient.put(`/reminders/${reminder.id}`, { status: "Sent" });
+      }
+      setReminders((prev) =>
+        prev.map((r) => (r.id === reminder.id ? { ...r, status: "Sent" } : r)),
+      );
 
-    Swal.fire({
-      icon: "success",
-      title: "Reminder Resent",
-      text: `Reminder re-queued and dispatched to ${reminder.patientName}.`,
-      confirmButtonColor: "#2563eb",
-    });
+      Swal.fire({
+        icon: "success",
+        title: "Reminder Resent",
+        text: `Reminder re-queued and updated in Firestore for ${reminder.patientName}.`,
+        confirmButtonColor: "#2563eb",
+      });
+    } catch (err) {
+      console.error("Failed to update reminder:", err);
+    }
   };
 
   const sendAllPending = async () => {
@@ -210,17 +244,28 @@ const Reminders = () => {
 
     if (!result.isConfirmed) return;
 
-    setReminders((prev) =>
-      prev.map((r) => (r.status === "Pending" ? { ...r, status: "Sent" } : r)),
-    );
+    try {
+      await Promise.allSettled(
+        pendingList.map((r) =>
+          r.id ? apiClient.put(`/reminders/${r.id}`, { status: "Sent" }) : Promise.resolve(),
+        ),
+      );
 
-    Swal.fire({
-      icon: "success",
-      title: "Batch Dispatch Complete",
-      text: `Successfully sent ${pendingList.length} refill reminders via WhatsApp.`,
-      confirmButtonColor: "#2563eb",
-    });
+      setReminders((prev) =>
+        prev.map((r) => (r.status === "Pending" ? { ...r, status: "Sent" } : r)),
+      );
+
+      Swal.fire({
+        icon: "success",
+        title: "Batch Dispatch Complete",
+        text: `Successfully sent ${pendingList.length} refill reminders and synchronized with Firestore.`,
+        confirmButtonColor: "#2563eb",
+      });
+    } catch (err) {
+      console.error("Batch reminder dispatch error:", err);
+    }
   };
+
 
   const resetFilters = () => {
     setSearch("");

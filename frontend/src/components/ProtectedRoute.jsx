@@ -10,7 +10,9 @@ const ProtectedRoute = ({ children }) => {
     return <AppLoader />;
   }
 
-  if (!user) {
+  const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+
+  if (!user && !token) {
     return <Navigate to="/login" replace />;
   }
 
