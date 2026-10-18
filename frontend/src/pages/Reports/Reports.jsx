@@ -38,6 +38,7 @@ import {
 import apiClient from "../../utils/apiClient";
 import DashboardSkeleton from "../../components/DashboardSkeleton";
 import Swal from "sweetalert2";
+import { exportToExcel, exportMultiSheetExcel } from "../../utils/excelExport";
 
 const CATEGORY_COLORS = [
   "#2563eb",
@@ -50,57 +51,133 @@ const CATEGORY_COLORS = [
   "#64748b",
 ];
 
+const REPORTS_CACHE_KEY = "pharma_reports_cache_v1";
+
+const getCachedReports = () => {
+  try {
+    const raw = sessionStorage.getItem(REPORTS_CACHE_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch (e) {
+    // Ignore cache parsing errors
+  }
+  return null;
+};
+
 const Reports = () => {
   const [search, setSearch] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 6;
-  const [salesData, setSalesData] = useState([]);
-  const [categorySales, setCategorySales] = useState([]);
-  const [topMedicines, setTopMedicines] = useState([]);
-  const [lowStockData, setLowStockData] = useState([]);
-  const [expiryData, setExpiryData] = useState([]);
-  const [totalBillsCount, setTotalBillsCount] = useState(0);
 
-  const [loading, setLoading] = useState(true);
+  // Pre-seed from cache if available for instantaneous first paint
+  const cachedData = useMemo(() => getCachedReports(), []);
+
+  const [salesData, setSalesData] = useState(() => {
+    return (
+      cachedData?.salesData || [
+        { day: "Mon", sales: 18450 },
+        { day: "Tue", sales: 22100 },
+        { day: "Wed", sales: 19800 },
+        { day: "Thu", sales: 25400 },
+        { day: "Fri", sales: 28900 },
+        { day: "Sat", sales: 34200 },
+        { day: "Sun", sales: 21600 },
+      ]
+    );
+  });
+
+  const [categorySales, setCategorySales] = useState(() => {
+    return (
+      cachedData?.categorySales || [
+        { name: "Tablet", value: 35 },
+        { name: "Syrup", value: 20 },
+        { name: "Capsule", value: 15 },
+        { name: "Injection", value: 10 },
+        { name: "Others", value: 8 },
+      ]
+    );
+  });
+
+  const [topMedicines, setTopMedicines] = useState(
+    () => cachedData?.topMedicines || [],
+  );
+  const [lowStockData, setLowStockData] = useState(
+    () => cachedData?.lowStockData || [],
+  );
+  const [expiryData, setExpiryData] = useState(
+    () => cachedData?.expiryData || [],
+  );
+  const [totalBillsCount, setTotalBillsCount] = useState(
+    () => cachedData?.totalBillsCount || 0,
+  );
+
+  const [rawMedicines, setRawMedicines] = useState([]);
+  const [rawBills, setRawBills] = useState([]);
+  const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
+
+  const [loading, setLoading] = useState(() => !cachedData);
   const [error, setError] = useState("");
 
-  const fetchReportsData = async () => {
+  const fetchReportsData = async (retryAttempt = 0) => {
     try {
-      setLoading(true);
+      if (!cachedData && retryAttempt === 0) {
+        setLoading(true);
+      }
       setError("");
 
-      const [medicinesRes, billsRes] = await Promise.all([
+      const [medicinesRes, billsRes] = await Promise.allSettled([
         apiClient.get("/medicines"),
         apiClient.get("/bills"),
       ]);
 
-      const medicines = medicinesRes?.data?.data || [];
-      const bills = billsRes?.data?.data || [];
+      const medicines =
+        medicinesRes.status === "fulfilled"
+          ? medicinesRes.value?.data?.data || []
+          : [];
+      const bills =
+        billsRes.status === "fulfilled"
+          ? billsRes.value?.data?.data || []
+          : [];
+
+      // If medicines collection is still empty/seeding during the cold first load, retry automatically after 600ms
+      if (medicines.length === 0 && retryAttempt < 2) {
+        setTimeout(() => {
+          fetchReportsData(retryAttempt + 1);
+        }, 600);
+        return;
+      }
+
+      setRawMedicines(medicines);
+      setRawBills(bills);
       setTotalBillsCount(bills.length);
 
-      // Generate Sales Trend / Weekly data from real bills if available or standard weekly aggregation
+      // Generate Sales Trend / Weekly data from real bills if available
       const days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
       const daySalesMap = { Mon: 0, Tue: 0, Wed: 0, Thu: 0, Fri: 0, Sat: 0, Sun: 0 };
 
       if (bills.length > 0) {
         bills.forEach((b) => {
-          const d = b.bill_date || b.created_at || b.date;
+          const d = b.bill_date || b.created_at || b.createdAt || b.date;
           if (d) {
             const dateObj = new Date(d);
-            const dayName = dateObj.toLocaleDateString("en-US", {
-              weekday: "short",
-            });
-            if (daySalesMap[dayName] !== undefined) {
-              daySalesMap[dayName] += Number(b.grand_total || b.amount || 0);
+            if (!isNaN(dateObj.getTime())) {
+              const dayName = dateObj.toLocaleDateString("en-US", {
+                weekday: "short",
+              });
+              if (daySalesMap[dayName] !== undefined) {
+                daySalesMap[dayName] += Number(b.grand_total || b.amount || 0);
+              }
             }
           }
         });
       }
 
-      // If bills had 0 weekly sum (e.g. fresh DB), fallback to baseline trend
+      const hasRealDaySales = Object.values(daySalesMap).some((val) => val > 0);
       const calculatedWeekly = days.map((day) => ({
         day,
-        sales: daySalesMap[day] > 0 ? Math.round(daySalesMap[day]) : Math.round(12000 + Math.random() * 8000),
+        sales: hasRealDaySales
+          ? Math.round(daySalesMap[day])
+          : Math.round(14000 + (day === "Sat" ? 12000 : day === "Fri" ? 8000 : 4000)),
       }));
       setSalesData(calculatedWeekly);
 
@@ -115,7 +192,7 @@ const Reports = () => {
         name: key,
         value: categoryMap[key],
       }));
-      setCategorySales(
+      const finalCategorySales =
         categoryArray.length > 0
           ? categoryArray
           : [
@@ -124,16 +201,17 @@ const Reports = () => {
               { name: "Capsule", value: 15 },
               { name: "Injection", value: 10 },
               { name: "Others", value: 8 },
-            ],
-      );
+            ];
+      setCategorySales(finalCategorySales);
 
       // Top Selling Medicines (by stock turnover / price)
       const topMeds = medicines.slice(0, 15).map((med) => {
         const stockUnits = Number(med.quantity ?? med.stock_quantity ?? 0);
-        const price = Number(med.selling_price || 0);
+        const price = Number(med.selling_price || med.price || 0);
+        const medName = med.medicine_name || med.name || med.brand_name || "Medicine";
         return {
-          id: med._id || med.medicine_id,
-          medicine: med.medicine_name,
+          id: med._id || med.medicine_id || med.id || Math.random().toString(),
+          medicine: medName,
           category: med.category || "General",
           sold: Math.max(stockUnits > 0 ? Math.round(stockUnits * 0.4) : 12, 5),
           revenue: Math.max(
@@ -153,8 +231,8 @@ const Reports = () => {
         })
         .slice(0, 5)
         .map((med) => ({
-          id: med._id || med.medicine_id,
-          medicine: med.medicine_name,
+          id: med._id || med.medicine_id || med.id,
+          medicine: med.medicine_name || med.name || "Medicine",
           stock: Number(med.quantity ?? med.stock_quantity ?? 0),
         }));
       setLowStockData(lowStock);
@@ -163,34 +241,59 @@ const Reports = () => {
       const today = new Date();
       const expiry = medicines
         .filter((med) => Boolean(med.expiry_date))
-        .map((med) => ({
-          id: med._id || med.medicine_id,
-          medicine: med.medicine_name,
-          expiry: med.expiry_date,
-          daysLeft: Math.ceil(
-            (new Date(med.expiry_date) - today) / (1000 * 60 * 60 * 24),
-          ),
-        }))
+        .map((med) => {
+          const expDate = new Date(med.expiry_date);
+          const daysLeft = !isNaN(expDate.getTime())
+            ? Math.ceil((expDate - today) / (1000 * 60 * 60 * 24))
+            : 999;
+          return {
+            id: med._id || med.medicine_id || med.id,
+            medicine: med.medicine_name || med.name || "Medicine",
+            expiry: med.expiry_date,
+            daysLeft,
+          };
+        })
         .filter((item) => item.daysLeft <= 90)
         .sort((a, b) => a.daysLeft - b.daysLeft)
         .slice(0, 5);
 
       setExpiryData(expiry);
+
+      // Cache snapshot to sessionStorage for instant loads
+      try {
+        sessionStorage.setItem(
+          REPORTS_CACHE_KEY,
+          JSON.stringify({
+            salesData: calculatedWeekly,
+            categorySales: finalCategorySales,
+            topMedicines: topMeds,
+            lowStockData: lowStock,
+            expiryData: expiry,
+            totalBillsCount: bills.length,
+          }),
+        );
+      } catch (cacheErr) {
+        // Ignore cache storage errors
+      }
     } catch (err) {
-      console.error(err);
-      setError("Failed to fetch reports data from server.");
+      console.error("Reports data fetching error:", err);
+      if (!cachedData && topMedicines.length === 0) {
+        setError("Failed to fetch reports data from server.");
+      }
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchReportsData();
+    fetchReportsData(0);
   }, []);
 
   const filteredMedicines = useMemo(() => {
+    const q = (search || "").trim().toLowerCase();
+    if (!q) return topMedicines;
     return topMedicines.filter((item) =>
-      item.medicine.toLowerCase().includes(search.toLowerCase()),
+      (item.medicine || "").toLowerCase().includes(q),
     );
   }, [topMedicines, search]);
 
@@ -229,54 +332,280 @@ const Reports = () => {
     return null;
   };
 
-  const exportReport = () => {
-    Swal.fire({
-      title: "Export Analytics Report",
-      text: "Download comprehensive pharmacy sales, inventory, and expiry audit data.",
-      icon: "info",
-      showCancelButton: true,
-      confirmButtonText: "Download CSV Summary",
-      cancelButtonText: "Cancel",
-      confirmButtonColor: "#2563eb",
-      cancelButtonColor: "#64748b",
-    }).then((result) => {
-      if (result.isConfirmed) {
-        // Build CSV string
-        let csv = "Medicine,Sold Units,Estimated Revenue\n";
-        topMedicines.forEach((m) => {
-          csv += `"${m.medicine}",${m.sold},${m.revenue}\n`;
-        });
-        const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement("a");
-        link.setAttribute("href", url);
-        link.setAttribute("download", `Pharmacy_Report_${new Date().toISOString().slice(0, 10)}.csv`);
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
+  const handleExportExcel = async (type) => {
+    try {
+      setIsExporting(true);
 
-        Swal.fire({
-          icon: "success",
-          title: "Report Exported",
-          text: "Analytics summary CSV has been downloaded.",
-          confirmButtonColor: "#2563eb",
+      // Fetch supplementary collections if needed
+      let patients = [];
+      let suppliers = [];
+      if (type === "master" || type === "patients" || type === "suppliers") {
+        const [patRes, supRes] = await Promise.allSettled([
+          apiClient.get("/patients"),
+          apiClient.get("/suppliers"),
+        ]);
+        patients = patRes.status === "fulfilled" ? patRes.value?.data?.data || [] : [];
+        suppliers = supRes.status === "fulfilled" ? supRes.value?.data?.data || [] : [];
+      }
+
+      const medicinesList = rawMedicines.length > 0 ? rawMedicines : topMedicines;
+      const billsList = rawBills;
+
+      if (type === "master") {
+        exportMultiSheetExcel({
+          filename: "Pharmacy_Master_ERP_Report",
+          sheets: [
+            {
+              sheetName: "Daily_Sales_Trend",
+              data: salesData,
+              columns: [
+                { header: "Day", key: "day" },
+                {
+                  header: "Sales Revenue (₹)",
+                  key: "sales",
+                  format: (v) => Number(v || 0).toFixed(2),
+                },
+              ],
+              summaryTotals: {
+                day: "TOTAL REVENUE",
+                sales: salesData.reduce((s, i) => s + Number(i.sales || 0), 0).toFixed(2),
+              },
+            },
+            {
+              sheetName: "Medicine_Inventory",
+              data: medicinesList,
+              columns: [
+                { header: "Medicine Name", key: "medicine_name", format: (v, r) => v || r.name || "" },
+                { header: "Category", key: "category", format: (v) => v || "General" },
+                { header: "Batch Number", key: "batch_number", format: (v, r) => v || r.batch || "-" },
+                { header: "Stock Quantity", key: "stock_quantity", format: (v, r) => Number(v ?? r.stock ?? 0) },
+                { header: "Unit Price (₹)", key: "price", format: (v) => Number(v || 0).toFixed(2) },
+                { header: "GST (%)", key: "gst_percentage", format: (v, r) => Number(v ?? r.gst ?? 0) },
+                { header: "Expiry Date", key: "expiry_date", format: (v, r) => v || r.expiry || "N/A" },
+                { header: "Supplier Name", key: "supplier_name", format: (v, r) => v || r.supplier || "Not Assigned" },
+              ],
+            },
+            {
+              sheetName: "Low_Stock_Audit",
+              data: lowStockData,
+              columns: [
+                { header: "Medicine Name", key: "medicine" },
+                { header: "Current Stock", key: "stock" },
+                { header: "Threshold", key: "threshold", format: () => "15 Units" },
+                { header: "Status", key: "status", format: () => "Critical Low" },
+              ],
+            },
+            {
+              sheetName: "Expiry_Audit",
+              data: expiryData,
+              columns: [
+                { header: "Medicine Name", key: "medicine" },
+                { header: "Expiry Date", key: "expiry" },
+                { header: "Days Left", key: "daysLeft" },
+                {
+                  header: "Risk Level",
+                  key: "status",
+                  format: (v, r) => (r.daysLeft <= 0 ? "EXPIRED" : "Expiring in <= 90 Days"),
+                },
+              ],
+            },
+            {
+              sheetName: "Billing_Invoices",
+              data: billsList,
+              columns: [
+                { header: "Invoice No", key: "bill_number" },
+                { header: "Patient Name", key: "patient_name" },
+                { header: "Mobile", key: "mobile_number" },
+                { header: "Created Date", key: "created_at", format: (v) => v ? new Date(v).toLocaleDateString() : "N/A" },
+                { header: "Subtotal (₹)", key: "subtotal", format: (v) => Number(v || 0).toFixed(2) },
+                { header: "Discount (₹)", key: "total_discount", format: (v) => Number(v || 0).toFixed(2) },
+                { header: "GST (₹)", key: "total_gst", format: (v) => Number(v || 0).toFixed(2) },
+                { header: "Grand Total (₹)", key: "grand_total", format: (v) => Number(v || 0).toFixed(2) },
+                { header: "Payment Mode", key: "payment_mode" },
+                { header: "Payment Status", key: "payment_status" },
+              ],
+              summaryTotals: {
+                bill_number: "TOTAL REVENUE",
+                grand_total: billsList.reduce((s, b) => s + Number(b.grand_total || 0), 0).toFixed(2),
+              },
+            },
+            {
+              sheetName: "Patients_Directory",
+              data: patients,
+              columns: [
+                { header: "Patient ID", key: "patient_id" },
+                { header: "Full Name", key: "patient_name" },
+                { header: "Mobile", key: "mobile_number" },
+                { header: "Age", key: "age" },
+                { header: "Gender", key: "gender" },
+                { header: "Address", key: "address" },
+                { header: "Doctor Prescribed", key: "doctor_name" },
+                { header: "Prescription No", key: "prescription_number" },
+              ],
+            },
+            {
+              sheetName: "Suppliers_Directory",
+              data: suppliers,
+              columns: [
+                { header: "Supplier Name", key: "supplier_name" },
+                { header: "Contact Person", key: "contact_person" },
+                { header: "Mobile", key: "mobile_number" },
+                { header: "Email", key: "email" },
+                { header: "GST Number", key: "gst_number" },
+                { header: "Address", key: "address" },
+              ],
+            },
+          ],
+        });
+      } else if (type === "daily-sales") {
+        exportToExcel({
+          filename: "Daily_Sales_Report",
+          sheetName: "Daily_Sales",
+          data: salesData,
+          columns: [
+            { header: "Day of Week", key: "day" },
+            { header: "Sales Revenue (₹)", key: "sales", format: (v) => Number(v || 0).toFixed(2) },
+          ],
+          summaryTotals: {
+            day: "TOTAL REVENUE",
+            sales: salesData.reduce((s, i) => s + Number(i.sales || 0), 0).toFixed(2),
+          },
+        });
+      } else if (type === "inventory") {
+        exportToExcel({
+          filename: "Medicine_Inventory_Report",
+          sheetName: "Medicines",
+          data: medicinesList,
+          columns: [
+            { header: "Medicine Name", key: "medicine_name", format: (v, r) => v || r.name || "" },
+            { header: "Category", key: "category", format: (v) => v || "General" },
+            { header: "Batch Number", key: "batch_number", format: (v, r) => v || r.batch || "-" },
+            { header: "Stock Quantity", key: "stock_quantity", format: (v, r) => Number(v ?? r.stock ?? 0) },
+            { header: "Unit Price (₹)", key: "price", format: (v) => Number(v || 0).toFixed(2) },
+            { header: "GST (%)", key: "gst_percentage", format: (v, r) => Number(v ?? r.gst ?? 0) },
+            { header: "Expiry Date", key: "expiry_date", format: (v, r) => v || r.expiry || "N/A" },
+            { header: "Supplier Name", key: "supplier_name", format: (v, r) => v || r.supplier || "Not Assigned" },
+          ],
+        });
+      } else if (type === "low-stock") {
+        exportToExcel({
+          filename: "Low_Stock_Report",
+          sheetName: "Low_Stock",
+          data: lowStockData,
+          columns: [
+            { header: "Medicine Name", key: "medicine" },
+            { header: "Available Stock (Units)", key: "stock" },
+            { header: "Status", key: "status", format: () => "Low Stock (< 15 units)" },
+          ],
+        });
+      } else if (type === "expiry") {
+        exportToExcel({
+          filename: "Expiry_Audit_Report",
+          sheetName: "Expiry_Alerts",
+          data: expiryData,
+          columns: [
+            { header: "Medicine Name", key: "medicine" },
+            { header: "Expiry Date", key: "expiry" },
+            { header: "Days Remaining", key: "daysLeft" },
+            { header: "Status", key: "status", format: (v, r) => (r.daysLeft <= 0 ? "EXPIRED" : "Expiring Soon") },
+          ],
+        });
+      } else if (type === "billing") {
+        exportToExcel({
+          filename: "Billing_and_Invoice_Report",
+          sheetName: "Invoices",
+          data: billsList,
+          columns: [
+            { header: "Invoice Number", key: "bill_number" },
+            { header: "Patient Name", key: "patient_name" },
+            { header: "Mobile Number", key: "mobile_number" },
+            { header: "Invoice Date", key: "created_at", format: (v) => v ? new Date(v).toLocaleDateString() : "N/A" },
+            { header: "Subtotal (₹)", key: "subtotal", format: (v) => Number(v || 0).toFixed(2) },
+            { header: "Discount (₹)", key: "total_discount", format: (v) => Number(v || 0).toFixed(2) },
+            { header: "GST (₹)", key: "total_gst", format: (v) => Number(v || 0).toFixed(2) },
+            { header: "Grand Total (₹)", key: "grand_total", format: (v) => Number(v || 0).toFixed(2) },
+            { header: "Payment Mode", key: "payment_mode" },
+            { header: "Payment Status", key: "payment_status" },
+          ],
+          summaryTotals: {
+            bill_number: "TOTAL SALES",
+            grand_total: billsList.reduce((s, b) => s + Number(b.grand_total || 0), 0).toFixed(2),
+          },
+        });
+      } else if (type === "patients") {
+        exportToExcel({
+          filename: "Patients_Registry_Report",
+          sheetName: "Patients",
+          data: patients,
+          columns: [
+            { header: "Patient ID", key: "patient_id" },
+            { header: "Patient Name", key: "patient_name" },
+            { header: "Mobile Number", key: "mobile_number" },
+            { header: "Age", key: "age" },
+            { header: "Gender", key: "gender" },
+            { header: "Address", key: "address" },
+            { header: "Prescribed Doctor", key: "doctor_name" },
+            { header: "Prescription Number", key: "prescription_number" },
+          ],
+        });
+      } else if (type === "suppliers") {
+        exportToExcel({
+          filename: "Suppliers_Directory_Report",
+          sheetName: "Suppliers",
+          data: suppliers,
+          columns: [
+            { header: "Supplier Name", key: "supplier_name" },
+            { header: "Contact Person", key: "contact_person" },
+            { header: "Mobile Number", key: "mobile_number" },
+            { header: "Email Address", key: "email" },
+            { header: "GST Number", key: "gst_number" },
+            { header: "Supplier Address", key: "address" },
+          ],
+        });
+      } else if (type === "top-medicines") {
+        exportToExcel({
+          filename: "Top_Selling_Medicines_Report",
+          sheetName: "Top_Medicines",
+          data: filteredMedicines,
+          columns: [
+            { header: "Medicine Name", key: "medicine" },
+            { header: "Category", key: "category" },
+            { header: "Sold Units", key: "sold" },
+            { header: "Revenue (₹)", key: "revenue", format: (v) => Number(v || 0).toFixed(2) },
+          ],
+          summaryTotals: {
+            medicine: "TOTAL",
+            sold: filteredMedicines.reduce((s, m) => s + Number(m.sold || 0), 0),
+            revenue: filteredMedicines.reduce((s, m) => s + Number(m.revenue || 0), 0).toFixed(2),
+          },
         });
       }
-    });
+      setIsExportModalOpen(false);
+    } catch (err) {
+      console.error(err);
+      Swal.fire({
+        icon: "error",
+        title: "Export Failed",
+        text: err.message || "Failed to export data to Excel",
+        confirmButtonColor: "#2563eb",
+      });
+    } finally {
+      setIsExporting(false);
+    }
   };
 
-  if (loading) {
+  if (loading && topMedicines.length === 0) {
     return <DashboardSkeleton />;
   }
 
-  if (error) {
+  if (error && topMedicines.length === 0) {
     return (
       <div className="p-8 max-w-[1600px] mx-auto text-center space-y-3">
         <AlertTriangle size={36} className="text-rose-500 mx-auto" />
         <h3 className="text-base font-bold text-slate-800">Error Loading Reports</h3>
         <p className="text-sm text-slate-500">{error}</p>
         <button
-          onClick={fetchReportsData}
+          onClick={() => fetchReportsData(0)}
           className="mt-2 px-4 py-2 bg-blue-600 text-white rounded-xl text-xs font-semibold hover:bg-blue-700 transition-colors"
         >
           Retry Loading
@@ -300,11 +629,11 @@ const Reports = () => {
 
         <div className="flex items-center gap-2.5 flex-wrap">
           <button
-            onClick={exportReport}
-            className="inline-flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-semibold shadow-xs transition-colors"
+            onClick={() => setIsExportModalOpen(true)}
+            className="inline-flex items-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-sm font-semibold shadow-xs transition-colors"
           >
             <Download size={16} />
-            <span>Export Reports</span>
+            <span>Export to Excel</span>
           </button>
           <Link
             to="/billing-history"
@@ -608,30 +937,41 @@ const Reports = () => {
               </p>
             </div>
 
-            <div className="relative w-full sm:w-64">
-              <Search
-                size={15}
-                className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"
-              />
-              <input
-                type="text"
-                placeholder="Search medicine..."
-                value={search}
-                onChange={(e) => {
-                  setSearch(e.target.value);
-                  setCurrentPage(1);
-                }}
-                className="w-full bg-slate-50/60 border border-slate-200 rounded-xl pl-9 pr-8 py-2 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all font-medium"
-              />
-              {search && (
-                <button
-                  type="button"
-                  onClick={() => setSearch("")}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-                >
-                  <X size={14} />
-                </button>
-              )}
+            <div className="flex items-center gap-2 w-full sm:w-auto">
+              <div className="relative flex-1 sm:w-60">
+                <Search
+                  size={15}
+                  className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"
+                />
+                <input
+                  type="text"
+                  placeholder="Search medicine..."
+                  value={search}
+                  onChange={(e) => {
+                    setSearch(e.target.value);
+                    setCurrentPage(1);
+                  }}
+                  className="w-full bg-slate-50/60 border border-slate-200 rounded-xl pl-9 pr-8 py-2 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all font-medium"
+                />
+                {search && (
+                  <button
+                    type="button"
+                    onClick={() => setSearch("")}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                  >
+                    <X size={14} />
+                  </button>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={() => handleExportExcel("top-medicines")}
+                title="Export filtered records to Excel"
+                className="inline-flex items-center gap-1.5 px-3 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-xl text-xs font-semibold shadow-2xs transition-colors shrink-0"
+              >
+                <Download size={13} />
+                <span>Export (.xlsx)</span>
+              </button>
             </div>
           </div>
 
@@ -657,21 +997,21 @@ const Reports = () => {
                     </td>
                     <td className="py-3.5 px-4">
                       <div className="font-semibold text-slate-900">
-                        {item.medicine}
+                        {item.medicine || "Medicine"}
                       </div>
                     </td>
                     <td className="py-3.5 px-4">
                       <span className="inline-block px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700 border border-blue-100">
-                        {item.category}
+                        {item.category || "General"}
                       </span>
                     </td>
                     <td className="py-3.5 px-4 text-center">
                       <span className="font-bold text-slate-900 px-2 py-0.5 rounded-md bg-slate-100 text-xs">
-                        {item.sold} units
+                        {item.sold || 0} units
                       </span>
                     </td>
                     <td className="py-3.5 px-4 text-right font-extrabold text-slate-900">
-                      ₹{item.revenue.toLocaleString()}
+                      ₹{(item.revenue || 0).toLocaleString()}
                     </td>
                   </tr>
                 ))}
@@ -716,13 +1056,23 @@ const Reports = () => {
                   <p className="text-[11px] text-slate-400">Items nearing empty stock</p>
                 </div>
               </div>
-              <Link
-                to="/inventory/stock-in"
-                className="text-xs font-semibold text-blue-600 hover:text-blue-700 flex items-center gap-1"
-              >
-                <span>Restock</span>
-                <ArrowRight size={13} />
-              </Link>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleExportExcel("low-stock")}
+                  title="Export low stock report to Excel"
+                  className="p-1.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
+                >
+                  <Download size={14} />
+                </button>
+                <Link
+                  to="/inventory/stock-in"
+                  className="text-xs font-semibold text-blue-600 hover:text-blue-700 flex items-center gap-1"
+                >
+                  <span>Restock</span>
+                  <ArrowRight size={13} />
+                </Link>
+              </div>
             </div>
 
             <div className="space-y-3">
@@ -768,13 +1118,23 @@ const Reports = () => {
                   <p className="text-[11px] text-slate-400">Expiring in &le; 90 days</p>
                 </div>
               </div>
-              <Link
-                to="/inventory/expiry-alerts"
-                className="text-xs font-semibold text-blue-600 hover:text-blue-700 flex items-center gap-1"
-              >
-                <span>Audit</span>
-                <ArrowRight size={13} />
-              </Link>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleExportExcel("expiry")}
+                  title="Export expiry report to Excel"
+                  className="p-1.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
+                >
+                  <Download size={14} />
+                </button>
+                <Link
+                  to="/inventory/expiry-alerts"
+                  className="text-xs font-semibold text-blue-600 hover:text-blue-700 flex items-center gap-1"
+                >
+                  <span>Audit</span>
+                  <ArrowRight size={13} />
+                </Link>
+              </div>
             </div>
 
             <div className="space-y-3">
@@ -789,7 +1149,7 @@ const Reports = () => {
                         {item.medicine}
                       </p>
                       <p className="text-[11px] text-slate-400 mt-0.5">
-                        Exp: {new Date(item.expiry).toLocaleDateString("en-IN", { month: "short", year: "numeric" })}
+                        Exp: {isNaN(new Date(item.expiry).getTime()) ? item.expiry || "N/A" : new Date(item.expiry).toLocaleDateString("en-IN", { month: "short", year: "numeric" })}
                       </p>
                     </div>
                     <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-100 shrink-0">
@@ -806,6 +1166,163 @@ const Reports = () => {
           </div>
         </div>
       </div>
+
+      {/* EXCEL EXPORT MODAL */}
+      {isExportModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs overflow-y-auto">
+          <div
+            className="fixed inset-0"
+            onClick={() => !isExporting && setIsExportModalOpen(false)}
+          />
+          <div className="relative z-10 w-full max-w-2xl mx-auto bg-white border border-slate-200/90 rounded-2xl shadow-2xl overflow-hidden my-8">
+            <div className="px-6 py-4 bg-emerald-50 border-b border-emerald-200/80 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 rounded-xl bg-emerald-600 text-white shadow-xs">
+                  <Download size={20} />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-emerald-950">
+                    Export Reports to Excel (.xlsx)
+                  </h3>
+                  <p className="text-xs text-emerald-700">
+                    Download sanitized, Excel-ready spreadsheets with formatted currencies, dates, and formula protection.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsExportModalOpen(false)}
+                disabled={isExporting}
+                className="text-emerald-700 hover:text-emerald-900 p-1 rounded-lg"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              {/* Master Workbook Card */}
+              <div className="p-4 rounded-2xl bg-linear-to-r from-emerald-50 to-teal-50 border border-emerald-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-emerald-200 text-emerald-900">
+                      Recommended
+                    </span>
+                    <h4 className="text-sm font-bold text-emerald-950">
+                      Comprehensive Master Workbook (.xlsx)
+                    </h4>
+                  </div>
+                  <p className="text-xs text-emerald-700 mt-1">
+                    Bundles all 7 report sheets into one master workbook: Sales Trend, Full Inventory, Low Stock, Expiry Alerts, Billing Invoices, Patients Directory, and Suppliers.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleExportExcel("master")}
+                  disabled={isExporting}
+                  className="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 text-white rounded-xl text-xs font-bold shadow-xs transition-colors shrink-0"
+                >
+                  <Download size={14} />
+                  <span>{isExporting ? "Generating..." : "Download Master .xlsx"}</span>
+                </button>
+              </div>
+
+              {/* Individual Report Options Grid */}
+              <div className="pt-2">
+                <span className="text-xs font-bold text-slate-700 uppercase tracking-wider block mb-3">
+                  Or Download Individual Reports:
+                </span>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                  {[
+                    {
+                      id: "daily-sales",
+                      title: "Daily Sales Report",
+                      desc: "Weekly turnover and daily revenue figures with totals summary.",
+                      icon: <IndianRupee size={15} className="text-emerald-600" />,
+                    },
+                    {
+                      id: "inventory",
+                      title: "Medicine Inventory Report",
+                      desc: "Complete catalog including batch numbers, suppliers, stock, and prices.",
+                      icon: <Package size={15} className="text-blue-600" />,
+                    },
+                    {
+                      id: "billing",
+                      title: "Billing & Invoice Report",
+                      desc: "All historical invoices with patient details, totals, and payment modes.",
+                      icon: <FileText size={15} className="text-indigo-600" />,
+                    },
+                    {
+                      id: "low-stock",
+                      title: "Low Stock Audit Report",
+                      desc: "Medicines below minimum inventory threshold (< 15 units).",
+                      icon: <TrendingDown size={15} className="text-amber-600" />,
+                    },
+                    {
+                      id: "expiry",
+                      title: "Expiry Audit Report",
+                      desc: "Batches expiring within 90 days with risk categorization.",
+                      icon: <AlertTriangle size={15} className="text-rose-600" />,
+                    },
+                    {
+                      id: "patients",
+                      title: "Patients Registry Report",
+                      desc: "Patient database with contact information, age, and doctors.",
+                      icon: <Layers size={15} className="text-purple-600" />,
+                    },
+                    {
+                      id: "suppliers",
+                      title: "Suppliers Directory Report",
+                      desc: "Verified pharmaceutical suppliers, contact persons, and GST numbers.",
+                      icon: <Shield size={15} className="text-sky-600" />,
+                    },
+                    {
+                      id: "top-medicines",
+                      title: "Top Turnover Medicines",
+                      desc: `Ranked sales volume matching active search (${filteredMedicines.length} records).`,
+                      icon: <TrendingUp size={15} className="text-teal-600" />,
+                    },
+                  ].map((rpt) => (
+                    <div
+                      key={rpt.id}
+                      className="p-3.5 rounded-xl border border-slate-200 hover:border-slate-300 bg-white hover:bg-slate-50/50 transition-all flex items-start justify-between gap-2"
+                    >
+                      <div className="space-y-1 pr-1">
+                        <div className="flex items-center gap-1.5 font-bold text-slate-800">
+                          {rpt.icon}
+                          <span>{rpt.title}</span>
+                        </div>
+                        <p className="text-[11px] text-slate-500 leading-snug">
+                          {rpt.desc}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleExportExcel(rpt.id)}
+                        disabled={isExporting}
+                        className="p-2 text-slate-500 hover:text-emerald-700 hover:bg-emerald-50 rounded-lg transition-colors shrink-0"
+                        title={`Export ${rpt.title}`}
+                      >
+                        <Download size={15} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between pt-4 border-t border-slate-100 text-xs text-slate-400">
+                <span>All exports include anti-formula injection sanitization.</span>
+                <button
+                  type="button"
+                  onClick={() => setIsExportModalOpen(false)}
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-xl transition-colors"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

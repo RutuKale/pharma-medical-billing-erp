@@ -18,5 +18,7 @@ router.put("/write-off/:medicine_id", expiryController.writeOffMedicine);
 
 // RETURN BILL TO MANUFACTURER
 router.post("/return-bill", expiryController.processReturnBill);
+router.post("/return", expiryController.processReturnBill);
+router.post("/", expiryController.processReturnBill);
 
 module.exports = router;

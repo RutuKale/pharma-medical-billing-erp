@@ -15,7 +15,12 @@ const cleanUrl = (url) => {
 
 const extractId = (url, prefix) => {
   const cleaned = cleanUrl(url);
-  const parts = cleaned.split("/");
+  const parts = cleaned.split("/").filter(Boolean);
+  if (parts.length === 0) return null;
+  const last = parts[parts.length - 1];
+  if (last !== "update" && last !== "bill" && last !== "bills") {
+    return last;
+  }
   return parts.length > 1 ? parts[1] : null;
 };
 
@@ -41,18 +46,30 @@ const apiClient = {
         const data = await firestoreService.getPatients();
         return { data: { success: true, data } };
       }
-      if (route.startsWith("patients/")) {
+      if (route.startsWith("patients/") && !route.includes("bill")) {
         const id = extractId(route, "patients");
         const data = await firestoreService.getPatientById(id);
         return { data: { success: true, data } };
       }
 
-      // 3. Bills
-      if (route === "bills") {
+      // 3. Bills & Patient Bills
+      if (
+        route === "bills" ||
+        route === "billing" ||
+        route === "patient-bills" ||
+        route === "patient/bills"
+      ) {
         const data = await firestoreService.getBills();
         return { data: { success: true, data } };
       }
-      if (route.startsWith("bills/")) {
+      if (
+        route.startsWith("bills/") ||
+        route.startsWith("billing/") ||
+        route.startsWith("patient-bills/") ||
+        route.startsWith("patient/bill/") ||
+        route.startsWith("patient-bill/") ||
+        (route.startsWith("patients/") && route.includes("bill"))
+      ) {
         const id = extractId(route, "bills");
         const data = await firestoreService.getBillById(id);
         return {
@@ -97,6 +114,23 @@ const apiClient = {
         return { data: res };
       }
 
+      // 8. Return Bills
+      if (route === "return-bills" || route === "expiry/return-bills") {
+        const data = await firestoreService.getReturnBills();
+        return { data: { success: true, data } };
+      }
+
+      // 9. Suppliers
+      if (route === "suppliers") {
+        const data = await firestoreService.getSuppliers();
+        return { data: { success: true, data } };
+      }
+      if (route.startsWith("suppliers/")) {
+        const id = extractId(route, "suppliers");
+        const data = await firestoreService.getSupplierById(id);
+        return { data: { success: true, data } };
+      }
+
       console.warn(`[Firestore apiClient] Unhandled GET route: ${url}`);
       return { data: { success: true, data: [] } };
     } catch (error) {
@@ -134,10 +168,27 @@ const apiClient = {
         return { data: { success: true, data: created, message: "Patient registered successfully" } };
       }
 
-      // 3. Bills
-      if (route === "bills") {
+      // 3. Bills & Patient Bills
+      if (
+        route === "bills" ||
+        route === "billing" ||
+        route === "patient-bills" ||
+        route === "patient/bills"
+      ) {
         const created = await firestoreService.createBill(payload);
         return { data: { success: true, data: created, message: "Bill generated successfully" } };
+      }
+      if (
+        route.startsWith("bills/") ||
+        route.startsWith("billing/") ||
+        route.startsWith("patient-bills/") ||
+        route.startsWith("patient/bill/") ||
+        route.startsWith("patient-bill/") ||
+        (route.startsWith("patients/") && route.includes("bill"))
+      ) {
+        const id = extractId(route, "bills");
+        const updated = await firestoreService.updateBill(id, payload);
+        return { data: { success: true, data: updated, message: "Bill updated successfully" } };
       }
 
       // 4. Inventory Stock-In & Stock-Out
@@ -171,6 +222,31 @@ const apiClient = {
         const res = await firestoreService.verifyOtp(payload.email, payload.otp);
         return { data: res };
       }
+      if (route === "auth/send-mobile-otp") {
+        const res = await firestoreService.sendMobileOtp(payload.mobile, payload.countryCode, payload.apiKey);
+        return { data: res };
+      }
+      if (route === "auth/verify-mobile-otp") {
+        const res = await firestoreService.verifyMobileOtp(payload.mobile, payload.otp, payload.countryCode);
+        return { data: res };
+      }
+
+      // 8. Manufacturer Return Bill
+      if (
+        route === "expiry/return-bill" ||
+        route === "return-bill" ||
+        route === "inventory/return-bill" ||
+        route === "expiry/return"
+      ) {
+        const res = await firestoreService.processReturnBill(payload);
+        return { data: { success: true, ...res } };
+      }
+
+      // 9. Suppliers
+      if (route === "suppliers") {
+        const created = await firestoreService.createSupplier(payload);
+        return { data: { success: true, data: created, message: "Supplier registered successfully" } };
+      }
 
       console.warn(`[Firestore apiClient] Unhandled POST route: ${url}`);
       return { data: { success: true, data: payload } };
@@ -191,22 +267,35 @@ const apiClient = {
         return { data: { success: true, data: updated, message: "Medicine updated successfully" } };
       }
 
+      if (
+        route.startsWith("bills/") ||
+        route.startsWith("billing/") ||
+        route.startsWith("patient-bills/") ||
+        route.startsWith("patient/bill/") ||
+        route.startsWith("patient-bill/") ||
+        (route.startsWith("patients/") && route.includes("bill"))
+      ) {
+        const id = extractId(route, "bills");
+        const updated = await firestoreService.updateBill(id, payload);
+        return { data: { success: true, data: updated, message: "Bill updated successfully" } };
+      }
+
       if (route.startsWith("patients/")) {
         const id = extractId(route, "patients");
         const updated = await firestoreService.updatePatient(id, payload);
         return { data: { success: true, data: updated, message: "Patient updated successfully" } };
       }
 
-      if (route.startsWith("bills/")) {
-        const id = extractId(route, "bills");
-        const updated = await firestoreService.updateBill(id, payload);
-        return { data: { success: true, data: updated, message: "Bill updated successfully" } };
-      }
-
       if (route.startsWith("reminders/")) {
         const id = extractId(route, "reminders");
         const updated = await firestoreService.updateReminder(id, payload);
         return { data: { success: true, data: updated, message: "Reminder updated successfully" } };
+      }
+
+      if (route.startsWith("suppliers/")) {
+        const id = extractId(route, "suppliers");
+        const updated = await firestoreService.updateSupplier(id, payload);
+        return { data: { success: true, data: updated, message: "Supplier updated successfully" } };
       }
 
       if (route === "settings" || route === "settings/pharmacy") {
@@ -233,17 +322,24 @@ const apiClient = {
         return { data: { success: true, message: "Medicine deleted successfully" } };
       }
 
-      if (route.startsWith("patients/")) {
-        const id = extractId(route, "patients");
-        await firestoreService.deletePatient(id);
-        return { data: { success: true, message: "Patient deleted successfully" } };
-      }
-
-      if (route.startsWith("bills/")) {
+      if (
+        route.startsWith("bills/") ||
+        route.startsWith("billing/") ||
+        route.startsWith("patient-bills/") ||
+        route.startsWith("patient/bill/") ||
+        route.startsWith("patient-bill/") ||
+        (route.startsWith("patients/") && route.includes("bill"))
+      ) {
         const id = extractId(route, "bills");
         const reason = config?.data?.reason || "Cancelled via billing history";
         await firestoreService.deleteBill(id, reason);
         return { data: { success: true, message: "Bill deleted and stock restored successfully" } };
+      }
+
+      if (route.startsWith("patients/")) {
+        const id = extractId(route, "patients");
+        await firestoreService.deletePatient(id);
+        return { data: { success: true, message: "Patient deleted successfully" } };
       }
 
       if (route.startsWith("reminders/")) {

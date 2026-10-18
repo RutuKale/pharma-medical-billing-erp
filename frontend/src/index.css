@@ -1,7 +1,18 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* Global Smooth Theme Transition */
+*, *::before, *::after {
+  transition-property: background-color, border-color, text-decoration-color, fill, stroke;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 150ms;
+}
+
+/* Scrollbar styles */
 .custom-scrollbar::-webkit-scrollbar {
   width: 6px;
+  height: 6px;
 }
 
 .custom-scrollbar::-webkit-scrollbar-track {
@@ -15,4 +26,151 @@
 
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
   background: rgba(148, 163, 184, 0.7);
+}
+
+/* =========================================================================
+   DARK MODE COLOR SYSTEM (Applies when .dark is on html / root)
+   Preserves 100% of the existing Light Mode UI while providing a sleek,
+   high-contrast Dark Mode across all components, forms, tables, modals & charts.
+   ========================================================================= */
+
+html.dark {
+  color-scheme: dark;
+}
+
+html.dark body {
+  background-color: #0b0f19 !important;
+  color: #f1f5f9 !important;
+}
+
+/* Dark mode surface elevations */
+html.dark .bg-slate-50 {
+  background-color: #0b0f19 !important;
+}
+
+html.dark .bg-slate-50\/80,
+html.dark .bg-slate-50\/60 {
+  background-color: #111827 !important;
+}
+
+html.dark .bg-white {
+  background-color: #111827 !important;
+}
+
+html.dark .bg-white\/80 {
+  background-color: rgba(17, 24, 39, 0.85) !important;
+}
+
+html.dark .bg-white\/90 {
+  background-color: rgba(17, 24, 39, 0.95) !important;
+}
+
+html.dark .bg-slate-100 {
+  background-color: #1f2937 !important;
+}
+
+html.dark .bg-slate-200 {
+  background-color: #374151 !important;
+}
+
+/* Borders */
+html.dark .border-slate-100 {
+  border-color: #1f2937 !important;
+}
+
+html.dark .border-slate-200,
+html.dark .border-slate-200\/90,
+html.dark .border-slate-300 {
+  border-color: #2e384d !important;
+}
+
+html.dark .divide-slate-100 > :not([hidden]) ~ :not([hidden]) {
+  border-color: #1f2937 !important;
+}
+
+html.dark .divide-slate-200 > :not([hidden]) ~ :not([hidden]) {
+  border-color: #2e384d !important;
+}
+
+/* Typography */
+html.dark .text-slate-900,
+html.dark .text-slate-800 {
+  color: #f9fafb !important;
+}
+
+html.dark .text-slate-700 {
+  color: #e5e7eb !important;
+}
+
+html.dark .text-slate-600,
+html.dark .text-slate-500 {
+  color: #9ca3af !important;
+}
+
+html.dark .text-slate-400 {
+  color: #6b7280 !important;
+}
+
+/* Inputs, Selects & Textareas */
+html.dark input:not([type="checkbox"]):not([type="radio"]),
+html.dark select,
+html.dark textarea {
+  background-color: #1f2937 !important;
+  border-color: #374151 !important;
+  color: #f9fafb !important;
+}
+
+html.dark input::placeholder,
+html.dark textarea::placeholder {
+  color: #6b7280 !important;
+}
+
+html.dark select option {
+  background-color: #1f2937 !important;
+  color: #f9fafb !important;
+}
+
+/* Tables & Lists */
+html.dark table thead tr {
+  background-color: #131c2e !important;
+  border-color: #1f2937 !important;
+}
+
+html.dark table tbody tr:hover {
+  background-color: #182235 !important;
+}
+
+/* Hover surfaces */
+html.dark .hover\:bg-slate-50:hover,
+html.dark .hover\:bg-slate-50\/80:hover {
+  background-color: #182235 !important;
+}
+
+html.dark .hover\:bg-slate-100:hover {
+  background-color: #1f2937 !important;
+}
+
+/* Cards & Modals shadow adjustments */
+html.dark .shadow-sm,
+html.dark .shadow-md,
+html.dark .shadow-lg,
+html.dark .shadow-xl {
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.4) !important;
+}
+
+/* Badges / Soft Accents */
+html.dark .bg-blue-50 {
+  background-color: rgba(37, 99, 235, 0.15) !important;
+}
+html.dark .bg-emerald-50 {
+  background-color: rgba(16, 185, 129, 0.15) !important;
+}
+html.dark .bg-amber-50 {
+  background-color: rgba(245, 158, 11, 0.15) !important;
+}
+html.dark .bg-rose-50 {
+  background-color: rgba(244, 63, 94, 0.15) !important;
+}
+html.dark .bg-purple-50 {
+  background-color: rgba(168, 85, 247, 0.15) !important;
 }

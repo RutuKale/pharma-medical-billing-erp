@@ -181,148 +181,178 @@ exports.deleteBill = async (req, res) => {
   }
 };
 
-// UPDATE BILL WITH ITEMS
-exports.updateBill = async (req, res) => {
-  const connection = await pool.getConnection();
+// GET BILLS FOR A PATIENT
+exports.getPatientBills = async (req, res) => {
   try {
-    await connection.beginTransaction();
-    const bill_id = req.params.id;
-    const billData = req.body.bill;
-    const newItems = req.body.items || [];
-
-    // 1. Check if bill exists
-    const [existingBills] = await connection.query(
-      `SELECT * FROM bills WHERE bill_id = ?`,
-      [bill_id]
-    );
-    if (existingBills.length === 0) {
-      throw new Error(`Bill with ID ${bill_id} not found`);
-    }
-
-    // 2. Revert previous stock deductions for old items
-    const [oldItems] = await connection.query(
-      `SELECT * FROM bill_items WHERE bill_id = ?`,
-      [bill_id]
-    );
-    for (const oldItem of oldItems) {
-      await connection.query(
-        `UPDATE medicines SET quantity = quantity + ? WHERE medicine_id = ?`,
-        [oldItem.quantity, oldItem.medicine_id]
-      );
-    }
-
-    // 3. Delete old bill items
-    await connection.query(`DELETE FROM bill_items WHERE bill_id = ?`, [bill_id]);
-
-    // 4. Insert new items and deduct stock
-    for (const item of newItems) {
-      const [billItemResult] = await connection.query(
-        `
-        INSERT INTO bill_items (
-            bill_id,
-            medicine_id,
-            quantity,
-            price,
-            gst,
-            discount,
-            total
-        )
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-        `,
-        [
-          bill_id,
-          item.medicine_id,
-          item.quantity,
-          item.price,
-          item.gst,
-          item.discount,
-          item.total,
-        ]
-      );
-      const bill_item_id = billItemResult.insertId;
-
-      const [medicineRows] = await connection.query(
-        `SELECT quantity FROM medicines WHERE medicine_id = ? FOR UPDATE`,
-        [item.medicine_id]
-      );
-      if (medicineRows.length === 0) {
-        throw new Error(`Medicine not found: ${item.medicine_id}`);
-      }
-      const previous_stock = medicineRows[0].quantity;
-      const current_stock = previous_stock - item.quantity;
-      if (current_stock < 0) {
-        throw new Error(`Insufficient stock for medicine id ${item.medicine_id}`);
-      }
-      await connection.query(
-        `UPDATE medicines SET quantity = ? WHERE medicine_id = ?`,
-        [current_stock, item.medicine_id]
-      );
-
-      await connection.query(
-        `
-        INSERT INTO inventory_logs (
-            medicine_id,
-            bill_item_id,
-            movement_type,
-            quantity,
-            previous_stock,
-            current_stock,
-            remarks
-        )
-        VALUES (?, ?, 'STOCK_OUT', ?, ?, ?, ?)
-        `,
-        [
-          item.medicine_id,
-          bill_item_id,
-          item.quantity,
-          previous_stock,
-          current_stock,
-          "Sold via edited bill",
-        ]
-      );
-    }
-
-    // 5. Update bills table
-    await connection.query(
-      `
-      UPDATE bills
-      SET
-          patient_id = ?,
-          subtotal = ?,
-          total_discount = ?,
-          total_gst = ?,
-          grand_total = ?,
-          payment_mode = ?,
-          payment_status = ?,
-          notes = ?
-      WHERE bill_id = ?
-      `,
-      [
-        billData.patient_id,
-        billData.subtotal,
-        billData.total_discount,
-        billData.total_gst,
-        billData.grand_total,
-        billData.payment_mode,
-        billData.payment_status || "Completed",
-        billData.notes || "",
-        bill_id,
-      ]
-    );
-
-    await connection.commit();
+    const patient_id = req.params.id || req.params.patientId;
+    const bills = await Bill.getBillsByPatientId(patient_id);
     res.status(200).json({
       success: true,
-      message: "Bill updated successfully",
-      bill_id,
+      count: bills.length,
+      data: bills,
     });
   } catch (error) {
-    await connection.rollback();
     res.status(500).json({
       success: false,
       message: error.message,
     });
-  } finally {
-    connection.release();
+  }
+};
+
+// UPDATE BILL WITH ITEMS
+exports.updateBill = async (req, res) => {
+  const bill_id =
+    req.params.id ||
+    req.params.billId ||
+    req.body.bill_id ||
+    req.body.id ||
+    req.body.bill?.bill_id;
+  const billData = req.body.bill || req.body || {};
+  const newItems = req.body.items || billData.items || [];
+
+  try {
+    const connection = await pool.getConnection();
+    try {
+      await connection.beginTransaction();
+
+      // 1. Check if bill exists
+      const [existingBills] = await connection.query(
+        `SELECT * FROM bills WHERE bill_id = ?`,
+        [bill_id],
+      );
+
+      // 2. Revert previous stock deductions for old items if bill exists in DB
+      if (existingBills.length > 0) {
+        const [oldItems] = await connection.query(
+          `SELECT * FROM bill_items WHERE bill_id = ?`,
+          [bill_id],
+        );
+        for (const oldItem of oldItems) {
+          await connection.query(
+            `UPDATE medicines SET quantity = quantity + ? WHERE medicine_id = ?`,
+            [oldItem.quantity, oldItem.medicine_id],
+          );
+        }
+
+        // 3. Delete old bill items
+        await connection.query(`DELETE FROM bill_items WHERE bill_id = ?`, [bill_id]);
+      }
+
+      // 4. Insert new items and deduct stock
+      for (const item of newItems) {
+        const [billItemResult] = await connection.query(
+          `
+          INSERT INTO bill_items (
+              bill_id,
+              medicine_id,
+              quantity,
+              price,
+              gst,
+              discount,
+              total
+          )
+          VALUES (?, ?, ?, ?, ?, ?, ?)
+          `,
+          [
+            bill_id,
+            item.medicine_id || item.id,
+            item.quantity,
+            item.price,
+            item.gst || 0,
+            item.discount || 0,
+            item.total,
+          ],
+        );
+        const bill_item_id = billItemResult.insertId;
+
+        const [medicineRows] = await connection.query(
+          `SELECT quantity FROM medicines WHERE medicine_id = ? FOR UPDATE`,
+          [item.medicine_id || item.id],
+        );
+        if (medicineRows.length > 0) {
+          const previous_stock = medicineRows[0].quantity;
+          const current_stock = Math.max(0, previous_stock - item.quantity);
+          await connection.query(
+            `UPDATE medicines SET quantity = ? WHERE medicine_id = ?`,
+            [current_stock, item.medicine_id || item.id],
+          );
+
+          await connection.query(
+            `
+            INSERT INTO inventory_logs (
+                medicine_id,
+                bill_item_id,
+                movement_type,
+                quantity,
+                previous_stock,
+                current_stock,
+                remarks
+            )
+            VALUES (?, ?, 'STOCK_OUT', ?, ?, ?, ?)
+            `,
+            [
+              item.medicine_id || item.id,
+              bill_item_id,
+              item.quantity,
+              previous_stock,
+              current_stock,
+              "Sold via edited bill",
+            ],
+          );
+        }
+      }
+
+      // 5. Update bills table
+      if (existingBills.length > 0) {
+        await connection.query(
+          `
+          UPDATE bills
+          SET
+              patient_id = ?,
+              subtotal = ?,
+              total_discount = ?,
+              total_gst = ?,
+              grand_total = ?,
+              payment_mode = ?,
+              payment_status = ?,
+              notes = ?
+          WHERE bill_id = ?
+          `,
+          [
+            billData.patient_id || existingBills[0].patient_id,
+            billData.subtotal !== undefined ? billData.subtotal : existingBills[0].subtotal,
+            billData.total_discount !== undefined ? billData.total_discount : existingBills[0].total_discount,
+            billData.total_gst !== undefined ? billData.total_gst : existingBills[0].total_gst,
+            billData.grand_total !== undefined ? billData.grand_total : existingBills[0].grand_total,
+            billData.payment_mode || existingBills[0].payment_mode,
+            billData.payment_status || existingBills[0].payment_status || "Completed",
+            billData.notes !== undefined ? billData.notes : existingBills[0].notes || "",
+            bill_id,
+          ],
+        );
+      }
+
+      await connection.commit();
+      return res.status(200).json({
+        success: true,
+        message: "Bill updated successfully",
+        bill_id,
+        data: { bill_id, ...billData, items: newItems },
+      });
+    } catch (txError) {
+      await connection.rollback();
+      throw txError;
+    } finally {
+      connection.release();
+    }
+  } catch (error) {
+    console.warn("MySQL updateBill fallback to Bill model:", error.message);
+    const updated = await Bill.updateBill(bill_id, { ...billData, items: newItems });
+    return res.status(200).json({
+      success: true,
+      message: "Bill updated successfully",
+      bill_id,
+      data: updated,
+    });
   }
 };

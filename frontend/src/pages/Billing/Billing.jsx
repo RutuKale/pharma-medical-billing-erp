@@ -28,13 +28,41 @@ import {
   Stethoscope,
   FileText,
   ArrowLeft,
+  UserPlus,
+  Layers,
+  MapPin,
+  Check,
 } from "lucide-react";
 import Swal from "sweetalert2";
 import { printBill, downloadBillPDF } from "../../utils/billUtils";
 import apiClient from "../../utils/apiClient";
 
 const Billing = () => {
-  const [patient, setPatient] = useState({
+  // Helper to construct a fresh patient bill
+  const createNewBillSession = (idx = 1) => ({
+    id: `bill_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+    invoiceNo: `INV-${Date.now().toString().slice(-6)}-${idx}`,
+    patient: {
+      patientId: "",
+      name: "",
+      mobile: "",
+      age: "",
+      gender: "",
+      doctorName: "",
+      prescriptionNumber: "",
+    },
+    selectedPatientId: "",
+    billItems: [],
+    paymentMode: "Cash",
+  });
+
+  // Multi-Patient Billing State
+  const [bills, setBills] = useState([createNewBillSession(1)]);
+  const [activeBillIndex, setActiveBillIndex] = useState(0);
+
+  // Active Bill Accessors
+  const activeBill = bills[activeBillIndex] || bills[0];
+  const patient = activeBill?.patient || {
     patientId: "",
     name: "",
     mobile: "",
@@ -42,15 +70,86 @@ const Billing = () => {
     gender: "",
     doctorName: "",
     prescriptionNumber: "",
+  };
+  const selectedPatientId = activeBill?.selectedPatientId || "";
+  const billItems = activeBill?.billItems || [];
+  const paymentMode = activeBill?.paymentMode || "Cash";
+
+  // Active Bill Updaters
+  const updateActiveBill = (updates) => {
+    setBills((prev) => {
+      const copy = [...prev];
+      const current = copy[activeBillIndex] || copy[0];
+      copy[activeBillIndex] =
+        typeof updates === "function" ? updates(current) : { ...current, ...updates };
+      return copy;
+    });
+  };
+
+  const setPatient = (newPatient) => {
+    updateActiveBill((prev) => ({
+      ...prev,
+      patient: typeof newPatient === "function" ? newPatient(prev.patient) : newPatient,
+    }));
+  };
+
+  const setSelectedPatientId = (newId) => {
+    updateActiveBill({ selectedPatientId: newId });
+  };
+
+  const setBillItems = (newItems) => {
+    updateActiveBill((prev) => ({
+      ...prev,
+      billItems: typeof newItems === "function" ? newItems(prev.billItems) : newItems,
+    }));
+  };
+
+  const setPaymentMode = (newMode) => {
+    updateActiveBill({ paymentMode: newMode });
+  };
+
+  // Multi-Bill Actions
+  const addNewPatientBill = () => {
+    const nextIdx = bills.length + 1;
+    const nextBill = createNewBillSession(nextIdx);
+    setBills([...bills, nextBill]);
+    setActiveBillIndex(bills.length);
+  };
+
+  const removePatientBill = (idx, e) => {
+    e?.stopPropagation();
+    if (bills.length <= 1) return;
+    const filtered = bills.filter((_, i) => i !== idx);
+    setBills(filtered);
+    if (activeBillIndex >= filtered.length) {
+      setActiveBillIndex(filtered.length - 1);
+    }
+  };
+
+  // Direct Patient Registration Modal State
+  const [isPatientModalOpen, setIsPatientModalOpen] = useState(false);
+  const [newPatient, setNewPatient] = useState({
+    name: "",
+    mobile: "",
+    age: "",
+    gender: "Male",
+    address: "",
+    doctorName: "",
+    prescriptionNumber: "",
   });
+  const [patientErrors, setPatientErrors] = useState({});
+  const [isRegisteringPatient, setIsRegisteringPatient] = useState(false);
+
+  // Multi-Bill Session Summary Modal State
+  const [sessionSummary, setSessionSummary] = useState(null);
+  const [isSavingAll, setIsSavingAll] = useState(false);
+
   const [patients, setPatients] = useState([]);
-  const [selectedPatientId, setSelectedPatientId] = useState("");
+  const [patientSearchQuery, setPatientSearchQuery] = useState("");
   const [search, setSearch] = useState("");
   const [selectedMedicine, setSelectedMedicine] = useState(null);
   const [quantity, setQuantity] = useState(1);
   const [discount, setDiscount] = useState(0);
-  const [billItems, setBillItems] = useState([]);
-  const [paymentMode, setPaymentMode] = useState("Cash");
   const [medicinesData, setMedicinesData] = useState([]);
   const [loading, setLoading] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
@@ -383,12 +482,12 @@ const Billing = () => {
     const patientId = e.target.value;
     setSelectedPatientId(patientId);
     const selectedPatient = patients.find(
-      (p) => p.patient_id === Number(patientId),
+      (p) => String(p.patient_id || p.id) === String(patientId)
     );
 
     if (selectedPatient) {
       setPatient({
-        patientId: selectedPatient.patient_id,
+        patientId: selectedPatient.patient_id || selectedPatient.id,
         name: selectedPatient.patient_name || "",
         mobile: selectedPatient.mobile_number || "",
         age: selectedPatient.age || "",
@@ -409,17 +508,18 @@ const Billing = () => {
     }
   };
 
-  const totals = useMemo(() => {
+  // Helper to calculate totals for any bill items list
+  const calculateItemsTotals = (items = []) => {
     let subtotal = 0;
     let gstTotal = 0;
     let discountTotal = 0;
     let grandTotal = 0;
 
-    billItems.forEach((item) => {
-      subtotal += item.subtotal;
-      gstTotal += item.gstAmount;
-      discountTotal += item.discountAmount;
-      grandTotal += item.total;
+    items.forEach((item) => {
+      subtotal += item.subtotal || 0;
+      gstTotal += item.gstAmount || 0;
+      discountTotal += item.discountAmount || 0;
+      grandTotal += item.total || 0;
     });
 
     return {
@@ -428,20 +528,145 @@ const Billing = () => {
       discountTotal,
       grandTotal,
     };
+  };
+
+  const totals = useMemo(() => {
+    return calculateItemsTotals(billItems);
   }, [billItems]);
 
-  const generateBillData = () => {
-    if (!patient.patientId) {
+  const sessionGrandTotal = useMemo(() => {
+    return bills.reduce(
+      (sum, b) => sum + calculateItemsTotals(b.billItems).grandTotal,
+      0
+    );
+  }, [bills]);
+
+  // Direct patient registration handler
+  const handleRegisterPatient = async (e) => {
+    e.preventDefault();
+    const errs = {};
+    if (!newPatient.name.trim()) errs.name = "Patient full name is required";
+    const cleanMobile = newPatient.mobile.replace(/\D/g, "");
+    if (!cleanMobile) {
+      errs.mobile = "Mobile number is required";
+    } else if (cleanMobile.length !== 10) {
+      errs.mobile = "Please enter a valid 10-digit mobile number";
+    }
+
+    if (Object.keys(errs).length > 0) {
+      setPatientErrors(errs);
+      return;
+    }
+
+    // Check duplicate
+    const existing = patients.find(
+      (p) =>
+        String(p.mobile_number || p.mobile || "").replace(/\D/g, "") === cleanMobile
+    );
+
+    if (existing) {
+      const confirmUse = await Swal.fire({
+        title: "Patient Already Registered",
+        text: `A patient "${existing.patient_name}" is already registered with mobile ${cleanMobile}. Would you like to select this existing patient?`,
+        icon: "info",
+        showCancelButton: true,
+        confirmButtonText: "Yes, Select Patient",
+        cancelButtonText: "Register Anyway",
+        confirmButtonColor: "#2563eb",
+      });
+
+      if (confirmUse.isConfirmed) {
+        handlePatientSelect({
+          target: { value: existing.patient_id || existing.id },
+        });
+        setIsPatientModalOpen(false);
+        return;
+      }
+    }
+
+    try {
+      setIsRegisteringPatient(true);
+      const patientPayload = {
+        patient_name: newPatient.name.trim(),
+        mobile_number: cleanMobile,
+        age: newPatient.age ? Number(newPatient.age) : null,
+        gender: newPatient.gender || null,
+        address: newPatient.address.trim() || null,
+        doctor_name: newPatient.doctorName.trim() || null,
+        prescription_number: newPatient.prescriptionNumber.trim() || null,
+        reminders_enabled: 1,
+      };
+
+      const res = await apiClient.post("/patients", patientPayload);
+      if (res.data?.success) {
+        const created = res.data.data;
+        const patId = created.patient_id || created.id;
+        setPatients((prev) => [created, ...prev]);
+
+        // Auto-populate active bill
+        setSelectedPatientId(String(patId));
+        setPatient({
+          patientId: patId,
+          name: created.patient_name || newPatient.name,
+          mobile: created.mobile_number || cleanMobile,
+          age: created.age || newPatient.age || "",
+          gender: created.gender || newPatient.gender || "",
+          doctorName: created.doctor_name || newPatient.doctorName || "",
+          prescriptionNumber:
+            created.prescription_number || newPatient.prescriptionNumber || "",
+        });
+
+        setIsPatientModalOpen(false);
+        setNewPatient({
+          name: "",
+          mobile: "",
+          age: "",
+          gender: "Male",
+          address: "",
+          doctorName: "",
+          prescriptionNumber: "",
+        });
+        setPatientErrors({});
+
+        Swal.fire({
+          icon: "success",
+          title: "Patient Registered",
+          text: `${created.patient_name} registered and selected for billing.`,
+          timer: 2000,
+          showConfirmButton: false,
+        });
+      }
+    } catch (err) {
+      console.error(err);
+      Swal.fire({
+        icon: "error",
+        title: "Registration Failed",
+        text:
+          err.response?.data?.message ||
+          err.message ||
+          "Failed to register patient",
+        confirmButtonColor: "#2563eb",
+      });
+    } finally {
+      setIsRegisteringPatient(false);
+    }
+  };
+
+  const generateBillData = (billToUse = activeBill) => {
+    const pat = billToUse.patient;
+    const items = billToUse.billItems;
+
+    if (!pat.patientId && !pat.name) {
       Swal.fire({
         icon: "warning",
         title: "Patient Required",
-        text: "Please select a patient before billing.",
+        text: "Please select or register a patient before billing.",
         confirmButtonColor: "#2563eb",
       });
       return null;
     }
 
-    if (billItems.length === 0) {
+    if (items.length === 0) {
       Swal.fire({
         icon: "warning",
         title: "No Medicines Added",
@@ -451,13 +676,15 @@ const Billing = () => {
       return null;
     }
 
+    const bTotals = calculateItemsTotals(items);
+
     return {
-      invoiceNo: `INV-${Date.now()}`,
+      invoiceNo: billToUse.invoiceNo || `INV-${Date.now()}`,
       date: new Date().toLocaleString(),
-      patient,
-      medicines: billItems,
-      paymentMode,
-      totals,
+      patient: pat,
+      medicines: items,
+      paymentMode: billToUse.paymentMode,
+      totals: bTotals,
     };
   };
 
@@ -480,7 +707,13 @@ const Billing = () => {
     try {
       const payload = {
         bill: {
-          patient_id: billData.patient.patientId,
+          patient_id: billData.patient.patientId || "",
+          patient_name: billData.patient.name || "",
+          mobile_number: billData.patient.mobile || "",
+          doctor_name: billData.patient.doctorName || "",
+          prescription_number: billData.patient.prescriptionNumber || "",
+          age: billData.patient.age || "",
+          gender: billData.patient.gender || "",
           bill_number: isEditingBill ? editingBillNumber : billData.invoiceNo,
           subtotal: billData.totals.subtotal,
           total_discount: billData.totals.discountTotal,
@@ -492,11 +725,13 @@ const Billing = () => {
         },
         items: billData.medicines.map((m) => ({
           medicine_id: m.medicine_id || m.id,
-          quantity: m.quantity,
-          price: m.price,
-          gst: m.gst,
-          discount: m.discount,
-          total: m.total,
+          name: m.name || m.medicine_name || "Medicine",
+          batch: m.batch || m.batch_number || "-",
+          quantity: Number(m.quantity || 1),
+          price: Number(m.price || 0),
+          gst: Number(m.gst || 0),
+          discount: Number(m.discount || 0),
+          total: Number(m.total || 0),
         })),
       };
 
@@ -518,21 +753,26 @@ const Billing = () => {
           Swal.fire({
             icon: "success",
             title: "Bill Generated",
-            text: "Bill created and inventory stock updated successfully!",
+            text: `Invoice #${billData.invoiceNo} saved and inventory stock updated successfully!`,
             confirmButtonColor: "#2563eb",
           });
 
-          setBillItems([]);
-          setPatient({
-            patientId: "",
-            name: "",
-            mobile: "",
-            age: "",
-            gender: "",
-            doctorName: "",
-            prescriptionNumber: "",
-          });
-          setSelectedPatientId("");
+          // If in multi-bill session with multiple bills, remove completed bill or reset
+          if (bills.length > 1) {
+            removePatientBill(activeBillIndex);
+          } else {
+            setBillItems([]);
+            setPatient({
+              patientId: "",
+              name: "",
+              mobile: "",
+              age: "",
+              gender: "",
+              doctorName: "",
+              prescriptionNumber: "",
+            });
+            setSelectedPatientId("");
+          }
           fetchMedicines();
         }
       }
@@ -541,9 +781,144 @@ const Billing = () => {
       Swal.fire({
         icon: "error",
         title: isEditingBill ? "Error Updating Bill" : "Error Generating Bill",
-        text: error.response?.data?.message || "Failed to save bill to database",
+        text:
+          error.response?.data?.message || "Failed to save bill to database",
         confirmButtonColor: "#2563eb",
       });
+    }
+  };
+
+  // Generate All Bills in Multi-Patient Session
+  const generateAllSessionBills = async () => {
+    for (let i = 0; i < bills.length; i++) {
+      const b = bills[i];
+      if (!b.patient.patientId && !b.patient.name) {
+        setActiveBillIndex(i);
+        return Swal.fire({
+          icon: "warning",
+          title: `Patient Missing (Bill #${i + 1})`,
+          text: `Please select or register patient details for Bill #${i + 1}.`,
+          confirmButtonColor: "#2563eb",
+        });
+      }
+      if (b.billItems.length === 0) {
+        setActiveBillIndex(i);
+        return Swal.fire({
+          icon: "warning",
+          title: `No Medicines Added (Bill #${i + 1})`,
+          text: `Please add at least one medicine to Bill #${i + 1}.`,
+          confirmButtonColor: "#2563eb",
+        });
+      }
+    }
+
+    // Validate inventory stock across all bills combined
+    const requestedStockMap = {};
+    bills.forEach((b) => {
+      b.billItems.forEach((it) => {
+        const medId = it.medicine_id || it.id;
+        requestedStockMap[medId] =
+          (requestedStockMap[medId] || 0) + Number(it.quantity || 1);
+      });
+    });
+
+    for (const [medId, requestedQty] of Object.entries(requestedStockMap)) {
+      const med = medicinesData.find(
+        (m) => String(m.id || m.medicine_id) === String(medId)
+      );
+      if (med && requestedQty > med.stock) {
+        return Swal.fire({
+          icon: "error",
+          title: "Insufficient Stock",
+          text: `Combined requested quantity for "${med.name}" (${requestedQty}) exceeds available inventory (${med.stock}).`,
+          confirmButtonColor: "#2563eb",
+        });
+      }
+    }
+
+    try {
+      setIsSavingAll(true);
+      const generatedResults = [];
+
+      for (let i = 0; i < bills.length; i++) {
+        const b = bills[i];
+        const bTotals = calculateItemsTotals(b.billItems);
+        const payload = {
+          bill: {
+            patient_id: b.patient.patientId || "",
+            patient_name: b.patient.name || "",
+            mobile_number: b.patient.mobile || "",
+            doctor_name: b.patient.doctorName || "",
+            prescription_number: b.patient.prescriptionNumber || "",
+            age: b.patient.age || "",
+            gender: b.patient.gender || "",
+            bill_number: b.invoiceNo,
+            subtotal: bTotals.subtotal,
+            total_discount: bTotals.discountTotal,
+            total_gst: bTotals.gstTotal,
+            grand_total: bTotals.grandTotal,
+            payment_mode: b.paymentMode,
+            payment_status: "Completed",
+            notes: `Generated in Multi-Bill Session (${i + 1} of ${bills.length})`,
+          },
+          items: b.billItems.map((m) => ({
+            medicine_id: m.medicine_id || m.id,
+            name: m.name || m.medicine_name || "Medicine",
+            batch: m.batch || m.batch_number || "-",
+            quantity: Number(m.quantity || 1),
+            price: Number(m.price || 0),
+            gst: Number(m.gst || 0),
+            discount: Number(m.discount || 0),
+            total: Number(m.total || 0),
+          })),
+        };
+
+        const res = await apiClient.post("/bills", payload);
+        if (res.data?.success) {
+          generatedResults.push({
+            invoiceNo: b.invoiceNo,
+            patientName: b.patient.name || "Patient",
+            itemCount: b.billItems.length,
+            grandTotal: bTotals.grandTotal,
+            paymentMode: b.paymentMode,
+            billData: {
+              invoiceNo: b.invoiceNo,
+              date: new Date().toLocaleString(),
+              patient: b.patient,
+              medicines: b.billItems,
+              paymentMode: b.paymentMode,
+              totals: bTotals,
+            },
+          });
+        }
+      }
+
+      // Refresh stock
+      fetchMedicines();
+
+      // Show Session Summary
+      setSessionSummary({
+        bills: generatedResults,
+        totalPatients: generatedResults.length,
+        sessionTotal: generatedResults.reduce((s, r) => s + r.grandTotal, 0),
+      });
+
+      // Reset bills list to fresh bill
+      setBills([createNewBillSession(1)]);
+      setActiveBillIndex(0);
+    } catch (err) {
+      console.error(err);
+      Swal.fire({
+        icon: "error",
+        title: "Session Billing Failed",
+        text:
+          err.response?.data?.message ||
+          err.message ||
+          "Failed to complete multi-bill session.",
+        confirmButtonColor: "#2563eb",
+      });
+    } finally {
+      setIsSavingAll(false);
     }
   };
 
@@ -719,6 +1094,95 @@ const Billing = () => {
         </div>
       )}
 
+      {/* MULTI-PATIENT BILLING SESSION TABS */}
+      {!isEditingBill && (
+        <div className="bg-white rounded-2xl p-4 border border-slate-200/90 shadow-xs space-y-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+                <Layers size={14} className="text-blue-600" />
+                Multi-Patient Session:
+              </span>
+              <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
+                {bills.length} {bills.length === 1 ? "Patient Bill" : "Patient Bills"}
+              </span>
+              <span className="text-xs text-slate-500 font-medium">
+                • Combined Total: <strong className="text-slate-900 font-bold">₹{sessionGrandTotal.toFixed(2)}</strong>
+              </span>
+            </div>
+
+            <div className="flex items-center gap-2">
+              {bills.length > 1 && (
+                <button
+                  type="button"
+                  onClick={generateAllSessionBills}
+                  disabled={isSavingAll}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 text-white rounded-xl text-xs font-semibold shadow-xs transition-colors"
+                >
+                  <CheckCircle2 size={14} />
+                  <span>{isSavingAll ? "Saving All..." : `Save All (${bills.length}) Bills`}</span>
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={addNewPatientBill}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-xl text-xs font-semibold shadow-2xs transition-colors"
+              >
+                <Plus size={14} />
+                <span>+ Add Patient Bill</span>
+              </button>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 overflow-x-auto pb-1 pt-0.5">
+            {bills.map((b, idx) => {
+              const isActive = idx === activeBillIndex;
+              const bTot = calculateItemsTotals(b.billItems);
+              const pName = b.patient?.name || `Patient #${idx + 1}`;
+              return (
+                <div
+                  key={b.sessionKey || idx}
+                  onClick={() => setActiveBillIndex(idx)}
+                  className={`group flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold cursor-pointer border transition-all shrink-0 select-none ${
+                    isActive
+                      ? "bg-blue-600 text-white border-blue-600 shadow-xs"
+                      : "bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200"
+                  }`}
+                >
+                  <div className="flex items-center gap-1.5">
+                    <User size={13} className={isActive ? "text-blue-100" : "text-slate-400"} />
+                    <span className="max-w-[120px] truncate">{pName}</span>
+                    <span
+                      className={`text-[10px] px-1.5 py-0.2 rounded font-mono ${
+                        isActive ? "bg-blue-700/80 text-white" : "bg-slate-200 text-slate-700"
+                      }`}
+                    >
+                      {b.billItems.length}
+                    </span>
+                    <span className="font-bold">₹{bTot.grandTotal.toFixed(0)}</span>
+                  </div>
+                  {bills.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        removePatientBill(idx);
+                      }}
+                      className={`p-0.5 rounded transition-colors ${
+                        isActive ? "text-blue-200 hover:bg-blue-700 hover:text-white" : "text-slate-400 hover:bg-slate-200 hover:text-rose-600"
+                      }`}
+                      title="Remove patient bill from session"
+                    >
+                      <X size={13} />
+                    </button>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {/* 2. MAIN WORKSPACE (2-COLUMN GRID) */}
       <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 items-start">
         {/* LEFT WORKSPACE (8 COLS) */}
@@ -739,12 +1203,22 @@ const Billing = () => {
                   </p>
                 </div>
               </div>
-              <Link
-                to="/patients"
-                className="text-xs font-semibold text-blue-600 hover:text-blue-700 hover:underline flex items-center gap-1"
-              >
-                + Register New
-              </Link>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsPatientModalOpen(true)}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-600 border border-blue-200 rounded-xl text-xs font-semibold transition-colors"
+                >
+                  <UserPlus size={13} />
+                  <span>+ Register New Patient</span>
+                </button>
+                <Link
+                  to="/patients"
+                  className="text-xs font-medium text-slate-400 hover:text-slate-600 hover:underline hidden sm:inline"
+                >
+                  Directory
+                </Link>
+              </div>
             </div>
 
             {/* Patient Selector */}
@@ -1317,8 +1791,30 @@ const Billing = () => {
                 className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 text-white px-4 py-3 rounded-xl font-semibold text-sm shadow-xs flex items-center justify-center gap-2 transition-colors disabled:cursor-not-allowed"
               >
                 <CheckCircle2 size={18} />
-                <span>{isEditingBill ? "Update Bill" : "Generate & Save Bill"}</span>
+                <span>
+                  {isEditingBill
+                    ? "Update Bill"
+                    : bills.length > 1
+                    ? `Save Active Patient Bill (${bills[activeBillIndex]?.patient?.name || `Patient #${activeBillIndex + 1}`})`
+                    : "Generate & Save Bill"}
+                </span>
               </button>
+
+              {bills.length > 1 && !isEditingBill && (
+                <button
+                  type="button"
+                  onClick={generateAllSessionBills}
+                  disabled={isSavingAll}
+                  className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 text-white px-4 py-3 rounded-xl font-semibold text-sm shadow-xs flex items-center justify-center gap-2 transition-colors disabled:cursor-not-allowed"
+                >
+                  <CheckCircle2 size={18} />
+                  <span>
+                    {isSavingAll
+                      ? "Saving All Bills..."
+                      : `Save All ${bills.length} Bills (₹${sessionGrandTotal.toFixed(2)})`}
+                  </span>
+                </button>
+              )}
 
               <div className="grid grid-cols-2 gap-2">
                 <button
@@ -1418,6 +1914,325 @@ const Billing = () => {
               >
                 Update Item
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 4. DIRECT PATIENT REGISTRATION MODAL */}
+      {isPatientModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs overflow-y-auto">
+          <div
+            className="fixed inset-0"
+            onClick={() => !isRegisteringPatient && setIsPatientModalOpen(false)}
+          />
+          <div className="relative z-10 w-full max-w-xl mx-auto bg-white border border-slate-200/90 rounded-2xl shadow-2xl overflow-hidden my-8">
+            <div className="px-6 py-4 bg-slate-50 border-b border-slate-200/80 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-xl bg-blue-600 text-white shadow-xs">
+                  <UserPlus size={18} />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-900">
+                    Register New Patient
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    Patient will be saved to registration database and assigned to this bill.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsPatientModalOpen(false)}
+                disabled={isRegisteringPatient}
+                className="text-slate-400 hover:text-slate-600 p-1 rounded-lg"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleRegisterPatient} className="p-6 space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* Full Name */}
+                <div className="sm:col-span-2">
+                  <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
+                    Patient Full Name <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Rahul Sharma"
+                    value={newPatient.name}
+                    onChange={(e) =>
+                      setNewPatient((prev) => ({ ...prev, name: e.target.value }))
+                    }
+                    className={`w-full bg-slate-50/60 border rounded-xl px-3.5 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 font-medium ${
+                      patientErrors.name ? "border-rose-400 bg-rose-50/20" : "border-slate-200"
+                    }`}
+                  />
+                  {patientErrors.name && (
+                    <span className="text-[11px] text-rose-500 font-medium mt-1 block">
+                      {patientErrors.name}
+                    </span>
+                  )}
+                </div>
+
+                {/* Mobile */}
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
+                    Mobile Number <span className="text-rose-500">*</span>
+                  </label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-slate-400">
+                      +91
+                    </span>
+                    <input
+                      type="tel"
+                      maxLength={10}
+                      placeholder="9876543210"
+                      value={newPatient.mobile}
+                      onChange={(e) =>
+                        setNewPatient((prev) => ({
+                          ...prev,
+                          mobile: e.target.value.replace(/\D/g, ""),
+                        }))
+                      }
+                      className={`w-full bg-slate-50/60 border rounded-xl pl-12 pr-3.5 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 font-medium ${
+                        patientErrors.mobile ? "border-rose-400 bg-rose-50/20" : "border-slate-200"
+                      }`}
+                    />
+                  </div>
+                  {patientErrors.mobile && (
+                    <span className="text-[11px] text-rose-500 font-medium mt-1 block">
+                      {patientErrors.mobile}
+                    </span>
+                  )}
+                </div>
+
+                {/* Age & Gender */}
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
+                      Age
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      max="130"
+                      placeholder="e.g. 32"
+                      value={newPatient.age}
+                      onChange={(e) =>
+                        setNewPatient((prev) => ({ ...prev, age: e.target.value }))
+                      }
+                      className="w-full bg-slate-50/60 border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 font-medium"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
+                      Gender
+                    </label>
+                    <select
+                      value={newPatient.gender}
+                      onChange={(e) =>
+                        setNewPatient((prev) => ({ ...prev, gender: e.target.value }))
+                      }
+                      className="w-full bg-slate-50/60 border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 font-medium"
+                    >
+                      <option value="Male">Male</option>
+                      <option value="Female">Female</option>
+                      <option value="Other">Other</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Address */}
+                <div className="sm:col-span-2">
+                  <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
+                    Address <span className="text-slate-400 font-normal lowercase">(optional)</span>
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Flat 402, Green Avenue, Mumbai"
+                    value={newPatient.address}
+                    onChange={(e) =>
+                      setNewPatient((prev) => ({ ...prev, address: e.target.value }))
+                    }
+                    className="w-full bg-slate-50/60 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 font-medium"
+                  />
+                </div>
+
+                {/* Doctor Name */}
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
+                    Doctor Name <span className="text-slate-400 font-normal lowercase">(optional)</span>
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Dr. A. K. Verma"
+                    value={newPatient.doctorName}
+                    onChange={(e) =>
+                      setNewPatient((prev) => ({ ...prev, doctorName: e.target.value }))
+                    }
+                    className="w-full bg-slate-50/60 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 font-medium"
+                  />
+                </div>
+
+                {/* Prescription Number */}
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
+                    Prescription No <span className="text-slate-400 font-normal lowercase">(optional)</span>
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. RX-2026-904"
+                    value={newPatient.prescriptionNumber}
+                    onChange={(e) =>
+                      setNewPatient((prev) => ({
+                        ...prev,
+                        prescriptionNumber: e.target.value,
+                      }))
+                    }
+                    className="w-full bg-slate-50/60 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 font-medium"
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setIsPatientModalOpen(false)}
+                  disabled={isRegisteringPatient}
+                  className="px-4 py-2.5 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-xl text-xs font-semibold shadow-xs transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isRegisteringPatient}
+                  className="inline-flex items-center gap-1.5 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 text-white rounded-xl text-xs font-semibold shadow-xs transition-colors"
+                >
+                  <CheckCircle2 size={15} />
+                  <span>
+                    {isRegisteringPatient
+                      ? "Registering..."
+                      : "Save & Assign to Bill"}
+                  </span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* 5. MULTI-BILL SESSION SUMMARY MODAL */}
+      {sessionSummary && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs overflow-y-auto">
+          <div
+            className="fixed inset-0"
+            onClick={() => setSessionSummary(null)}
+          />
+          <div className="relative z-10 w-full max-w-2xl mx-auto bg-white border border-slate-200/90 rounded-2xl shadow-2xl overflow-hidden my-8">
+            <div className="px-6 py-4 bg-emerald-50 border-b border-emerald-200/80 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-xl bg-emerald-600 text-white shadow-xs">
+                  <CheckCircle2 size={20} />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-emerald-950">
+                    Multi-Patient Billing Completed
+                  </h3>
+                  <p className="text-xs text-emerald-700">
+                    All {sessionSummary.totalPatients} bills were successfully recorded and inventory synchronized.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSessionSummary(null)}
+                className="text-emerald-700 hover:text-emerald-900 p-1 rounded-lg"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-5">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="p-3.5 bg-slate-50 border border-slate-100 rounded-xl">
+                  <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">
+                    Bills Generated
+                  </span>
+                  <span className="text-xl font-bold text-slate-900 mt-0.5 block">
+                    {sessionSummary.totalPatients} Invoices
+                  </span>
+                </div>
+                <div className="p-3.5 bg-slate-50 border border-slate-100 rounded-xl">
+                  <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">
+                    Session Grand Total
+                  </span>
+                  <span className="text-xl font-bold text-emerald-600 mt-0.5 block">
+                    ₹{sessionSummary.sessionTotal.toFixed(2)}
+                  </span>
+                </div>
+              </div>
+
+              <div className="border border-slate-200 rounded-xl overflow-hidden">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 font-semibold uppercase">
+                    <tr>
+                      <th className="py-2.5 px-3">Invoice #</th>
+                      <th className="py-2.5 px-3">Patient</th>
+                      <th className="py-2.5 px-3 text-center">Items</th>
+                      <th className="py-2.5 px-3 text-right">Amount</th>
+                      <th className="py-2.5 px-3 text-center">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {sessionSummary.bills.map((res) => (
+                      <tr key={res.invoiceNo} className="hover:bg-slate-50/50">
+                        <td className="py-2.5 px-3 font-mono font-semibold text-slate-800">
+                          {res.invoiceNo}
+                        </td>
+                        <td className="py-2.5 px-3 font-medium text-slate-900">
+                          {res.patientName}
+                        </td>
+                        <td className="py-2.5 px-3 text-center text-slate-600">
+                          {res.itemCount} items
+                        </td>
+                        <td className="py-2.5 px-3 text-right font-bold text-slate-900">
+                          ₹{res.grandTotal.toFixed(2)}
+                        </td>
+                        <td className="py-2.5 px-3 text-center">
+                          <button
+                            type="button"
+                            onClick={() => printBill(res.billData)}
+                            className="inline-flex items-center gap-1 px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold transition-colors"
+                          >
+                            <Printer size={12} />
+                            <span>Print</span>
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="flex items-center justify-between pt-2">
+                <button
+                  type="button"
+                  onClick={() => navigate("/billing-history")}
+                  className="inline-flex items-center gap-1.5 px-4 py-2.5 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-xl text-xs font-semibold shadow-xs transition-colors"
+                >
+                  <History size={15} />
+                  <span>View Billing History</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSessionSummary(null)}
+                  className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold shadow-xs transition-colors"
+                >
+                  Start New Bill
+                </button>
+              </div>
             </div>
           </div>
         </div>

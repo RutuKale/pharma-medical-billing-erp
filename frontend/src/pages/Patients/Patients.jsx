@@ -22,10 +22,12 @@ import {
   X,
   Shield,
   RotateCcw,
+  Download,
 } from "lucide-react";
 import Swal from "sweetalert2";
 import apiClient from "../../utils/apiClient";
 import DashboardSkeleton from "../../components/DashboardSkeleton";
+import { exportToExcel } from "../../utils/excelExport";
 
 const API_URL = "/patients";
 
@@ -53,15 +55,27 @@ const Patients = () => {
   const [showModal, setShowModal] = useState(false);
   const itemsPerPage = 8;
 
-  const fetchPatients = async () => {
+  const fetchPatients = async (retryCount = 0) => {
     try {
       setLoading(true);
       const response = await apiClient.get(API_URL);
-      if (response.data.success) {
+      const list =
+        response?.data?.data ||
+        (Array.isArray(response?.data) ? response.data : []);
+      if (Array.isArray(list)) {
+        setPatientsData(list);
+      } else if (response?.data?.success && response.data.data) {
         setPatientsData(response.data.data);
       }
     } catch (error) {
       console.error("Fetch Patients Error:", error);
+      if (retryCount < 1) {
+        // Automatic silent retry once after 500ms
+        setTimeout(() => {
+          fetchPatients(retryCount + 1);
+        }, 500);
+        return;
+      }
       Swal.fire({
         icon: "error",
         title: "Error Loading Patients",
@@ -142,8 +156,12 @@ const Patients = () => {
       };
 
       if (editMode) {
+        const patientId =
+          selectedPatient.patient_id ||
+          selectedPatient.id ||
+          selectedPatient._firestoreId;
         await apiClient.put(
-          `${API_URL}/${selectedPatient.patient_id}`,
+          `${API_URL}/${patientId}`,
           patientPayload,
         );
 
@@ -254,8 +272,10 @@ const Patients = () => {
     if (!result.isConfirmed) return;
 
     try {
+      const patientId =
+        patient.patient_id || patient.id || patient._firestoreId;
       const response = await apiClient.delete(
-        `${API_URL}/${patient.patient_id}`,
+        `${API_URL}/${patientId}`,
       );
 
       if (response.data.success) {
@@ -268,9 +288,13 @@ const Patients = () => {
 
         fetchPatients();
 
+        const selectedId =
+          selectedPatient?.patient_id ||
+          selectedPatient?.id ||
+          selectedPatient?._firestoreId;
         if (
           selectedPatient &&
-          selectedPatient.patient_id === patient.patient_id
+          selectedId === patientId
         ) {
           setEditMode(false);
           setSelectedPatient(null);
@@ -303,6 +327,34 @@ const Patients = () => {
     return { totalPatients, activeReminders, totalBills, doctors };
   }, [patientsData]);
 
+  const handleExportPatientsExcel = () => {
+    exportToExcel({
+      filename: "Patients_Registry_Report",
+      sheetName: "Patients",
+      data: filteredPatients,
+      columns: [
+        { header: "Patient ID", key: "patient_id" },
+        { header: "Full Name", key: "patient_name" },
+        { header: "Mobile Number", key: "mobile_number" },
+        { header: "Age", key: "age", format: (v) => v || "-" },
+        { header: "Gender", key: "gender", format: (v) => v || "-" },
+        { header: "Address", key: "address", format: (v) => v || "-" },
+        { header: "Prescribed Doctor", key: "doctor_name", format: (v) => v || "-" },
+        { header: "Prescription No", key: "prescription_number", format: (v) => v || "-" },
+        {
+          header: "Refill Reminders",
+          key: "reminders_enabled",
+          format: (v) => (v ? "Active" : "Disabled"),
+        },
+        { header: "Total Invoices", key: "total_bills", format: (v) => Number(v || 0) },
+      ],
+      summaryTotals: {
+        patient_name: "TOTAL PATIENTS",
+        total_bills: filteredPatients.reduce((sum, p) => sum + Number(p.total_bills || 0), 0),
+      },
+    });
+  };
+
   if (loading) {
     return <DashboardSkeleton />;
   }
@@ -321,6 +373,14 @@ const Patients = () => {
         </div>
 
         <div className="flex items-center gap-2.5 flex-wrap">
+          <button
+            type="button"
+            onClick={handleExportPatientsExcel}
+            className="inline-flex items-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-sm font-semibold shadow-xs transition-colors"
+          >
+            <Download size={16} />
+            <span>Export to Excel</span>
+          </button>
           <button
             onClick={openNewPatientModal}
             className="inline-flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-semibold shadow-xs transition-colors"
@@ -527,9 +587,9 @@ const Patients = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-sm">
-              {paginatedPatients.map((patient) => (
+              {paginatedPatients.map((patient, idx) => (
                 <tr
-                  key={patient.patient_id}
+                  key={patient.patient_id || patient.id || patient._firestoreId || idx}
                   className="hover:bg-slate-50/60 transition-colors"
                 >
                   <td className="py-3.5 px-4">

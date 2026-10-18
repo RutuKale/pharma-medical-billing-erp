@@ -31,6 +31,7 @@ import {
   printBill as utilityPrintBill,
   downloadBillPDF as utilityDownloadBillPDF,
 } from "../../utils/billUtils";
+import { exportToExcel } from "../../utils/excelExport";
 
 const BillingHistory = () => {
   const [search, setSearch] = useState("");
@@ -52,7 +53,7 @@ const BillingHistory = () => {
       const res = await apiClient.get(`/bills`);
       if (res.data?.success) {
         const mapped = res.data.data.map((b) => ({
-          id: b.bill_id,
+          id: b.bill_id || b.id || b._firestoreId,
           billNumber: b.bill_number || b.billNumber || "-",
           patientName: b.patient_name || b.patientName || "-",
           mobile: b.mobile_number || b.mobile || "-",
@@ -286,7 +287,8 @@ const BillingHistory = () => {
       });
       return;
     }
-    navigate(`/billing?editBillId=${bill.id}`);
+    const billId = bill.id || bill.bill_id || bill._firestoreId;
+    navigate(`/billing?editBillId=${billId}`);
   };
 
   const resetFilters = () => {
@@ -294,6 +296,30 @@ const BillingHistory = () => {
     setStatusFilter("All");
     setDateFilter("");
     setCurrentPage(1);
+  };
+
+  const handleExportBillingExcel = () => {
+    exportToExcel({
+      filename: "Billing_and_Invoices_Report",
+      sheetName: "Invoices",
+      data: filteredBills,
+      columns: [
+        { header: "Invoice Number", key: "billNumber" },
+        { header: "Patient Name", key: "patientName" },
+        { header: "Mobile Number", key: "mobile" },
+        { header: "Invoice Date", key: "date" },
+        { header: "Subtotal (₹)", key: "subtotal", format: (v) => Number(v || 0).toFixed(2) },
+        { header: "Discount (₹)", key: "discount", format: (v) => Number(v || 0).toFixed(2) },
+        { header: "GST (₹)", key: "tax", format: (v) => Number(v || 0).toFixed(2) },
+        { header: "Grand Total (₹)", key: "amount", format: (v) => Number(v || 0).toFixed(2) },
+        { header: "Payment Mode", key: "paymentMode" },
+        { header: "Status", key: "status" },
+      ],
+      summaryTotals: {
+        billNumber: "TOTAL SALES",
+        amount: filteredBills.reduce((acc, b) => acc + Number(b.amount || 0), 0).toFixed(2),
+      },
+    });
   };
 
   const hasActiveFilters = Boolean(
@@ -314,6 +340,14 @@ const BillingHistory = () => {
         </div>
 
         <div className="flex items-center gap-2.5 flex-wrap">
+          <button
+            type="button"
+            onClick={handleExportBillingExcel}
+            className="inline-flex items-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-sm font-semibold shadow-xs transition-colors"
+          >
+            <Download size={16} />
+            <span>Export to Excel</span>
+          </button>
           <Link
             to="/billing"
             className="inline-flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-semibold shadow-xs transition-colors"

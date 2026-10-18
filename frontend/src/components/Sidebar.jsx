@@ -260,6 +260,7 @@ const Sidebar = () => {
                     <NavLink
                       key={index}
                       to={item.path}
+                      end
                       onClick={() => setIsOpen(false)}
                       className={({ isActive }) =>
                         `flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-200 group relative
@@ -317,6 +318,7 @@ const Sidebar = () => {
                     <NavLink
                       key={index}
                       to={item.path}
+                      end
                       onClick={() => setIsOpen(false)}
                       className={({ isActive }) =>
                         `flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-200 group relative

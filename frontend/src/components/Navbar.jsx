@@ -1,10 +1,12 @@
 import React, { useState } from "react";
-import { Search, Bell, User, LogOut, ChevronDown, Settings } from "lucide-react";
+import { Search, Bell, User, LogOut, ChevronDown, Settings, Sun, Moon } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
+import { useTheme } from "../context/ThemeContext";
 import { Link, useNavigate } from "react-router-dom";
 
 const Navbar = () => {
     const { user, logout } = useAuth();
+    const { theme, toggleTheme } = useTheme();
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
     const navigate = useNavigate();
 
@@ -38,6 +40,20 @@ const Navbar = () => {
 
             {/* Right Actions */}
             <div className="flex items-center gap-3 md:gap-5 ml-4">
+                {/* Dark / Light Mode Toggle */}
+                <button
+                    onClick={toggleTheme}
+                    title={theme === "dark" ? "Switch to Light Mode" : "Switch to Dark Mode"}
+                    aria-label="Toggle Dark and Light Mode"
+                    className="relative p-2 rounded-xl text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition-all duration-200 active:scale-95 group"
+                >
+                    {theme === "dark" ? (
+                        <Sun size={20} className="text-amber-400 group-hover:rotate-45 transition-transform duration-300" />
+                    ) : (
+                        <Moon size={20} className="text-slate-600 group-hover:-rotate-12 transition-transform duration-300" />
+                    )}
+                </button>
+
                 {/* Notifications */}
                 <button className="relative p-2 rounded-xl text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition-colors">
                     <Bell size={20} />

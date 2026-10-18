@@ -22,6 +22,17 @@ import {
   Layers,
   ArrowUpDown,
   CheckCircle2,
+  Eye,
+  Truck,
+  Phone,
+  Mail,
+  MapPin,
+  Building2,
+  Calendar,
+  Hash,
+  User,
+  FileText,
+  AlertCircle,
 } from "lucide-react";
 import Swal from "sweetalert2";
 import apiClient from "../../utils/apiClient";
@@ -103,6 +114,20 @@ const Inventory = () => {
     setIsStockModalOpen(false);
     setStockMedicineId(null);
     setStockMedicineName("");
+  };
+
+  // Medicine Details View Modal State
+  const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
+  const [selectedMedicine, setSelectedMedicine] = useState(null);
+
+  const openDetailsModal = (medicine) => {
+    setSelectedMedicine(medicine);
+    setIsDetailsModalOpen(true);
+  };
+
+  const closeDetailsModal = () => {
+    setIsDetailsModalOpen(false);
+    setSelectedMedicine(null);
   };
 
   const submitStockChange = async () => {
@@ -578,6 +603,261 @@ const Inventory = () => {
         </div>
       )}
 
+      {/* 1.5. MEDICINE DETAILS VIEW MODAL (WITH SUPPLIER INFORMATION) */}
+      {isDetailsModalOpen && selectedMedicine && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div
+            className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs transition-opacity"
+            onClick={closeDetailsModal}
+          />
+
+          <div className="relative z-10 w-full max-w-2xl bg-white rounded-2xl shadow-2xl border border-slate-200 animate-in fade-in zoom-in-95 duration-150 max-h-[90vh] overflow-y-auto">
+            {/* Header */}
+            <div className="p-6 border-b border-slate-100 flex items-start justify-between gap-4 sticky top-0 bg-white/95 backdrop-blur-xs z-10">
+              <div className="flex items-center gap-3">
+                <div className="w-11 h-11 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold text-lg shrink-0 shadow-2xs">
+                  {(selectedMedicine.medicine_name || "M").charAt(0).toUpperCase()}
+                </div>
+                <div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h3 className="text-lg font-bold text-slate-900">
+                      {selectedMedicine.medicine_name}
+                    </h3>
+                    <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200/60">
+                      {selectedMedicine.category || "General"}
+                    </span>
+                    <span
+                      className={`px-2.5 py-0.5 rounded-full text-xs font-semibold border ${
+                        getStockStatus(selectedMedicine.quantity, selectedMedicine.min_stock).badgeBg
+                      }`}
+                    >
+                      {getStockStatus(selectedMedicine.quantity, selectedMedicine.min_stock).label}
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-500 mt-1">
+                    {selectedMedicine.brand_name || "Generic"}
+                    {selectedMedicine.salt_name ? ` • Composition: ${selectedMedicine.salt_name}` : ""}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={closeDetailsModal}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors shrink-0"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-6 space-y-6">
+              {/* SUPPLIER DETAILS SECTION (Before Basic Medicine Info) */}
+              <div>
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <Truck size={16} className="text-blue-600" />
+                    <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
+                      Supplier & Vendor Details
+                    </h4>
+                  </div>
+                  {selectedMedicine.supplier_name && (
+                    <span className="text-[11px] font-semibold text-blue-600 bg-blue-50 px-2.5 py-0.5 rounded-full border border-blue-200/60">
+                      Verified Supplier
+                    </span>
+                  )}
+                </div>
+
+                {selectedMedicine.supplier_name || selectedMedicine.supplier_id ? (
+                  <div className="bg-gradient-to-br from-blue-50/60 to-slate-50/80 rounded-2xl p-4 sm:p-5 border border-blue-200/80 shadow-2xs">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-blue-100">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center font-bold shrink-0 shadow-xs">
+                          <Truck size={20} />
+                        </div>
+                        <div>
+                          <h5 className="font-bold text-slate-900 text-sm sm:text-base">
+                            {selectedMedicine.supplier_name}
+                          </h5>
+                          {selectedMedicine.supplier_contact && (
+                            <p className="text-xs text-slate-600 flex items-center gap-1.5 mt-0.5">
+                              <User size={13} className="text-slate-400" />
+                              <span>Contact Person: <strong className="text-slate-800">{selectedMedicine.supplier_contact}</strong></span>
+                            </p>
+                          )}
+                        </div>
+                      </div>
+
+                      {selectedMedicine.supplier_gst && (
+                        <div className="px-3 py-1 bg-white border border-slate-200 rounded-lg text-xs self-start sm:self-center">
+                          <span className="text-slate-400 text-[10px] uppercase block">GST Number</span>
+                          <span className="font-mono font-bold text-slate-700">{selectedMedicine.supplier_gst}</span>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-3 text-xs">
+                      {selectedMedicine.supplier_mobile && (
+                        <div className="flex items-center gap-2.5 p-2.5 bg-white/80 rounded-xl border border-slate-100">
+                          <Phone size={15} className="text-blue-500 shrink-0" />
+                          <div>
+                            <span className="text-[10px] text-slate-400 uppercase block">Phone / Mobile</span>
+                            <a
+                              href={`tel:${selectedMedicine.supplier_mobile}`}
+                              className="font-semibold text-blue-600 hover:underline"
+                            >
+                              {selectedMedicine.supplier_mobile}
+                            </a>
+                          </div>
+                        </div>
+                      )}
+
+                      {selectedMedicine.supplier_email && (
+                        <div className="flex items-center gap-2.5 p-2.5 bg-white/80 rounded-xl border border-slate-100">
+                          <Mail size={15} className="text-blue-500 shrink-0" />
+                          <div>
+                            <span className="text-[10px] text-slate-400 uppercase block">Email Address</span>
+                            <a
+                              href={`mailto:${selectedMedicine.supplier_email}`}
+                              className="font-semibold text-blue-600 hover:underline truncate block"
+                            >
+                              {selectedMedicine.supplier_email}
+                            </a>
+                          </div>
+                        </div>
+                      )}
+
+                      {selectedMedicine.supplier_address && (
+                        <div className="sm:col-span-2 flex items-start gap-2.5 p-2.5 bg-white/80 rounded-xl border border-slate-100">
+                          <MapPin size={15} className="text-slate-400 shrink-0 mt-0.5" />
+                          <div>
+                            <span className="text-[10px] text-slate-400 uppercase block">Supplier Address</span>
+                            <p className="text-slate-700 font-medium leading-relaxed">
+                              {selectedMedicine.supplier_address}
+                            </p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="p-4 rounded-xl bg-slate-50 border border-dashed border-slate-200 text-center text-xs text-slate-500">
+                    <p className="font-medium text-slate-600">No supplier linked to this medicine record</p>
+                    <p className="text-slate-400 mt-1">Existing or legacy medicines can be associated with a supplier anytime by clicking Edit.</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Basic & Manufacturer Details */}
+              <div>
+                <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">
+                  Specification & Classification
+                </h4>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3.5 bg-slate-50/70 p-4 rounded-xl border border-slate-100 text-xs">
+                  <div>
+                    <span className="text-slate-400 block text-[11px]">Brand Name</span>
+                    <span className="font-semibold text-slate-800">{selectedMedicine.brand_name || "—"}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 block text-[11px]">Manufacturer</span>
+                    <span className="font-semibold text-slate-800">{selectedMedicine.manufacturer || "—"}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 block text-[11px]">Category</span>
+                    <span className="font-semibold text-slate-800">{selectedMedicine.category || "—"}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 block text-[11px]">Pack Size</span>
+                    <span className="font-semibold text-slate-800">{selectedMedicine.pack_size || "—"}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 block text-[11px]">Dosage Unit</span>
+                    <span className="font-semibold text-slate-800">{selectedMedicine.unit || "—"}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 block text-[11px]">Shelf / Location</span>
+                    <span className="font-semibold text-slate-800">{selectedMedicine.rack_location || selectedMedicine.rackLocation || "Not Assigned"}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Pricing, Tax & Inventory Status */}
+              <div>
+                <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">
+                  Stock & Pricing Breakdown
+                </h4>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  <div className="p-3 bg-white rounded-xl border border-slate-200">
+                    <span className="text-[11px] text-slate-400 block">Purchase Price</span>
+                    <span className="text-sm font-bold text-slate-700">₹{Number(selectedMedicine.purchase_price || 0).toFixed(2)}</span>
+                  </div>
+                  <div className="p-3 bg-emerald-50/50 rounded-xl border border-emerald-200/60">
+                    <span className="text-[11px] text-emerald-600 font-medium block">Selling Price</span>
+                    <span className="text-sm font-bold text-emerald-700">₹{Number(selectedMedicine.selling_price || 0).toFixed(2)}</span>
+                  </div>
+                  <div className="p-3 bg-blue-50/50 rounded-xl border border-blue-200/60">
+                    <span className="text-[11px] text-blue-600 font-medium block">Current Stock</span>
+                    <span className="text-sm font-bold text-blue-700">{selectedMedicine.quantity} units</span>
+                  </div>
+                  <div className="p-3 bg-amber-50/50 rounded-xl border border-amber-200/60">
+                    <span className="text-[11px] text-amber-600 font-medium block">Min Stock Alert</span>
+                    <span className="text-sm font-bold text-amber-700">{selectedMedicine.min_stock || 10} units</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Batch & Expiry Timeline */}
+              <div>
+                <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">
+                  Batch & Expiry Details
+                </h4>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 bg-slate-50/70 p-4 rounded-xl border border-slate-100 text-xs">
+                  <div>
+                    <span className="text-slate-400 block text-[11px]">Batch Number</span>
+                    <span className="font-mono font-semibold text-slate-800">{selectedMedicine.batch_number || "—"}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 block text-[11px]">Manufacture Date</span>
+                    <span className="font-semibold text-slate-800">{formatCleanDate(selectedMedicine.manufacture_date)}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 block text-[11px]">Expiry Date</span>
+                    <div className="flex items-center gap-1.5 mt-0.5">
+                      <span className="font-semibold text-slate-800">{formatCleanDate(selectedMedicine.expiry_date)}</span>
+                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold border ${getExpiryStatus(selectedMedicine.expiry_date).color}`}>
+                        {getExpiryStatus(selectedMedicine.expiry_date).label}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-4 sm:p-5 bg-slate-50/70 border-t border-slate-100 flex items-center justify-between gap-3 sticky bottom-0">
+              <button
+                type="button"
+                onClick={closeDetailsModal}
+                className="px-4 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 text-xs sm:text-sm font-semibold transition-colors"
+              >
+                Close View
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  closeDetailsModal();
+                  handleEdit(selectedMedicine);
+                }}
+                className="inline-flex items-center gap-2 px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs sm:text-sm font-semibold shadow-xs transition-colors"
+              >
+                <SquarePen size={15} />
+                <span>Edit Medicine & Supplier</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* 2. HEADER SECTION */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div>
@@ -1003,7 +1283,10 @@ const Inventory = () => {
                           {initial}
                         </div>
                         <div>
-                          <h4 className="font-semibold text-slate-800 text-sm leading-tight group-hover:text-blue-600 transition-colors">
+                          <h4
+                            onClick={() => openDetailsModal(medicine)}
+                            className="font-semibold text-slate-800 text-sm leading-tight group-hover:text-blue-600 transition-colors cursor-pointer"
+                          >
                             {medicine.medicine_name}
                           </h4>
                           <p className="text-[11px] text-slate-400 mt-0.5">
@@ -1013,6 +1296,15 @@ const Inventory = () => {
                           {medicine.manufacturer && (
                             <p className="text-[10px] text-slate-400/90 mt-0.5">
                               {medicine.manufacturer}
+                            </p>
+                          )}
+                          {medicine.supplier_name && (
+                            <p
+                              onClick={() => openDetailsModal(medicine)}
+                              className="text-[10px] text-blue-600 font-medium mt-0.5 cursor-pointer hover:underline flex items-center gap-1"
+                            >
+                              <Truck size={11} />
+                              <span>Supplier: {medicine.supplier_name} {medicine.supplier_mobile ? `• ${medicine.supplier_mobile}` : ""}</span>
                             </p>
                           )}
                         </div>
@@ -1082,6 +1374,14 @@ const Inventory = () => {
                     {/* Action Buttons */}
                     <td className="py-3.5 px-5 text-right whitespace-nowrap">
                       <div className="flex items-center justify-end gap-1.5">
+                        <button
+                          onClick={() => openDetailsModal(medicine)}
+                          title="View Medicine & Supplier Details"
+                          className="w-8 h-8 rounded-lg bg-slate-50 hover:bg-blue-50 text-slate-500 hover:text-blue-600 flex items-center justify-center transition-colors shadow-2xs"
+                        >
+                          <Eye size={14} />
+                        </button>
+
                         <button
                           onClick={() => handleEdit(medicine)}
                           title="Edit Medicine"
@@ -1171,17 +1471,35 @@ const Inventory = () => {
                     {initial}
                   </div>
                   <div className="min-w-0">
-                    <h4 className="font-semibold text-slate-800 text-sm truncate">
+                    <h4
+                      onClick={() => openDetailsModal(medicine)}
+                      className="font-semibold text-slate-800 text-sm truncate cursor-pointer hover:text-blue-600"
+                    >
                       {medicine.medicine_name}
                     </h4>
                     <p className="text-[11px] text-slate-400 truncate">
                       {medicine.brand_name || "Generic"}{" "}
                       {medicine.salt_name ? `• ${medicine.salt_name}` : ""}
                     </p>
+                    {medicine.supplier_name && (
+                      <p
+                        onClick={() => openDetailsModal(medicine)}
+                        className="text-[10px] text-blue-600 font-medium truncate cursor-pointer"
+                      >
+                        Supplier: {medicine.supplier_name}
+                      </p>
+                    )}
                   </div>
                 </div>
 
                 <div className="flex items-center gap-1 shrink-0">
+                  <button
+                    onClick={() => openDetailsModal(medicine)}
+                    title="View Details"
+                    className="w-7 h-7 rounded-lg bg-slate-50 text-slate-600 hover:bg-blue-50 hover:text-blue-600 flex items-center justify-center transition-colors"
+                  >
+                    <Eye size={13} />
+                  </button>
                   <button
                     onClick={() => handleEdit(medicine)}
                     title="Edit"

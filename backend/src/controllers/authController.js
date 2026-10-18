@@ -80,7 +80,6 @@ exports.sendOtp = async (req, res) => {
       message: emailSent
         ? "Verification code sent to your email"
         : "OTP generated successfully",
-      devOtp: !emailSent ? otp : undefined,
     });
   } catch (err) {
     console.error("sendOtp error:", err);
@@ -148,6 +147,166 @@ exports.verifyOtp = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: err.message || "Failed to verify OTP",
+    });
+  }
+};
+
+// Mobile SMS OTP Store
+const mobileOtpStore = {};
+
+exports.sendMobileOtp = async (req, res) => {
+  try {
+    const { mobile, countryCode = "+91" } = req.body;
+    const cleanMobile = String(mobile || "").replace(/\D/g, "");
+
+    if (!cleanMobile || cleanMobile.length < 10) {
+      return res.status(400).json({
+        success: false,
+        message: "Please enter a valid 10-digit mobile number",
+      });
+    }
+
+    const fullPhoneNumber = `${countryCode}${cleanMobile.slice(-10)}`;
+
+    // Rate limiting: cooldown 60 seconds
+    const existing = mobileOtpStore[fullPhoneNumber];
+    if (existing && Date.now() - existing.createdAt < 60 * 1000) {
+      const waitSec = Math.ceil((60 * 1000 - (Date.now() - existing.createdAt)) / 1000);
+      return res.status(429).json({
+        success: false,
+        message: `Please wait ${waitSec} seconds before requesting a new OTP.`,
+      });
+    }
+
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+
+    mobileOtpStore[fullPhoneNumber] = {
+      otp,
+      attempts: 0,
+      createdAt: Date.now(),
+      expires: Date.now() + 5 * 60 * 1000,
+    };
+
+    // SMS Gateway Dispatch:
+    // If external SMS provider (e.g. Fast2SMS / MSG91 / Twilio) is configured in environment
+    const smsApiKey = process.env.SMS_API_KEY || process.env.FAST2SMS_API_KEY;
+    if (smsApiKey) {
+      try {
+        const https = require("https");
+        const fast2smsUrl = `https://www.fast2sms.com/dev/bulkV2?authorization=${smsApiKey}&route=otp&variables_values=${otp}&numbers=${cleanMobile.slice(-10)}`;
+        https.get(fast2smsUrl, (resp) => {
+          let data = "";
+          resp.on("data", (chunk) => { data += chunk; });
+          resp.on("end", () => {
+            console.log("[Fast2SMS] SMS sent response:", data);
+          });
+        }).on("error", (err) => {
+          console.error("[Fast2SMS] Gateway error:", err.message);
+        });
+      } catch (smsErr) {
+        console.error("SMS Gateway error:", smsErr);
+      }
+    } else {
+      console.log(`[SMS Server] 📱 Generated OTP for ${fullPhoneNumber}`);
+    }
+
+    return res.json({
+      success: true,
+      message: `Verification code sent to ${fullPhoneNumber}`,
+      phoneNumber: fullPhoneNumber,
+    });
+  } catch (err) {
+    console.error("sendMobileOtp error:", err);
+    return res.status(500).json({
+      success: false,
+      message: err.message || "Failed to send mobile OTP",
+    });
+  }
+};
+
+exports.verifyMobileOtp = async (req, res) => {
+  try {
+    const { mobile, otp, countryCode = "+91" } = req.body;
+    const cleanMobile = String(mobile || "").replace(/\D/g, "");
+
+    if (!cleanMobile || cleanMobile.length < 10) {
+      return res.status(400).json({
+        success: false,
+        message: "Please enter a valid 10-digit mobile number",
+      });
+    }
+
+    if (!otp || String(otp).trim().length !== 6) {
+      return res.status(400).json({
+        success: false,
+        message: "Please enter the complete 6-digit verification code",
+      });
+    }
+
+    const fullPhoneNumber = `${countryCode}${cleanMobile.slice(-10)}`;
+    const record = mobileOtpStore[fullPhoneNumber];
+
+    if (!record) {
+      return res.status(400).json({
+        success: false,
+        message: "No active verification code found for this mobile number. Please request a new code.",
+      });
+    }
+
+    if (Date.now() > record.expires) {
+      delete mobileOtpStore[fullPhoneNumber];
+      return res.status(400).json({
+        success: false,
+        message: "Verification code has expired. Please request a new code.",
+      });
+    }
+
+    record.attempts = (record.attempts || 0) + 1;
+    if (record.attempts > 5) {
+      delete mobileOtpStore[fullPhoneNumber];
+      return res.status(429).json({
+        success: false,
+        message: "Maximum verification attempts exceeded. Please request a new OTP.",
+      });
+    }
+
+    if (record.otp !== String(otp).trim()) {
+      return res.status(400).json({
+        success: false,
+        message: `Invalid verification code (${5 - record.attempts} attempts remaining).`,
+      });
+    }
+
+    // Valid OTP - clear
+    delete mobileOtpStore[fullPhoneNumber];
+
+    const jwtSecret = process.env.JWT_SECRET || "pharmamed_jwt_secret_dev_key_2026";
+    const token = jwt.sign(
+      {
+        phoneNumber: fullPhoneNumber,
+        mobile: fullPhoneNumber,
+        role: "Pharmacist",
+      },
+      jwtSecret,
+      { expiresIn: "7d" }
+    );
+
+    return res.json({
+      success: true,
+      token,
+      message: "Mobile verification successful! Welcome to PharmaMed ERP.",
+      user: {
+        phoneNumber: fullPhoneNumber,
+        mobile: fullPhoneNumber,
+        displayName: `Pharmacist (${fullPhoneNumber.slice(-4)})`,
+        role: "Pharmacist",
+      },
+    });
+  } catch (err) {
+    console.error("verifyMobileOtp error:", err);
+    return res.status(500).json({
+      success: false,
+      message: err.message || "Failed to verify mobile OTP",
     });
   }
 };

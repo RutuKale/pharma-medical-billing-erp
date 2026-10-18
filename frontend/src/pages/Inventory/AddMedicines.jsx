@@ -20,6 +20,14 @@ import {
   TrendingUp,
   ShieldCheck,
   Calculator,
+  Truck,
+  UserPlus,
+  Phone,
+  Mail,
+  FileText,
+  X,
+  User,
+  Search,
 } from "lucide-react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import Swal from "sweetalert2";
@@ -141,6 +149,13 @@ const AddMedicines = () => {
     rackLocation: "",
     minStock: "",
     quantity: "",
+    supplierId: "",
+    supplierName: "",
+    supplierContact: "",
+    supplierMobile: "",
+    supplierEmail: "",
+    supplierAddress: "",
+    supplierGst: "",
   });
   const [totalTabletQty, setTotalTabletQty] = useState("");
   const [totalPackPrice, setTotalPackPrice] = useState("");
@@ -150,6 +165,37 @@ const AddMedicines = () => {
   const navigate = useNavigate();
   const editMode = location.state?.editMode || false;
   const medicineData = location.state?.medicineData;
+
+  // Supplier Management State
+  const [suppliers, setSuppliers] = useState([]);
+  const [selectedSupplierId, setSelectedSupplierId] = useState("");
+  const [supplierSearchQuery, setSupplierSearchQuery] = useState("");
+  const [isSupplierModalOpen, setIsSupplierModalOpen] = useState(false);
+  const [isSavingSupplier, setIsSavingSupplier] = useState(false);
+  const [newSupplier, setNewSupplier] = useState({
+    supplier_name: "",
+    contact_person: "",
+    mobile: "",
+    email: "",
+    address: "",
+    gst_number: "",
+  });
+  const [supplierErrors, setSupplierErrors] = useState({});
+
+  // Fetch available suppliers
+  useEffect(() => {
+    const fetchSuppliers = async () => {
+      try {
+        const res = await apiClient.get("/suppliers");
+        if (res.data?.success) {
+          setSuppliers(res.data.data || []);
+        }
+      } catch (err) {
+        console.error("Error fetching suppliers:", err);
+      }
+    };
+    fetchSuppliers();
+  }, []);
 
   const handleTabletQtyChange = (val) => {
     setTotalTabletQty(val);
@@ -184,6 +230,140 @@ const AddMedicines = () => {
     }
   };
 
+  const handleSupplierSelect = (supId) => {
+    setSelectedSupplierId(supId);
+    if (!supId) {
+      setFormData((prev) => ({
+        ...prev,
+        supplierId: "",
+        supplierName: "",
+        supplierContact: "",
+        supplierMobile: "",
+        supplierEmail: "",
+        supplierAddress: "",
+        supplierGst: "",
+      }));
+      return;
+    }
+
+    const sup = suppliers.find(
+      (s) => String(s.supplier_id || s.id) === String(supId)
+    );
+    if (sup) {
+      setFormData((prev) => ({
+        ...prev,
+        supplierId: sup.supplier_id || sup.id,
+        supplierName: sup.supplier_name || sup.name || "",
+        supplierContact: sup.contact_person || "",
+        supplierMobile: sup.mobile || sup.mobile_number || "",
+        supplierEmail: sup.email || "",
+        supplierAddress: sup.address || "",
+        supplierGst: sup.gst_number || "",
+      }));
+    }
+  };
+
+  const handleSaveNewSupplier = async (e) => {
+    e.preventDefault();
+    const errs = {};
+    if (!newSupplier.supplier_name.trim()) {
+      errs.supplier_name = "Supplier name is required";
+    }
+    const cleanMobile = newSupplier.mobile.replace(/\D/g, "");
+    if (!cleanMobile) {
+      errs.mobile = "Mobile number is required";
+    } else if (cleanMobile.length !== 10) {
+      errs.mobile = "Enter a valid 10-digit mobile number";
+    }
+    if (newSupplier.email && !newSupplier.email.includes("@")) {
+      errs.email = "Enter a valid email address";
+    }
+
+    if (Object.keys(errs).length > 0) {
+      setSupplierErrors(errs);
+      return;
+    }
+
+    // Check if supplier already exists locally by mobile number
+    const existingLocal = suppliers.find(
+      (s) =>
+        (s.mobile || s.mobile_number || "").replace(/\D/g, "") === cleanMobile
+    );
+    if (existingLocal) {
+      const supId = existingLocal.supplier_id || existingLocal.id;
+      handleSupplierSelect(supId);
+      setIsSupplierModalOpen(false);
+      setNewSupplier({
+        supplier_name: "",
+        contact_person: "",
+        mobile: "",
+        email: "",
+        address: "",
+        gst_number: "",
+      });
+      setSupplierErrors({});
+      Swal.fire({
+        icon: "info",
+        title: "Supplier Already Exists",
+        text: `Existing supplier "${existingLocal.supplier_name || existingLocal.name}" was automatically selected.`,
+        confirmButtonColor: "#2563eb",
+      });
+      return;
+    }
+
+    try {
+      setIsSavingSupplier(true);
+      const res = await apiClient.post("/suppliers", newSupplier);
+      if (res.data?.success) {
+        const created = res.data.data;
+        const supId = created.supplier_id || created.id;
+        if (!suppliers.some((s) => String(s.supplier_id || s.id) === String(supId))) {
+          setSuppliers((prev) => [...prev, created]);
+        }
+        setSelectedSupplierId(supId);
+        setFormData((prev) => ({
+          ...prev,
+          supplierId: supId,
+          supplierName: created.supplier_name || created.name || "",
+          supplierContact: created.contact_person || "",
+          supplierMobile: created.mobile || created.mobile_number || "",
+          supplierEmail: created.email || "",
+          supplierAddress: created.address || "",
+          supplierGst: created.gst_number || "",
+        }));
+
+        setIsSupplierModalOpen(false);
+        setNewSupplier({
+          supplier_name: "",
+          contact_person: "",
+          mobile: "",
+          email: "",
+          address: "",
+          gst_number: "",
+        });
+        setSupplierErrors({});
+
+        Swal.fire({
+          icon: "success",
+          title: "Supplier Registered",
+          text: `${created.supplier_name || "Supplier"} linked successfully to this medicine.`,
+          timer: 2000,
+          showConfirmButton: false,
+        });
+      }
+    } catch (err) {
+      console.error(err);
+      Swal.fire({
+        icon: "error",
+        title: "Registration Failed",
+        text: err.response?.data?.message || err.message || "Failed to add supplier",
+        confirmButtonColor: "#2563eb",
+      });
+    } finally {
+      setIsSavingSupplier(false);
+    }
+  };
+
   useEffect(() => {
     if (editMode && medicineData) {
       setFormData({
@@ -207,7 +387,17 @@ const AddMedicines = () => {
         rackLocation: medicineData.rack_location || "",
         minStock: medicineData.min_stock || "",
         quantity: medicineData.quantity || "",
+        supplierId: medicineData.supplier_id || "",
+        supplierName: medicineData.supplier_name || "",
+        supplierContact: medicineData.supplier_contact || "",
+        supplierMobile: medicineData.supplier_mobile || "",
+        supplierEmail: medicineData.supplier_email || "",
+        supplierAddress: medicineData.supplier_address || "",
+        supplierGst: medicineData.supplier_gst || "",
       });
+      if (medicineData.supplier_id) {
+        setSelectedSupplierId(medicineData.supplier_id);
+      }
     }
   }, [editMode, medicineData]);
 
@@ -346,9 +536,16 @@ const AddMedicines = () => {
         manufacture_date: formData.manufactureDate || null,
         expiry_date: formData.expiryDate,
         quantity: Number(formData.quantity),
-        rack_location: formData.rackLocation,
+        rackLocation: formData.rackLocation,
         min_stock: Number(formData.minStock || 0),
         status: "ACTIVE",
+        supplier_id: formData.supplierId || null,
+        supplier_name: formData.supplierName || "",
+        supplier_contact: formData.supplierContact || "",
+        supplier_mobile: formData.supplierMobile || "",
+        supplier_email: formData.supplierEmail || "",
+        supplier_address: formData.supplierAddress || "",
+        supplier_gst: formData.supplierGst || "",
       };
 
       if (editMode) {
@@ -421,7 +618,15 @@ const AddMedicines = () => {
         rackLocation: "",
         minStock: "",
         quantity: "",
+        supplierId: "",
+        supplierName: "",
+        supplierContact: "",
+        supplierMobile: "",
+        supplierEmail: "",
+        supplierAddress: "",
+        supplierGst: "",
       });
+      setSelectedSupplierId("");
       setErrors({});
     }
   };
@@ -484,6 +689,175 @@ const AddMedicines = () => {
           </div>
 
           <div className="p-5 sm:p-6 space-y-6">
+            {/* SECTION: Supplier Details (Before Basic Medicine Info) */}
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-blue-600"></span>
+                  <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                    Supplier & Vendor Assignment
+                  </h3>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setIsSupplierModalOpen(true)}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-xl text-xs font-bold transition-all shadow-2xs active:scale-95"
+                >
+                  <UserPlus size={14} />
+                  <span>+ Add New Supplier</span>
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div className="w-full sm:col-span-2 lg:col-span-1">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="block text-xs font-semibold text-slate-700">
+                      Select Supplier / Vendor
+                    </label>
+                    {suppliers.length > 0 && (
+                      <span className="text-[10px] text-slate-400">
+                        {suppliers.length} on file
+                      </span>
+                    )}
+                  </div>
+                  <div className="space-y-1.5">
+                    {/* Quick Search / Filter Input */}
+                    <div className="relative">
+                      <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none">
+                        <Search size={13} />
+                      </div>
+                      <input
+                        type="text"
+                        placeholder="Search supplier by name or phone..."
+                        value={supplierSearchQuery}
+                        onChange={(e) => setSupplierSearchQuery(e.target.value)}
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-8 pr-7 py-1.5 text-xs text-slate-800 placeholder-slate-400 outline-none focus:ring-1 focus:ring-blue-500"
+                      />
+                      {supplierSearchQuery && (
+                        <button
+                          type="button"
+                          onClick={() => setSupplierSearchQuery("")}
+                          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs"
+                        >
+                          ✕
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Select Dropdown */}
+                    <div className="relative">
+                      <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none z-10">
+                        <Truck size={16} />
+                      </div>
+                      <select
+                        value={selectedSupplierId}
+                        onChange={(e) => handleSupplierSelect(e.target.value)}
+                        className="w-full bg-slate-50/80 border border-slate-200 rounded-xl pl-10 pr-9 py-2 text-sm font-medium text-slate-700 outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all cursor-pointer appearance-none"
+                      >
+                        <option value="">-- Select or Search Supplier --</option>
+                        {suppliers
+                          .filter((s) => {
+                            if (!supplierSearchQuery.trim()) return true;
+                            const q = supplierSearchQuery.toLowerCase();
+                            return (
+                              (s.supplier_name || s.name || "").toLowerCase().includes(q) ||
+                              (s.mobile || s.mobile_number || "").includes(q) ||
+                              (s.contact_person || "").toLowerCase().includes(q)
+                            );
+                          })
+                          .map((s) => (
+                            <option
+                              key={s.supplier_id || s.id}
+                              value={s.supplier_id || s.id}
+                              className="bg-white text-slate-800"
+                            >
+                              {s.supplier_name || s.name} {s.mobile ? `(${s.mobile})` : ""}
+                            </option>
+                          ))}
+                      </select>
+                      <ChevronDown
+                        size={14}
+                        className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Direct display of selected supplier contact & mobile */}
+                <div className="w-full">
+                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                    Supplier Contact Person
+                  </label>
+                  <div className="relative">
+                    <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none">
+                      <User size={16} />
+                    </div>
+                    <input
+                      type="text"
+                      readOnly
+                      value={formData.supplierContact || "None specified"}
+                      className="w-full bg-slate-100/70 border border-slate-200 rounded-xl pl-10 pr-3.5 py-2.5 text-sm text-slate-600 outline-none cursor-default"
+                      placeholder="Select supplier to view"
+                    />
+                  </div>
+                </div>
+
+                <div className="w-full">
+                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                    Supplier Phone / Mobile
+                  </label>
+                  <div className="relative">
+                    <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none">
+                      <Phone size={16} />
+                    </div>
+                    <input
+                      type="text"
+                      readOnly
+                      value={formData.supplierMobile || "None specified"}
+                      className="w-full bg-slate-100/70 border border-slate-200 rounded-xl pl-10 pr-3.5 py-2.5 text-sm text-slate-600 outline-none cursor-default"
+                      placeholder="Select supplier to view"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Active Supplier Detailed Card */}
+              {formData.supplierName && (
+                <div className="mt-4 p-4 rounded-xl bg-blue-50/50 border border-blue-200/70 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-xl bg-blue-600 text-white flex items-center justify-center font-bold shrink-0 shadow-2xs">
+                      <Truck size={18} />
+                    </div>
+                    <div>
+                      <h4 className="font-bold text-slate-900 text-sm">
+                        {formData.supplierName}
+                      </h4>
+                      <p className="text-slate-500 mt-0.5">
+                        {formData.supplierContact && `Contact: ${formData.supplierContact} • `}
+                        {formData.supplierMobile && `Mobile: ${formData.supplierMobile} • `}
+                        {formData.supplierGst ? `GST: ${formData.supplierGst}` : "GST: Not Provided"}
+                      </p>
+                      {formData.supplierAddress && (
+                        <p className="text-slate-400 text-[11px] mt-0.5">
+                          Address: {formData.supplierAddress}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleSupplierSelect("")}
+                    className="text-xs font-semibold text-rose-600 hover:text-rose-700 underline shrink-0"
+                  >
+                    Clear Supplier
+                  </button>
+                </div>
+              )}
+            </div>
+
+            <hr className="border-slate-100" />
+
             {/* SECTION A: General Information */}
             <div>
               <div className="flex items-center gap-2 mb-3">
@@ -811,6 +1185,7 @@ const AddMedicines = () => {
                 />
               </div>
             </div>
+
           </div>
 
           {/* Form Action Footer */}
@@ -852,6 +1227,149 @@ const AddMedicines = () => {
           </div>
         </div>
       </form>
+
+      {/* 3. ADD NEW SUPPLIER MODAL */}
+      {isSupplierModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div
+            className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs transition-opacity"
+            onClick={() => setIsSupplierModalOpen(false)}
+          />
+
+          <div className="relative z-10 w-full max-w-lg bg-white rounded-2xl p-6 shadow-2xl border border-slate-200 animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100 mb-4">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold">
+                  <Truck size={18} />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-800 leading-tight">
+                    Add New Supplier
+                  </h3>
+                  <p className="text-xs text-slate-400">
+                    Register vendor details to link with medicines and stock.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsSupplierModalOpen(false)}
+                className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveNewSupplier} className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                <div className="sm:col-span-2">
+                  <InputField
+                    label="Supplier / Company Name"
+                    name="supplier_name"
+                    value={newSupplier.supplier_name}
+                    onChange={(e) => {
+                      setNewSupplier({ ...newSupplier, supplier_name: e.target.value });
+                      if (supplierErrors.supplier_name) setSupplierErrors({ ...supplierErrors, supplier_name: "" });
+                    }}
+                    error={supplierErrors.supplier_name}
+                    placeholder="e.g. Apex Healthcare Ltd"
+                    required
+                    icon={Building2}
+                  />
+                </div>
+
+                <InputField
+                  label="Contact Person"
+                  name="contact_person"
+                  value={newSupplier.contact_person}
+                  onChange={(e) => setNewSupplier({ ...newSupplier, contact_person: e.target.value })}
+                  placeholder="e.g. Rajesh Kumar"
+                  icon={User}
+                />
+
+                <InputField
+                  label="Mobile Number"
+                  name="mobile"
+                  value={newSupplier.mobile}
+                  onChange={(e) => {
+                    setNewSupplier({ ...newSupplier, mobile: e.target.value });
+                    if (supplierErrors.mobile) setSupplierErrors({ ...supplierErrors, mobile: "" });
+                  }}
+                  error={supplierErrors.mobile}
+                  placeholder="10-digit phone number"
+                  required
+                  icon={Phone}
+                />
+
+                <InputField
+                  label="Email Address (Optional)"
+                  name="email"
+                  type="email"
+                  value={newSupplier.email}
+                  onChange={(e) => {
+                    setNewSupplier({ ...newSupplier, email: e.target.value });
+                    if (supplierErrors.email) setSupplierErrors({ ...supplierErrors, email: "" });
+                  }}
+                  error={supplierErrors.email}
+                  placeholder="e.g. orders@apexhealth.in"
+                  icon={Mail}
+                />
+
+                <InputField
+                  label="GST Number (Optional)"
+                  name="gst_number"
+                  value={newSupplier.gst_number}
+                  onChange={(e) => setNewSupplier({ ...newSupplier, gst_number: e.target.value })}
+                  placeholder="e.g. 24AAACA1234A1Z5"
+                  icon={FileText}
+                />
+
+                <div className="sm:col-span-2">
+                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                    Supplier Address (Optional)
+                  </label>
+                  <div className="relative">
+                    <div className="absolute left-3.5 top-3 text-slate-400 pointer-events-none">
+                      <MapPin size={16} />
+                    </div>
+                    <textarea
+                      rows={2}
+                      value={newSupplier.address}
+                      onChange={(e) => setNewSupplier({ ...newSupplier, address: e.target.value })}
+                      placeholder="e.g. Plot 42, GIDC Phase 2, Industrial Area"
+                      className="w-full bg-slate-50/80 border border-slate-200 rounded-xl pl-10 pr-3.5 py-2 text-sm text-slate-900 placeholder-slate-400 outline-none focus:ring-2 focus:ring-blue-500 transition-all resize-none"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setIsSupplierModalOpen(false)}
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSavingSupplier}
+                  className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-colors disabled:opacity-50 flex items-center gap-1.5"
+                >
+                  {isSavingSupplier ? (
+                    <ButtonLoader text="Saving..." />
+                  ) : (
+                    <>
+                      <Save size={14} />
+                      <span>Save & Link Supplier</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

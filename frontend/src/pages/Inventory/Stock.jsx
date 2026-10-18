@@ -17,9 +17,11 @@ import {
   CheckCircle2,
   ArrowRight,
   Filter,
+  Download,
 } from "lucide-react";
 import API from "../../utils/api";
 import DashboardSkeleton from "../../components/DashboardSkeleton";
+import { exportToExcel } from "../../utils/excelExport";
 
 const Stock = () => {
   const [medicines, setMedicines] = useState([]);
@@ -207,6 +209,38 @@ const Stock = () => {
 
   const totalPagesLogs = Math.ceil(filteredLogs.length / itemsPerPage);
 
+  const handleExportStockExcel = () => {
+    exportToExcel({
+      filename: "Medicine_Inventory_Stock_Report",
+      sheetName: "Stock_Overview",
+      data: filteredMedicines,
+      columns: [
+        { header: "Medicine Name", key: "medicine_name" },
+        { header: "Category", key: "category", format: (v) => v || "General" },
+        { header: "Batch Number", key: "batch_number", format: (v) => v || "-" },
+        { header: "Current Stock", key: "quantity", format: (v) => Number(v || 0) },
+        { header: "Min Stock Alert", key: "min_stock", format: (v) => Number(v || 10) },
+        { header: "Price (₹)", key: "price", format: (v) => Number(v || 0).toFixed(2) },
+        { header: "GST (%)", key: "gst_percentage", format: (v) => Number(v || 0) },
+        { header: "Expiry Date", key: "expiry_date", format: (v) => v || "N/A" },
+        { header: "Supplier Name", key: "supplier_name", format: (v) => v || "Not Assigned" },
+        {
+          header: "Stock Status",
+          key: "quantity",
+          format: (v, r) => {
+            const s = Number(v || 0);
+            const m = Number(r.min_stock || 10);
+            return s === 0 ? "Out of Stock" : s <= m ? "Low Stock" : "In Stock";
+          },
+        },
+      ],
+      summaryTotals: {
+        medicine_name: "TOTAL ITEMS",
+        quantity: filteredMedicines.reduce((sum, item) => sum + Number(item.quantity || 0), 0),
+      },
+    });
+  };
+
   if (loading) {
     return <DashboardSkeleton />;
   }
@@ -226,7 +260,15 @@ const Stock = () => {
           </div>
         </div>
 
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-2.5 flex-wrap">
+          <button
+            type="button"
+            onClick={handleExportStockExcel}
+            className="inline-flex items-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-sm font-semibold shadow-xs transition-colors"
+          >
+            <Download size={16} />
+            <span>Export to Excel</span>
+          </button>
           <Link
             to="/inventory"
             className="inline-flex items-center gap-2 px-4 py-2.5 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-xl text-sm font-semibold shadow-xs transition-colors"
@@ -434,6 +476,11 @@ const Stock = () => {
                             <p className="text-[11px] text-slate-400 mt-0.5">
                               {medicine.category || "General"} {medicine.batch_number ? `• ${medicine.batch_number}` : ""}
                             </p>
+                            {medicine.supplier_name && (
+                              <p className="text-[10px] text-blue-600 font-medium mt-0.5">
+                                Supplier: {medicine.supplier_name}
+                              </p>
+                            )}
                           </div>
                         </div>
                       </td>
