@@ -310,7 +310,6 @@ const BillingHistory = () => {
         { header: "Invoice Date", key: "date" },
         { header: "Subtotal (₹)", key: "subtotal", format: (v) => Number(v || 0).toFixed(2) },
         { header: "Discount (₹)", key: "discount", format: (v) => Number(v || 0).toFixed(2) },
-        { header: "GST (₹)", key: "tax", format: (v) => Number(v || 0).toFixed(2) },
         { header: "Grand Total (₹)", key: "amount", format: (v) => Number(v || 0).toFixed(2) },
         { header: "Payment Mode", key: "paymentMode" },
         { header: "Status", key: "status" },
@@ -331,10 +330,10 @@ const BillingHistory = () => {
       {/* 1. HEADER SECTION (No icon next to title per design standards) */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight flex items-center gap-2">
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight flex items-center gap-2">
             <span>Billing History</span>
           </h1>
-          <p className="text-slate-500 text-xs sm:text-sm mt-0.5">
+          <p className="text-slate-500 dark:text-slate-400 text-xs sm:text-sm mt-0.5">
             Audit pharmacy transactions, view customer receipts, and manage invoice status.
           </p>
         </div>
@@ -357,9 +356,9 @@ const BillingHistory = () => {
           </Link>
           <Link
             to="/patients"
-            className="inline-flex items-center gap-2 px-4 py-2.5 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-xl text-sm font-semibold shadow-xs transition-colors"
+            className="inline-flex items-center gap-2 px-4 py-2.5 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-200 rounded-xl text-sm font-semibold shadow-xs transition-colors"
           >
-            <Users size={16} className="text-slate-500" />
+            <Users size={16} className="text-slate-500 dark:text-slate-400" />
             <span>Patients</span>
           </Link>
         </div>
@@ -368,33 +367,33 @@ const BillingHistory = () => {
       {/* 2. STAT CARDS ROW */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Total Bills */}
-        <div className="bg-white rounded-2xl p-5 border border-slate-200/90 shadow-xs hover:shadow-sm transition-all flex flex-col justify-between">
+        <div className="bg-white dark:bg-slate-900 rounded-2xl p-5 border border-slate-200/90 dark:border-slate-800 shadow-xs hover:shadow-sm transition-all flex flex-col justify-between">
           <div className="flex items-start justify-between">
             <div>
-              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+              <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
                 Total Invoices
               </p>
-              <p className="text-2xl font-bold text-slate-900 mt-2">
+              <p className="text-2xl font-bold text-slate-900 dark:text-white mt-2">
                 {stats.totalBills}
               </p>
             </div>
-            <div className="p-2.5 rounded-xl bg-blue-50 text-blue-600 border border-blue-100">
+            <div className="p-2.5 rounded-xl bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 border border-blue-100 dark:border-blue-900/50">
               <IndianRupee size={20} />
             </div>
           </div>
-          <div className="mt-4 flex items-center gap-1.5 text-xs text-slate-500 font-medium">
+          <div className="mt-4 flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400 font-medium">
             <span>All recorded pharmacy bills</span>
           </div>
         </div>
 
         {/* Total Sales */}
-        <div className="bg-white rounded-2xl p-5 border border-slate-200/90 shadow-xs hover:shadow-sm transition-all flex flex-col justify-between">
+        <div className="bg-white dark:bg-slate-900 rounded-2xl p-5 border border-slate-200/90 dark:border-slate-800 shadow-xs hover:shadow-sm transition-all flex flex-col justify-between">
           <div className="flex items-start justify-between">
             <div>
-              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+              <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
                 Total Revenue
               </p>
-              <p className="text-2xl font-bold text-slate-900 mt-2">
+              <p className="text-2xl font-bold text-slate-900 dark:text-white mt-2">
                 ₹
                 {stats.totalSales.toLocaleString("en-IN", {
                   minimumFractionDigits: 2,
@@ -402,60 +401,60 @@ const BillingHistory = () => {
                 })}
               </p>
             </div>
-            <div className="p-2.5 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-100">
+            <div className="p-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-900/50">
               <TrendingUp size={20} />
             </div>
           </div>
-          <div className="mt-4 flex items-center gap-1.5 text-xs text-emerald-600 font-medium">
+          <div className="mt-4 flex items-center gap-1.5 text-xs text-emerald-600 dark:text-emerald-400 font-medium">
             <CheckCircle2 size={13} />
             <span>Completed sales only</span>
           </div>
         </div>
 
         {/* Today's Bills */}
-        <div className="bg-white rounded-2xl p-5 border border-slate-200/90 shadow-xs hover:shadow-sm transition-all flex flex-col justify-between">
+        <div className="bg-white dark:bg-slate-900 rounded-2xl p-5 border border-slate-200/90 dark:border-slate-800 shadow-xs hover:shadow-sm transition-all flex flex-col justify-between">
           <div className="flex items-start justify-between">
             <div>
-              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+              <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
                 Today's Bills
               </p>
-              <p className="text-2xl font-bold text-slate-900 mt-2">
+              <p className="text-2xl font-bold text-slate-900 dark:text-white mt-2">
                 {stats.todayBills}
               </p>
             </div>
-            <div className="p-2.5 rounded-xl bg-purple-50 text-purple-600 border border-purple-100">
+            <div className="p-2.5 rounded-xl bg-purple-50 dark:bg-purple-950/40 text-purple-600 dark:text-purple-400 border border-purple-100 dark:border-purple-900/50">
               <Calendar size={20} />
             </div>
           </div>
-          <div className="mt-4 flex items-center gap-1.5 text-xs text-slate-500 font-medium">
-            <Clock size={13} className="text-purple-500" />
+          <div className="mt-4 flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400 font-medium">
+            <Clock size={13} className="text-purple-500 dark:text-purple-400" />
             <span>Generated today</span>
           </div>
         </div>
 
         {/* Cancelled Bills */}
-        <div className="bg-white rounded-2xl p-5 border border-slate-200/90 shadow-xs hover:shadow-sm transition-all flex flex-col justify-between">
+        <div className="bg-white dark:bg-slate-900 rounded-2xl p-5 border border-slate-200/90 dark:border-slate-800 shadow-xs hover:shadow-sm transition-all flex flex-col justify-between">
           <div className="flex items-start justify-between">
             <div>
-              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+              <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
                 Cancelled Bills
               </p>
-              <p className="text-2xl font-bold text-slate-900 mt-2">
+              <p className="text-2xl font-bold text-slate-900 dark:text-white mt-2">
                 {stats.cancelledBills}
               </p>
             </div>
-            <div className="p-2.5 rounded-xl bg-rose-50 text-rose-600 border border-rose-100">
+            <div className="p-2.5 rounded-xl bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 border border-rose-100 dark:border-rose-900/50">
               <XCircle size={20} />
             </div>
           </div>
-          <div className="mt-4 flex items-center gap-1.5 text-xs text-slate-500 font-medium">
+          <div className="mt-4 flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400 font-medium">
             <span>Voided transactions</span>
           </div>
         </div>
       </div>
 
       {/* 3. SEARCH & FILTERS CARD */}
-      <div className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200/90 shadow-xs space-y-3">
+      <div className="bg-white dark:bg-slate-900 rounded-2xl p-4 sm:p-5 border border-slate-200/90 dark:border-slate-800 shadow-xs space-y-3">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
           {/* Search Bar */}
           <div className="relative flex-1">
@@ -471,13 +470,13 @@ const BillingHistory = () => {
                 setSearch(e.target.value);
                 setCurrentPage(1);
               }}
-              className="w-full bg-slate-50/60 border border-slate-200 rounded-xl pl-10 pr-10 py-2.5 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all font-medium"
+              className="w-full bg-slate-50/60 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl pl-10 pr-10 py-2.5 text-sm text-slate-800 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all font-medium"
             />
             {search && (
               <button
                 type="button"
                 onClick={() => setSearch("")}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1"
               >
                 <X size={15} />
               </button>
@@ -487,7 +486,7 @@ const BillingHistory = () => {
           {/* Quick Filters */}
           <div className="flex items-center gap-2.5 flex-wrap">
             {/* Status Tabs */}
-            <div className="flex items-center p-1 bg-slate-100 rounded-xl border border-slate-200/70">
+            <div className="flex items-center p-1 bg-slate-100 dark:bg-slate-800 rounded-xl border border-slate-200/70 dark:border-slate-700">
               {["All", "Completed", "Cancelled"].map((status) => (
                 <button
                   key={status}
@@ -498,8 +497,8 @@ const BillingHistory = () => {
                   }}
                   className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
                     statusFilter === status
-                      ? "bg-white text-blue-600 shadow-xs"
-                      : "text-slate-600 hover:text-slate-900"
+                      ? "bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-xs"
+                      : "text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white"
                   }`}
                 >
                   {status}
@@ -516,7 +515,7 @@ const BillingHistory = () => {
                   setDateFilter(e.target.value);
                   setCurrentPage(1);
                 }}
-                className="bg-white border border-slate-200 rounded-xl px-3 py-1.5 text-xs text-slate-700 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-1.5 text-xs text-slate-700 dark:text-slate-200 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
               />
             </div>
 
@@ -525,7 +524,7 @@ const BillingHistory = () => {
               <button
                 type="button"
                 onClick={resetFilters}
-                className="inline-flex items-center gap-1 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-xs font-semibold transition-colors"
+                className="inline-flex items-center gap-1 px-3 py-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-xl text-xs font-semibold transition-colors"
                 title="Reset all filters"
               >
                 <RotateCcw size={13} />
@@ -537,13 +536,13 @@ const BillingHistory = () => {
       </div>
 
       {/* 4. BILLS TABLE CARD */}
-      <div className="bg-white rounded-2xl border border-slate-200/90 shadow-xs overflow-hidden">
-        <div className="p-4 sm:p-5 flex items-center justify-between border-b border-slate-100">
+      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/90 dark:border-slate-800 shadow-xs overflow-hidden">
+        <div className="p-4 sm:p-5 flex items-center justify-between border-b border-slate-100 dark:border-slate-800">
           <div>
-            <h3 className="text-base font-bold text-slate-900">
+            <h3 className="text-base font-bold text-slate-900 dark:text-white">
               Invoices List
             </h3>
-            <p className="text-xs text-slate-500 mt-0.5">
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
               Showing {filteredBills.length} recorded transactions
             </p>
           </div>
@@ -552,7 +551,7 @@ const BillingHistory = () => {
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse min-w-[950px]">
             <thead>
-              <tr className="border-b border-slate-100 text-[11px] font-semibold text-slate-400 uppercase tracking-wider bg-slate-50/60">
+              <tr className="border-b border-slate-100 dark:border-slate-800 text-[11px] font-semibold text-slate-400 dark:text-slate-400 uppercase tracking-wider bg-slate-50/60 dark:bg-slate-800/50">
                 <th className="py-3 px-4">Bill #</th>
                 <th className="py-3 px-4">Patient</th>
                 <th className="py-3 px-4">Mobile</th>
@@ -563,19 +562,19 @@ const BillingHistory = () => {
                 <th className="py-3 px-4 text-center w-36">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 text-sm">
+            <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-sm">
               {paginatedBills.map((bill) => (
                 <tr
                   key={bill.id}
-                  className="hover:bg-slate-50/60 transition-colors"
+                  className="hover:bg-slate-50/60 dark:hover:bg-slate-800/40 transition-colors"
                 >
                   <td className="py-3.5 px-4">
-                    <span className="font-mono text-xs font-semibold px-2.5 py-1 rounded-md bg-blue-50 text-blue-700 border border-blue-100">
+                    <span className="font-mono text-xs font-semibold px-2.5 py-1 rounded-md bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border border-blue-100 dark:border-blue-900/50">
                       {bill.billNumber}
                     </span>
                   </td>
                   <td className="py-3.5 px-4">
-                    <div className="font-semibold text-slate-900">
+                    <div className="font-semibold text-slate-900 dark:text-white">
                       {bill.patientName}
                     </div>
                     {bill.doctorName && bill.doctorName !== "-" && (
@@ -585,10 +584,10 @@ const BillingHistory = () => {
                       </div>
                     )}
                   </td>
-                  <td className="py-3.5 px-4 text-slate-600 font-medium">
+                  <td className="py-3.5 px-4 text-slate-600 dark:text-slate-300 font-medium">
                     {bill.mobile}
                   </td>
-                  <td className="py-3.5 px-4 text-slate-600 text-xs">
+                  <td className="py-3.5 px-4 text-slate-600 dark:text-slate-300 text-xs">
                     {bill.date && !isNaN(new Date(bill.date).getTime())
                       ? new Date(bill.date).toLocaleDateString("en-IN", {
                           day: "2-digit",
@@ -598,7 +597,7 @@ const BillingHistory = () => {
                       : bill.date}
                   </td>
                   <td className="py-3.5 px-4">
-                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-700">
+                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
                       <Banknote size={12} className="text-slate-400" />
                       {bill.paymentMode}
                     </span>
@@ -607,8 +606,8 @@ const BillingHistory = () => {
                     <span
                       className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold ${
                         bill.status === "Completed"
-                          ? "bg-emerald-50 text-emerald-700 border border-emerald-100"
-                          : "bg-rose-50 text-rose-700 border border-rose-100"
+                          ? "bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-300 border border-emerald-100 dark:border-emerald-800"
+                          : "bg-rose-50 dark:bg-rose-950/30 text-rose-700 dark:text-rose-300 border border-rose-100 dark:border-rose-800"
                       }`}
                     >
                       {bill.status === "Completed" ? (
@@ -619,7 +618,7 @@ const BillingHistory = () => {
                       {bill.status}
                     </span>
                   </td>
-                  <td className="py-3.5 px-4 text-right font-extrabold text-slate-900">
+                  <td className="py-3.5 px-4 text-right font-extrabold text-slate-900 dark:text-white">
                     ₹{Number(bill.amount || 0).toFixed(2)}
                   </td>
                   <td className="py-3.5 px-4 text-center">
@@ -627,7 +626,7 @@ const BillingHistory = () => {
                       <button
                         type="button"
                         onClick={() => viewBill(bill)}
-                        className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                        className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-slate-800 rounded-lg transition-colors"
                         title="View details"
                       >
                         <Eye size={15} />
@@ -636,7 +635,7 @@ const BillingHistory = () => {
                         <button
                           type="button"
                           onClick={() => handleEditBill(bill)}
-                          className="p-1.5 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors"
+                          className="p-1.5 text-slate-400 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-slate-800 rounded-lg transition-colors"
                           title="Edit Bill"
                         >
                           <Edit size={15} />
@@ -645,7 +644,7 @@ const BillingHistory = () => {
                       <button
                         type="button"
                         onClick={() => printBill(bill)}
-                        className="p-1.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
+                        className="p-1.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-slate-800 rounded-lg transition-colors"
                         title="Print receipt"
                       >
                         <Printer size={15} />
@@ -653,7 +652,7 @@ const BillingHistory = () => {
                       <button
                         type="button"
                         onClick={() => downloadBill(bill)}
-                        className="p-1.5 text-slate-400 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
+                        className="p-1.5 text-slate-400 hover:text-purple-600 hover:bg-purple-50 dark:hover:bg-slate-800 rounded-lg transition-colors"
                         title="Download PDF"
                       >
                         <Download size={15} />
@@ -662,7 +661,7 @@ const BillingHistory = () => {
                         <button
                           type="button"
                           onClick={() => cancelBill(bill)}
-                          className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                          className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-slate-800 rounded-lg transition-colors"
                           title="Void / Cancel bill"
                         >
                           <XCircle size={15} />
@@ -677,10 +676,10 @@ const BillingHistory = () => {
 
           {filteredBills.length === 0 && (
             <div className="text-center py-14 px-4 space-y-2">
-              <div className="w-12 h-12 rounded-2xl bg-slate-100 text-slate-400 mx-auto flex items-center justify-center">
+              <div className="w-12 h-12 rounded-2xl bg-slate-100 dark:bg-slate-800 text-slate-400 mx-auto flex items-center justify-center">
                 <IndianRupee size={24} />
               </div>
-              <p className="text-sm font-semibold text-slate-700">
+              <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">
                 No billing records found
               </p>
               <p className="text-xs text-slate-400 max-w-sm mx-auto">
@@ -692,7 +691,7 @@ const BillingHistory = () => {
                 <button
                   type="button"
                   onClick={resetFilters}
-                  className="mt-2 inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-blue-50 text-blue-600 rounded-xl text-xs font-semibold hover:bg-blue-100 transition-colors"
+                  className="mt-2 inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 rounded-xl text-xs font-semibold hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors"
                 >
                   <RotateCcw size={13} />
                   <span>Reset Filters</span>
@@ -704,7 +703,7 @@ const BillingHistory = () => {
 
         {/* Pagination */}
         {totalPages > 1 && (
-          <div className="p-4 border-t border-slate-100 flex items-center justify-between">
+          <div className="p-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
             <Pagination
               currentPage={currentPage}
               totalPages={totalPages}
@@ -718,7 +717,7 @@ const BillingHistory = () => {
 
       {/* 5. BILL DETAILS MODAL */}
       {viewingBill && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
           <div
             className="fixed inset-0"
             onClick={() => {
@@ -726,23 +725,23 @@ const BillingHistory = () => {
               setViewingItems([]);
             }}
           />
-          <div className="relative z-10 bg-white w-full max-w-2xl rounded-2xl border border-slate-200 shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
+          <div className="relative z-10 bg-white dark:bg-slate-900 w-full max-w-2xl rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
             {/* Modal Header */}
-            <div className="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+            <div className="p-4 sm:p-5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-50/50 dark:bg-slate-800/50">
               <div className="flex items-center gap-2.5">
-                <div className="p-2 rounded-xl bg-blue-50 text-blue-600 border border-blue-100">
+                <div className="p-2 rounded-xl bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 border border-blue-100 dark:border-blue-900/50">
                   <IndianRupee size={18} />
                 </div>
                 <div>
                   <div className="flex items-center gap-2">
-                    <h3 className="font-bold text-slate-900 text-base">
+                    <h3 className="font-bold text-slate-900 dark:text-white text-base">
                       Invoice Details
                     </h3>
-                    <span className="font-mono text-xs font-semibold px-2 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-100">
+                    <span className="font-mono text-xs font-semibold px-2 py-0.5 rounded bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border border-blue-100 dark:border-blue-900/50">
                       {viewingBill.bill_number || viewingBill.billNumber}
                     </span>
                   </div>
-                  <p className="text-xs text-slate-500 mt-0.5">
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
                     {viewingBill.bill_date
                       ? new Date(viewingBill.bill_date).toLocaleString("en-IN")
                       : viewingBill.created_at
@@ -758,7 +757,7 @@ const BillingHistory = () => {
                   setViewingBill(null);
                   setViewingItems([]);
                 }}
-                className="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-100 transition-colors"
+                className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
               >
                 <X size={18} />
               </button>
@@ -767,22 +766,22 @@ const BillingHistory = () => {
             {/* Modal Body */}
             <div className="p-5 overflow-y-auto space-y-4">
               {/* Patient Info Grid */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 p-3.5 rounded-xl bg-slate-50 border border-slate-100 text-xs">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800 text-xs">
                 <div>
                   <span className="text-slate-400 block font-medium">Patient</span>
-                  <span className="font-bold text-slate-800 mt-0.5 block truncate">
+                  <span className="font-bold text-slate-800 dark:text-slate-200 mt-0.5 block truncate">
                     {viewingBill.patient_name || viewingBill.patientName || "—"}
                   </span>
                 </div>
                 <div>
                   <span className="text-slate-400 block font-medium">Mobile</span>
-                  <span className="font-semibold text-slate-800 mt-0.5 block">
+                  <span className="font-semibold text-slate-800 dark:text-slate-200 mt-0.5 block">
                     {viewingBill.mobile_number || viewingBill.mobile || "—"}
                   </span>
                 </div>
                 <div>
                   <span className="text-slate-400 block font-medium">Payment Mode</span>
-                  <span className="font-semibold text-slate-800 mt-0.5 block">
+                  <span className="font-semibold text-slate-800 dark:text-slate-200 mt-0.5 block">
                     {viewingBill.payment_mode || viewingBill.paymentMode || "—"}
                   </span>
                 </div>
@@ -792,8 +791,8 @@ const BillingHistory = () => {
                     className={`font-bold mt-0.5 block ${
                       (viewingBill.payment_status || viewingBill.status) ===
                       "Completed"
-                        ? "text-emerald-600"
-                        : "text-rose-600"
+                        ? "text-emerald-600 dark:text-emerald-400"
+                        : "text-rose-600 dark:text-rose-400"
                     }`}
                   >
                     {viewingBill.payment_status || viewingBill.status}
@@ -802,9 +801,9 @@ const BillingHistory = () => {
               </div>
 
               {/* Items List */}
-              <div className="border border-slate-200/90 rounded-xl overflow-hidden">
+              <div className="border border-slate-200/90 dark:border-slate-800 rounded-xl overflow-hidden">
                 <table className="w-full text-left text-xs">
-                  <thead className="bg-slate-50 border-b border-slate-100 text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
+                  <thead className="bg-slate-50 dark:bg-slate-800/60 border-b border-slate-100 dark:border-slate-800 text-[11px] font-semibold text-slate-400 dark:text-slate-400 uppercase tracking-wider">
                     <tr>
                       <th className="py-2.5 px-3">Medicine</th>
                       <th className="py-2.5 px-3 text-center">Qty</th>
@@ -812,7 +811,7 @@ const BillingHistory = () => {
                       <th className="py-2.5 px-3 text-right">Total</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-100">
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                     {modalLoading ? (
                       <tr>
                         <td colSpan={4} className="py-6 text-center text-slate-400">
@@ -821,9 +820,9 @@ const BillingHistory = () => {
                       </tr>
                     ) : viewingItems.length > 0 ? (
                       viewingItems.map((item, idx) => (
-                        <tr key={idx} className="hover:bg-slate-50/50">
+                        <tr key={idx} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/40">
                           <td className="py-2.5 px-3">
-                            <div className="font-semibold text-slate-800">
+                            <div className="font-semibold text-slate-800 dark:text-slate-200">
                               {item.medicine_name || item.name || item.medicine_id}
                             </div>
                             {item.batch_number && (
@@ -832,13 +831,13 @@ const BillingHistory = () => {
                               </div>
                             )}
                           </td>
-                          <td className="py-2.5 px-3 text-center font-bold text-slate-700">
+                          <td className="py-2.5 px-3 text-center font-bold text-slate-700 dark:text-slate-300">
                             {item.quantity}
                           </td>
-                          <td className="py-2.5 px-3 text-right text-slate-600">
+                          <td className="py-2.5 px-3 text-right text-slate-600 dark:text-slate-300">
                             ₹{Number(item.price || 0).toFixed(2)}
                           </td>
-                          <td className="py-2.5 px-3 text-right font-bold text-slate-900">
+                          <td className="py-2.5 px-3 text-right font-bold text-slate-900 dark:text-white">
                             ₹{Number(item.total || 0).toFixed(2)}
                           </td>
                         </tr>
@@ -855,36 +854,28 @@ const BillingHistory = () => {
               </div>
 
               {/* Summary Breakdown */}
-              <div className="p-3.5 rounded-xl bg-slate-50/70 border border-slate-100 space-y-1.5 text-xs">
+              <div className="p-3.5 rounded-xl bg-slate-50/70 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 space-y-1.5 text-xs">
                 {viewingBill.subtotal !== undefined && (
-                  <div className="flex justify-between text-slate-500">
+                  <div className="flex justify-between text-slate-500 dark:text-slate-400">
                     <span>Subtotal</span>
-                    <span className="font-medium text-slate-700">
+                    <span className="font-medium text-slate-700 dark:text-slate-300">
                       ₹{Number(viewingBill.subtotal || 0).toFixed(2)}
                     </span>
                   </div>
                 )}
                 {viewingBill.total_discount !== undefined && Number(viewingBill.total_discount) > 0 && (
-                  <div className="flex justify-between text-rose-600">
+                  <div className="flex justify-between text-rose-600 dark:text-rose-400">
                     <span>Discount</span>
                     <span className="font-medium">
                       -₹{Number(viewingBill.total_discount || 0).toFixed(2)}
                     </span>
                   </div>
                 )}
-                {viewingBill.total_gst !== undefined && Number(viewingBill.total_gst) > 0 && (
-                  <div className="flex justify-between text-slate-500">
-                    <span>GST Tax</span>
-                    <span className="font-medium text-slate-700">
-                      +₹{Number(viewingBill.total_gst || 0).toFixed(2)}
-                    </span>
-                  </div>
-                )}
-                <div className="pt-2 border-t border-slate-200 flex justify-between items-baseline">
-                  <span className="font-bold text-slate-800 text-sm">
+                <div className="pt-2 border-t border-slate-200 dark:border-slate-700 flex justify-between items-baseline">
+                  <span className="font-bold text-slate-800 dark:text-slate-200 text-sm">
                     Grand Total
                   </span>
-                  <span className="font-extrabold text-slate-900 text-base">
+                  <span className="font-extrabold text-slate-900 dark:text-white text-base">
                     ₹{Number(viewingBill.grand_total || viewingBill.amount || 0).toFixed(2)}
                   </span>
                 </div>
@@ -892,12 +883,12 @@ const BillingHistory = () => {
             </div>
 
             {/* Modal Footer */}
-            <div className="p-4 border-t border-slate-100 flex items-center justify-end gap-2.5 bg-slate-50/40">
+            <div className="p-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-end gap-2.5 bg-slate-50/40 dark:bg-slate-800/40">
               {viewingBill.status !== "Cancelled" && (
                 <button
                   type="button"
                   onClick={() => handleEditBill(viewingBill)}
-                  className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-amber-50 hover:bg-amber-100 border border-amber-200 text-amber-800 rounded-xl text-xs font-semibold shadow-xs transition-colors"
+                  className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-amber-50 dark:bg-amber-950/40 hover:bg-amber-100 dark:hover:bg-amber-900/50 border border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-300 rounded-xl text-xs font-semibold shadow-xs transition-colors"
                 >
                   <Edit size={14} />
                   <span>Edit Bill</span>
@@ -906,7 +897,7 @@ const BillingHistory = () => {
               <button
                 type="button"
                 onClick={() => printBill(viewingBill)}
-                className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-xl text-xs font-semibold shadow-xs transition-colors"
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-semibold shadow-xs transition-colors"
               >
                 <Printer size={14} />
                 <span>Print Bill</span>
@@ -914,7 +905,7 @@ const BillingHistory = () => {
               <button
                 type="button"
                 onClick={() => downloadBill(viewingBill)}
-                className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-xl text-xs font-semibold shadow-xs transition-colors"
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-semibold shadow-xs transition-colors"
               >
                 <Download size={14} />
                 <span>Download PDF</span>

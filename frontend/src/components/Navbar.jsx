@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Search, Bell, User, LogOut, ChevronDown, Settings, Sun, Moon } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { useTheme } from "../context/ThemeContext";
@@ -8,7 +8,15 @@ const Navbar = () => {
     const { user, logout } = useAuth();
     const { theme, toggleTheme } = useTheme();
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+    const [imgError, setImgError] = useState(false);
     const navigate = useNavigate();
+
+    useEffect(() => {
+        setImgError(false);
+    }, [user?.photoURL]);
+
+    const userName = user?.displayName || user?.name || (user?.email ? user.email.split("@")[0] : "") || "unknown user";
+    const userInitial = (userName.trim().charAt(0) || "U").toUpperCase();
 
     const handleLogout = async () => {
         try {
@@ -70,15 +78,19 @@ const Navbar = () => {
                         className="flex items-center gap-2 md:gap-3 p-1 pr-2 rounded-xl border border-transparent hover:border-slate-200 hover:bg-slate-50 transition-all group"
                     >
                         <div className="relative">
-                            <img
-                                src={
-                                    user?.photoURL ||
-                                    `https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&h=100&fit=crop&crop=face`
-                                }
-                                alt="Profile"
-                                className="w-8 h-8 rounded-lg object-cover ring-2 ring-blue-500/30 group-hover:ring-blue-400 transition-all"
-                            />
-                            <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-slate-900"></div>
+                            {user?.photoURL && !imgError ? (
+                                <img
+                                    src={user.photoURL}
+                                    alt={userName}
+                                    onError={() => setImgError(true)}
+                                    className="w-8 h-8 rounded-lg object-cover ring-2 ring-blue-500/30 group-hover:ring-blue-400 transition-all"
+                                />
+                            ) : (
+                                <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-blue-600 to-indigo-600 text-white font-bold text-sm flex items-center justify-center uppercase ring-2 ring-blue-500/30 group-hover:ring-blue-400 transition-all shadow-xs select-none">
+                                    {userInitial}
+                                </div>
+                            )}
+                            <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-white dark:border-slate-900"></div>
                         </div>
 
                         <div className="hidden md:block text-left relative z-10">

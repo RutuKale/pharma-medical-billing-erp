@@ -46,10 +46,7 @@ const getHtmlTemplate = (billData) => {
 
   const subtotal = Number(totals.subtotal || 0);
   const discountTotal = Number(totals.discountTotal || 0);
-  const gstTotal = Number(totals.gstTotal || 0);
-  const grandTotal = Number(totals.grandTotal || 0);
-  const cgst = (gstTotal / 2).toFixed(2);
-  const sgst = (gstTotal / 2).toFixed(2);
+  const grandTotal = Number(totals.grandTotal || subtotal - discountTotal);
 
   return `
     <style>
@@ -330,14 +327,13 @@ const getHtmlTemplate = (billData) => {
             Email: pharmacy@gmail.com
           </p>
           <p class="store-contact" style="margin-top: 2px; font-weight: 600; color: #334155;">
-            GSTIN: 27ABCDE1234F1Z5 &bull; 
             Drug Lic. No: MH-AKL-2023-DL8841
           </p>
         </div>
 
-        <!-- Tax Invoice Sub-banner -->
+        <!-- Invoice Sub-banner -->
         <div class="tax-invoice-bar">
-          <span>TAX INVOICE / CASH MEMO</span>
+          <span>INVOICE / CASH MEMO</span>
           <span>Original for Recipient</span>
         </div>
         
@@ -394,8 +390,8 @@ const getHtmlTemplate = (billData) => {
               <span class="info-value" style="color: #059669; font-weight: 700;">PAID</span>
             </div>
             <div class="info-row">
-              <span class="info-label">Term / State:</span>
-              <span class="info-value">Maharashtra (Code: 27)</span>
+              <span class="info-label">State / Region:</span>
+              <span class="info-value">Maharashtra</span>
             </div>
           </div>
         </div>
@@ -405,14 +401,13 @@ const getHtmlTemplate = (billData) => {
           <thead>
             <tr>
               <th class="text-center" width="5%">#</th>
-              <th class="text-left" width="34%">Medicine / Description</th>
-              <th class="text-center" width="13%">Batch No</th>
-              <th class="text-center" width="10%">Exp Date</th>
-              <th class="text-center" width="9%">Qty (Tab)</th>
-              <th width="10%">Rate/Tab</th>
-              <th width="7%">Dis%</th>
-              <th width="6%">GST</th>
-              <th width="11%">Amount</th>
+              <th class="text-left" width="38%">Medicine / Description</th>
+              <th class="text-center" width="14%">Batch No</th>
+              <th class="text-center" width="11%">Exp Date</th>
+              <th class="text-center" width="10%">Qty (Tab)</th>
+              <th width="11%">Rate/Tab</th>
+              <th width="9%">Dis%</th>
+              <th width="12%">Amount</th>
             </tr>
           </thead>
           <tbody>
@@ -421,8 +416,7 @@ const getHtmlTemplate = (billData) => {
                 const qty = Number(item.quantity || 0);
                 const price = Number(item.price || 0);
                 const discount = Number(item.discount || 0);
-                const gst = Number(item.gst || 0);
-                const total = Number(item.total || qty * price);
+                const total = Number(item.total || (qty * price) - ((qty * price * discount) / 100));
 
                 // Format expiry date cleanly
                 let expFormatted = "-";
@@ -447,7 +441,6 @@ const getHtmlTemplate = (billData) => {
                     <td class="text-center"><b>${qty}</b></td>
                     <td>₹${price.toFixed(2)}</td>
                     <td>${discount > 0 ? `${discount}%` : "-"}</td>
-                    <td>${gst > 0 ? `${gst}%` : "0%"}</td>
                     <td><b>₹${total.toFixed(2)}</b></td>
                   </tr>
                 `;
@@ -461,7 +454,7 @@ const getHtmlTemplate = (billData) => {
           <div class="terms-block">
             <div class="terms-title">Terms & Conditions:</div>
             <ul class="terms-list">
-              <li>Medicines once sold will only be accepted for return within 7 days with valid tax invoice.</li>
+              <li>Medicines once sold will only be accepted for return within 7 days with valid invoice.</li>
               <li>Schedule H, H1 & X drugs dispensed strictly on the prescription of a registered medical practitioner.</li>
               <li>Store medicines as per storage conditions mentioned on the packaging.</li>
               <li>Goods sold are for personal patient consumption only.</li>
@@ -488,15 +481,6 @@ const getHtmlTemplate = (billData) => {
               `
                 : ""
             }
-            <div class="total-row">
-              <span>CGST (Output):</span>
-              <span>+ ₹${cgst}</span>
-            </div>
-            <div class="total-row">
-              <span>SGST (Output):</span>
-              <span>+ ₹${sgst}</span>
-            </div>
-            
             <div class="grand-total">
               <span>Net Amount:</span>
               <span style="color: #2563eb;">₹${grandTotal.toFixed(2)}</span>

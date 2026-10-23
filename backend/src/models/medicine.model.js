@@ -23,6 +23,20 @@ exports.getMedicineById = async (id) => {
   return rows[0];
 };
 
+// GET MEDICINES BY SUPPLIER
+exports.getMedicinesBySupplier = async (supplierId) => {
+  const [rows] = await pool.query(
+    `
+        SELECT * FROM medicines
+        WHERE supplier_id = ?
+        ORDER BY medicine_id DESC
+    `,
+    [supplierId],
+  );
+
+  return rows;
+};
+
 // ADD MEDICINE
 exports.createMedicine = async (data) => {
   const {
@@ -42,6 +56,13 @@ exports.createMedicine = async (data) => {
     quantity,
     rack_location,
     min_stock,
+    supplier_id,
+    supplier_name,
+    supplier_contact,
+    supplier_mobile,
+    supplier_email,
+    supplier_address,
+    supplier_gst,
   } = data;
 
   const [result] = await pool.query(
@@ -62,9 +83,16 @@ exports.createMedicine = async (data) => {
             expiry_date,
             quantity,
             rack_location,
-            min_stock
+            min_stock,
+            supplier_id,
+            supplier_name,
+            supplier_contact,
+            supplier_mobile,
+            supplier_email,
+            supplier_address,
+            supplier_gst
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `,
     [
       medicine_name,
@@ -76,13 +104,20 @@ exports.createMedicine = async (data) => {
       unit,
       purchase_price,
       selling_price,
-      gst,
+      gst || 0,
       batch_number,
       manufacture_date,
       expiry_date,
       quantity,
       rack_location,
-      min_stock,
+      min_stock || 0,
+      supplier_id || null,
+      supplier_name || null,
+      supplier_contact || null,
+      supplier_mobile || null,
+      supplier_email || null,
+      supplier_address || null,
+      supplier_gst || null,
     ],
   );
 
@@ -112,12 +147,20 @@ exports.bulkCreateMedicines = async (dataArray) => {
     "quantity",
     "rack_location",
     "min_stock",
+    "supplier_id",
+    "supplier_name",
+    "supplier_contact",
+    "supplier_mobile",
+    "supplier_email",
+    "supplier_address",
+    "supplier_gst",
   ];
 
   const values = dataArray.map((row) =>
-    columns.map((column) =>
-      Object.prototype.hasOwnProperty.call(row, column) ? row[column] : null,
-    ),
+    columns.map((column) => {
+      if (column === "gst") return row.gst || 0;
+      return Object.prototype.hasOwnProperty.call(row, column) ? row[column] : null;
+    }),
   );
 
   const [result] = await pool.query(
@@ -153,6 +196,13 @@ exports.updateMedicine = async (id, data) => {
     rack_location,
     min_stock,
     status,
+    supplier_id,
+    supplier_name,
+    supplier_contact,
+    supplier_mobile,
+    supplier_email,
+    supplier_address,
+    supplier_gst,
   } = data;
 
   const [result] = await pool.query(
@@ -175,7 +225,14 @@ exports.updateMedicine = async (id, data) => {
             quantity = ?,
             rack_location = ?,
             min_stock = ?,
-            status = ?
+            status = ?,
+            supplier_id = ?,
+            supplier_name = ?,
+            supplier_contact = ?,
+            supplier_mobile = ?,
+            supplier_email = ?,
+            supplier_address = ?,
+            supplier_gst = ?
         WHERE medicine_id = ?
     `,
     [
@@ -188,14 +245,21 @@ exports.updateMedicine = async (id, data) => {
       unit,
       purchase_price,
       selling_price,
-      gst,
+      gst || 0,
       batch_number,
       manufacture_date,
       expiry_date,
       quantity,
       rack_location,
-      min_stock,
-      status,
+      min_stock || 0,
+      status || "ACTIVE",
+      supplier_id || null,
+      supplier_name || null,
+      supplier_contact || null,
+      supplier_mobile || null,
+      supplier_email || null,
+      supplier_address || null,
+      supplier_gst || null,
       id,
     ],
   );

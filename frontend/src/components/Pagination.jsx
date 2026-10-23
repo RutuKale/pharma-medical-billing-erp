@@ -33,15 +33,15 @@ const Pagination = ({
   );
 
   return (
-    <div className="mt-6 flex flex-col sm:flex-row items-center justify-between gap-4 bg-white shadow-sm border border-slate-200 p-4 rounded-xl backdrop-blur-sm">
-      <span className="text-slate-500 text-sm">
+    <div className="mt-6 flex flex-col sm:flex-row items-center justify-between gap-4 bg-white dark:bg-slate-900 shadow-sm border border-slate-200 dark:border-slate-800 p-4 rounded-xl backdrop-blur-sm">
+      <span className="text-slate-500 dark:text-slate-400 text-sm">
         Showing {startIndex} to {endIndex} of {totalItems} entries
       </span>
       <div className="flex items-center gap-2">
         <button
           onClick={() => onPageChange(Math.max(1, currentPage - 1))}
           disabled={currentPage === 1}
-          className="p-1.5 sm:px-3 sm:py-1.5 rounded-lg border border-slate-200 bg-white shadow-sm text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all text-sm flex items-center gap-1"
+          className="p-1.5 sm:px-3 sm:py-1.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed transition-all text-sm flex items-center gap-1"
         >
           <ChevronLeft size={16} />
           <span className="hidden sm:inline">Previous</span>
@@ -51,7 +51,7 @@ const Pagination = ({
           {displayPages.map((page, idx) => {
             if (page === "...") {
               return (
-                <span key={`ellipsis-${idx}`} className="text-gray-500 px-1">
+                <span key={`ellipsis-${idx}`} className="text-gray-500 dark:text-slate-500 px-1">
                   ...
                 </span>
               );
@@ -63,7 +63,7 @@ const Pagination = ({
                 className={`w-8 h-8 rounded-lg flex items-center justify-center text-sm transition-all ${
                   currentPage === page
                     ? "bg-blue-500 text-white font-medium shadow-sm"
-                    : "border border-slate-200 bg-white shadow-sm text-slate-700 hover:bg-slate-50 hover:text-slate-900"
+                    : "border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white"
                 }`}
               >
                 {page}
@@ -75,7 +75,7 @@ const Pagination = ({
         <button
           onClick={() => onPageChange(Math.min(totalPages, currentPage + 1))}
           disabled={currentPage === totalPages}
-          className="p-1.5 sm:px-3 sm:py-1.5 rounded-lg border border-slate-200 bg-white shadow-sm text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all text-sm flex items-center gap-1"
+          className="p-1.5 sm:px-3 sm:py-1.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed transition-all text-sm flex items-center gap-1"
         >
           <span className="hidden sm:inline">Next</span>
           <ChevronRight size={16} />

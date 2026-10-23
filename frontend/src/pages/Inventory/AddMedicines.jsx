@@ -46,12 +46,12 @@ const InputField = ({
   error,
 }) => (
   <div className="w-full">
-    <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
       {label} {required && <span className="text-blue-500 font-bold">*</span>}
     </label>
     <div className="relative">
       {Icon && (
-        <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none">
+        <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500 pointer-events-none">
           <Icon size={16} />
         </div>
       )}
@@ -61,15 +61,17 @@ const InputField = ({
         value={value}
         onChange={onChange}
         placeholder={placeholder}
-        className={`w-full bg-slate-50/80 border rounded-xl ${Icon ? "pl-10" : "pl-3.5"
-          } pr-3.5 py-2.5 text-sm text-slate-900 placeholder-slate-400 outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all ${error
-            ? "border-rose-400 focus:ring-rose-400 bg-rose-50/20"
-            : "border-slate-200 hover:border-slate-300"
-          }`}
+        className={`w-full bg-slate-50/80 dark:bg-slate-800/80 border rounded-xl ${
+          Icon ? "pl-10" : "pl-3.5"
+        } pr-3.5 py-2.5 text-sm text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all ${
+          error
+            ? "border-rose-400 dark:border-rose-500 focus:ring-rose-400 bg-rose-50/20"
+            : "border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600"
+        }`}
       />
     </div>
     {error && (
-      <p className="text-rose-500 text-xs mt-1 flex items-center gap-1 font-medium">
+      <p className="text-rose-500 dark:text-rose-400 text-xs mt-1 flex items-center gap-1 font-medium">
         <AlertCircle size={12} className="shrink-0" />
         <span>{error}</span>
       </p>
@@ -89,12 +91,12 @@ const SelectField = ({
   error,
 }) => (
   <div className="w-full">
-    <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
       {label} {required && <span className="text-blue-500 font-bold">*</span>}
     </label>
     <div className="relative">
       {Icon && (
-        <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none z-10">
+        <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500 pointer-events-none z-10">
           <Icon size={16} />
         </div>
       )}
@@ -102,28 +104,30 @@ const SelectField = ({
         name={name}
         value={value}
         onChange={onChange}
-        className={`w-full bg-slate-50/80 border rounded-xl ${Icon ? "pl-10" : "pl-3.5"
-          } pr-9 py-2.5 text-sm font-medium text-slate-700 outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all cursor-pointer appearance-none ${error
-            ? "border-rose-400 focus:ring-rose-400 bg-rose-50/20"
-            : "border-slate-200 hover:border-slate-300"
-          }`}
+        className={`w-full bg-slate-50/80 dark:bg-slate-800/80 border rounded-xl ${
+          Icon ? "pl-10" : "pl-3.5"
+        } pr-9 py-2.5 text-sm font-medium text-slate-700 dark:text-slate-200 outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all cursor-pointer appearance-none ${
+          error
+            ? "border-rose-400 dark:border-rose-500 focus:ring-rose-400 bg-rose-50/20"
+            : "border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600"
+        }`}
       >
-        <option value="" className="bg-white text-slate-400">
+        <option value="" className="bg-white dark:bg-slate-900 text-slate-400">
           {placeholder}
         </option>
         {options.map((option, index) => (
-          <option key={index} value={option} className="bg-white text-slate-800">
+          <option key={index} value={option} className="bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100">
             {option}
           </option>
         ))}
       </select>
       <ChevronDown
         size={14}
-        className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"
+        className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500 pointer-events-none"
       />
     </div>
     {error && (
-      <p className="text-rose-500 text-xs mt-1 flex items-center gap-1 font-medium">
+      <p className="text-rose-500 dark:text-rose-400 text-xs mt-1 flex items-center gap-1 font-medium">
         <AlertCircle size={12} className="shrink-0" />
         <span>{error}</span>
       </p>
@@ -142,7 +146,7 @@ const AddMedicines = () => {
     unit: "",
     purchasePrice: "",
     sellingPrice: "",
-    gst: "",
+    gst: "0",
     batchNumber: "",
     manufactureDate: "",
     expiryDate: "",
@@ -196,6 +200,32 @@ const AddMedicines = () => {
     };
     fetchSuppliers();
   }, []);
+
+  // Supplier-Wise Medicines State & Hook
+  const [supplierMedicines, setSupplierMedicines] = useState([]);
+  const [loadingSupplierMeds, setLoadingSupplierMeds] = useState(false);
+
+  useEffect(() => {
+    const supId = selectedSupplierId || formData.supplierId;
+    if (!supId) {
+      setSupplierMedicines([]);
+      return;
+    }
+    const fetchSupplierMeds = async () => {
+      try {
+        setLoadingSupplierMeds(true);
+        const res = await apiClient.get(`/medicines?supplier_id=${supId}`);
+        if (res.data?.success) {
+          setSupplierMedicines(res.data.data || []);
+        }
+      } catch (err) {
+        console.error("Error fetching supplier medicines:", err);
+      } finally {
+        setLoadingSupplierMeds(false);
+      }
+    };
+    fetchSupplierMeds();
+  }, [selectedSupplierId, formData.supplierId]);
 
   const handleTabletQtyChange = (val) => {
     setTotalTabletQty(val);
@@ -501,13 +531,6 @@ const AddMedicines = () => {
       newErrors.minStock = "Minimum stock cannot be negative";
     }
 
-    if (
-      formData.gst &&
-      (parseFloat(formData.gst) < 0 || parseFloat(formData.gst) > 100)
-    ) {
-      newErrors.gst = "GST must be between 0 and 100";
-    }
-
     setErrors(newErrors);
 
     return Object.keys(newErrors).length === 0;
@@ -531,7 +554,7 @@ const AddMedicines = () => {
         unit: formData.unit,
         purchase_price: Number(formData.purchasePrice),
         selling_price: Number(formData.sellingPrice),
-        gst: Number(formData.gst || 0),
+        gst: 0,
         batch_number: formData.batchNumber,
         manufacture_date: formData.manufactureDate || null,
         expiry_date: formData.expiryDate,
@@ -646,10 +669,10 @@ const AddMedicines = () => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           <div>
-            <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight flex items-center gap-2">
+            <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight flex items-center gap-2">
               <span>{editMode ? "Edit Medicine" : "Add Medicine"}</span>
             </h1>
-            <p className="text-slate-500 text-xs sm:text-sm mt-0.5">
+            <p className="text-slate-500 dark:text-slate-400 text-xs sm:text-sm mt-0.5">
               {editMode
                 ? "Update medicine specifications and catalog details."
                 : "Register a new medicine into your inventory catalog."}
@@ -659,7 +682,7 @@ const AddMedicines = () => {
 
         <Link
           to="/inventory"
-          className="inline-flex items-center gap-2 px-4 py-2.5 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-xl text-sm font-semibold shadow-xs transition-colors w-fit"
+          className="inline-flex items-center gap-2 px-4 py-2.5 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-200 rounded-xl text-sm font-semibold shadow-xs transition-colors w-fit"
         >
           <ArrowLeft size={16} />
           <span>Back to Inventory</span>
@@ -668,12 +691,12 @@ const AddMedicines = () => {
 
       {/* 2. MAIN FORM CARD */}
       <form onSubmit={handleSubmit} className="space-y-6">
-        <div className="bg-white rounded-2xl border border-slate-200/90 shadow-xs overflow-hidden">
+        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/90 dark:border-slate-800 shadow-xs overflow-hidden">
           {/* Card Top Title Banner */}
-          <div className="p-5 sm:p-6 border-b border-slate-100 flex items-center justify-between">
+          <div className="p-5 sm:p-6 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
             <div className="flex items-center gap-2.5">
               <div>
-                <h2 className="text-base font-bold text-slate-800 leading-tight">
+                <h2 className="text-base font-bold text-slate-800 dark:text-white leading-tight">
                   Medicine Specifications
                 </h2>
                 <p className="text-xs text-slate-400">
@@ -682,9 +705,9 @@ const AddMedicines = () => {
               </div>
             </div>
 
-            <div className="hidden sm:flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 text-emerald-600 text-xs font-semibold">
+            <div className="hidden sm:flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 text-xs font-semibold">
               <ShieldCheck size={14} />
-              <span>GST & Batch Tracking</span>
+              <span>Batch & Inventory Tracking</span>
             </div>
           </div>
 
@@ -694,7 +717,7 @@ const AddMedicines = () => {
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2">
                   <span className="w-2 h-2 rounded-full bg-blue-600"></span>
-                  <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                  <h3 className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
                     Supplier & Vendor Assignment
                   </h3>
                 </div>
@@ -702,17 +725,17 @@ const AddMedicines = () => {
                 <button
                   type="button"
                   onClick={() => setIsSupplierModalOpen(true)}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-xl text-xs font-bold transition-all shadow-2xs active:scale-95"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 dark:bg-blue-950/40 hover:bg-blue-100 dark:hover:bg-blue-900/50 text-blue-700 dark:text-blue-400 rounded-xl text-xs font-bold transition-all shadow-2xs active:scale-95"
                 >
                   <UserPlus size={14} />
-                  <span>+ Add New Supplier</span>
+                  <span>Add New Supplier</span>
                 </button>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 <div className="w-full sm:col-span-2 lg:col-span-1">
                   <div className="flex items-center justify-between mb-1.5">
-                    <label className="block text-xs font-semibold text-slate-700">
+                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
                       Select Supplier / Vendor
                     </label>
                     {suppliers.length > 0 && (
@@ -824,22 +847,22 @@ const AddMedicines = () => {
 
               {/* Active Supplier Detailed Card */}
               {formData.supplierName && (
-                <div className="mt-4 p-4 rounded-xl bg-blue-50/50 border border-blue-200/70 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
+                <div className="mt-4 p-4 rounded-xl bg-blue-50/50 dark:bg-blue-950/30 border border-blue-200/70 dark:border-blue-900/60 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
                   <div className="flex items-center gap-3">
                     <div className="w-9 h-9 rounded-xl bg-blue-600 text-white flex items-center justify-center font-bold shrink-0 shadow-2xs">
                       <Truck size={18} />
                     </div>
                     <div>
-                      <h4 className="font-bold text-slate-900 text-sm">
+                      <h4 className="font-bold text-slate-900 dark:text-white text-sm">
                         {formData.supplierName}
                       </h4>
-                      <p className="text-slate-500 mt-0.5">
+                      <p className="text-slate-500 dark:text-slate-400 mt-0.5">
                         {formData.supplierContact && `Contact: ${formData.supplierContact} • `}
                         {formData.supplierMobile && `Mobile: ${formData.supplierMobile} • `}
                         {formData.supplierGst ? `GST: ${formData.supplierGst}` : "GST: Not Provided"}
                       </p>
                       {formData.supplierAddress && (
-                        <p className="text-slate-400 text-[11px] mt-0.5">
+                        <p className="text-slate-400 dark:text-slate-500 text-[11px] mt-0.5">
                           Address: {formData.supplierAddress}
                         </p>
                       )}
@@ -848,10 +871,116 @@ const AddMedicines = () => {
                   <button
                     type="button"
                     onClick={() => handleSupplierSelect("")}
-                    className="text-xs font-semibold text-rose-600 hover:text-rose-700 underline shrink-0"
+                    className="text-xs font-semibold text-rose-600 dark:text-rose-400 hover:text-rose-700 dark:hover:text-rose-300 underline shrink-0"
                   >
                     Clear Supplier
                   </button>
+                </div>
+              )}
+
+              {/* Supplier-Wise Medicine Details Table */}
+              {(formData.supplierName || selectedSupplierId) && (
+                <div className="mt-4 bg-slate-50/70 dark:bg-slate-800/50 rounded-2xl border border-slate-200/90 dark:border-slate-700/80 p-4 sm:p-5 shadow-2xs space-y-3">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-200/60 dark:border-slate-700">
+                    <div>
+                      <h4 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                        <span>Medicines Supplied by {formData.supplierName || "Supplier"}</span>
+                        <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800">
+                          {supplierMedicines.length} {supplierMedicines.length === 1 ? "Medicine" : "Medicines"}
+                        </span>
+                      </h4>
+                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                        Complete inventory records registered under this supplier without skipping any fields.
+                      </p>
+                    </div>
+                  </div>
+
+                  {loadingSupplierMeds ? (
+                    <div className="py-8 text-center text-xs text-slate-500 dark:text-slate-400 font-medium">
+                      Loading supplier medicines...
+                    </div>
+                  ) : supplierMedicines.length > 0 ? (
+                    <div className="overflow-x-auto scrollbar-thin rounded-xl border border-slate-200/80 dark:border-slate-700 bg-white dark:bg-slate-900">
+                      <table className="w-full text-left border-collapse min-w-[950px] text-xs">
+                        <thead>
+                          <tr className="border-b border-slate-100 dark:border-slate-800 text-[11px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider bg-slate-50/80 dark:bg-slate-800/60">
+                            <th className="py-3 px-3 text-center w-10">#</th>
+                            <th className="py-3 px-3">Medicine & Salt</th>
+                            <th className="py-3 px-3">Category</th>
+                            <th className="py-3 px-3">Batch</th>
+                            <th className="py-3 px-3">Pack & Unit</th>
+                            <th className="py-3 px-3 text-right">Purchase Price</th>
+                            <th className="py-3 px-3 text-right">Selling Price</th>
+                            <th className="py-3 px-3 text-center">Stock</th>
+                            <th className="py-3 px-3 text-center">Min Stock</th>
+                            <th className="py-3 px-3">Mfg & Exp Date</th>
+                            <th className="py-3 px-3">Rack</th>
+                            <th className="py-3 px-3 text-center">Status</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                          {supplierMedicines.map((med, idx) => (
+                            <tr key={med.medicine_id || idx} className="hover:bg-slate-50/60 dark:hover:bg-slate-800/40 transition-colors">
+                              <td className="py-2.5 px-3 text-center text-slate-400 font-medium">{idx + 1}</td>
+                              <td className="py-2.5 px-3">
+                                <div className="font-bold text-slate-900 dark:text-white text-xs">{med.medicine_name}</div>
+                                <div className="text-[10px] text-slate-500 dark:text-slate-400">
+                                  {med.salt_name ? `Salt: ${med.salt_name}` : med.brand_name ? `Brand: ${med.brand_name}` : "—"}
+                                </div>
+                              </td>
+                              <td className="py-2.5 px-3">
+                                <span className="px-2 py-0.5 rounded-md text-[10px] font-medium bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200/60 dark:border-slate-700">
+                                  {med.category || "General"}
+                                </span>
+                              </td>
+                              <td className="py-2.5 px-3 font-mono text-[11px] text-slate-700 dark:text-slate-300">
+                                {med.batch_number || "—"}
+                              </td>
+                              <td className="py-2.5 px-3 text-slate-600 dark:text-slate-400">
+                                {med.pack_size || "1"} {med.unit ? `(${med.unit})` : ""}
+                              </td>
+                              <td className="py-2.5 px-3 text-right font-semibold text-slate-700 dark:text-slate-300">
+                                ₹{Number(med.purchase_price || 0).toFixed(2)}
+                              </td>
+                              <td className="py-2.5 px-3 text-right font-bold text-slate-900 dark:text-white">
+                                ₹{Number(med.selling_price || 0).toFixed(2)}
+                              </td>
+                              <td className="py-2.5 px-3 text-center font-bold text-slate-800 dark:text-slate-100">
+                                {med.quantity}
+                              </td>
+                              <td className="py-2.5 px-3 text-center text-slate-500 dark:text-slate-400">
+                                {med.min_stock || 0}
+                              </td>
+                              <td className="py-2.5 px-3 text-[11px] text-slate-600 dark:text-slate-400">
+                                <div>Exp: {med.expiry_date ? new Date(med.expiry_date).toLocaleDateString("en-IN", { month: "short", year: "numeric" }) : "—"}</div>
+                                {med.manufacture_date && (
+                                  <div className="text-[10px] text-slate-400">Mfg: {new Date(med.manufacture_date).toLocaleDateString("en-IN", { month: "short", year: "numeric" })}</div>
+                                )}
+                              </td>
+                              <td className="py-2.5 px-3 text-slate-600 dark:text-slate-400">
+                                {med.rack_location || "—"}
+                              </td>
+                              <td className="py-2.5 px-3 text-center">
+                                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                  med.quantity <= 0 
+                                    ? "bg-rose-50 text-rose-600 border border-rose-200 dark:bg-rose-950/40 dark:text-rose-400 dark:border-rose-900"
+                                    : med.quantity <= (med.min_stock || 10)
+                                      ? "bg-amber-50 text-amber-600 border border-amber-200 dark:bg-amber-950/40 dark:text-amber-400 dark:border-amber-900"
+                                      : "bg-emerald-50 text-emerald-600 border border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-900"
+                                }`}>
+                                  {med.quantity <= 0 ? "Out of Stock" : med.quantity <= (med.min_stock || 10) ? "Low Stock" : "Active"}
+                                </span>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : (
+                    <div className="py-6 text-center text-xs text-slate-400 dark:text-slate-500 bg-white/70 dark:bg-slate-900/60 rounded-xl border border-slate-200/60 dark:border-slate-800">
+                      No medicines registered under this supplier yet. Complete the form below to add the first medicine for this supplier.
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -938,19 +1067,19 @@ const AddMedicines = () => {
               </div>
             </div>
 
-            <hr className="border-slate-100" />
+            <hr className="border-slate-100 dark:border-slate-800" />
 
-            {/* SECTION B: Pricing & Taxation */}
+            {/* SECTION B: Pricing Details */}
             <div>
               <div className="flex items-center gap-2 mb-3">
                 <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-                <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-                  Pricing & Taxation
+                <h3 className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                  Pricing Details
                 </h3>
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 <div className="w-full">
-                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
                     Total Tablet Quantity (in Pack/Strip)
                   </label>
                   <div className="relative">
@@ -962,14 +1091,14 @@ const AddMedicines = () => {
                       min="1"
                       value={totalTabletQty}
                       onChange={(e) => handleTabletQtyChange(e.target.value)}
-                      placeholder="e.g. 10 (tablets in strip)"
-                      className="w-full bg-slate-50/80 border border-slate-200 rounded-xl pl-10 pr-3.5 py-2.5 text-sm text-slate-900 placeholder-slate-400 outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                      placeholder="e.g. 10"
+                      className="w-full bg-slate-50/80 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl pl-10 pr-3.5 py-2.5 text-sm text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 outline-none focus:ring-2 focus:ring-blue-500 transition-all"
                     />
                   </div>
                 </div>
 
                 <div className="w-full">
-                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
                     Total Pack / Strip Price (₹)
                   </label>
                   <div className="relative">
@@ -983,20 +1112,20 @@ const AddMedicines = () => {
                       value={totalPackPrice}
                       onChange={(e) => handleTotalPackPriceChange(e.target.value)}
                       placeholder="e.g. 150.00"
-                      className="w-full bg-slate-50/80 border border-slate-200 rounded-xl pl-10 pr-3.5 py-2.5 text-sm text-slate-900 placeholder-slate-400 outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                      className="w-full bg-slate-50/80 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl pl-10 pr-3.5 py-2.5 text-sm text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 outline-none focus:ring-2 focus:ring-blue-500 transition-all"
                     />
                   </div>
                 </div>
 
                 <InputField
-                  label="Selling Price (Per Tablet / Unit)"
+                  label="Selling Price (Per Unit)"
                   name="sellingPrice"
                   type="number"
                   step="0.01"
                   value={formData.sellingPrice}
                   onChange={handleChange}
                   error={errors.sellingPrice}
-                  placeholder="Auto-calculated or enter rate"
+                  placeholder="Auto or enter rate"
                   required
                   icon={IndianRupee}
                 />
@@ -1009,37 +1138,26 @@ const AddMedicines = () => {
                   value={formData.purchasePrice}
                   onChange={handleChange}
                   error={errors.purchasePrice}
-                  placeholder="Cost price per unit"
+                  placeholder="Cost price"
                   required
                   icon={IndianRupee}
                 />
 
-                <InputField
-                  label="GST Rate (%)"
-                  name="gst"
-                  type="number"
-                  value={formData.gst}
-                  onChange={handleChange}
-                  error={errors.gst}
-                  placeholder="e.g. 5, 12, or 18"
-                  icon={Percent}
-                />
-
                 {/* Per-Tablet Calculation Banner */}
-                <div className="sm:col-span-2 lg:col-span-3 p-3.5 rounded-xl bg-blue-50/70 border border-blue-200/80 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                <div className="sm:col-span-2 lg:col-span-4 p-3.5 rounded-xl bg-blue-50/70 dark:bg-blue-950/40 border border-blue-200/80 dark:border-blue-900/50 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                   <div className="flex items-center gap-2.5">
                     <div className="p-2 rounded-lg bg-blue-600 text-white shrink-0">
                       <Calculator size={16} />
                     </div>
                     <div>
-                      <span className="text-xs font-bold text-slate-800">
+                      <span className="text-xs font-bold text-slate-800 dark:text-slate-100">
                         Per-Tablet Price Calculation:
                       </span>
-                      <p className="text-[11px] text-slate-600 mt-0.5">
+                      <p className="text-[11px] text-slate-600 dark:text-slate-300 mt-0.5">
                         {totalTabletQty && totalPackPrice ? (
                           <>
                             Total Price (₹{Number(totalPackPrice).toFixed(2)}) ÷ Total Quantity ({totalTabletQty} tablets) ={" "}
-                            <span className="font-bold text-blue-700">₹{(Number(totalPackPrice) / Number(totalTabletQty)).toFixed(2)} per tablet</span>
+                            <span className="font-bold text-blue-700 dark:text-blue-400">₹{(Number(totalPackPrice) / Number(totalTabletQty)).toFixed(2)} per tablet</span>
                           </>
                         ) : (
                           "Enter total tablet quantity and total pack price to automatically calculate the per-tablet selling rate for billing."
@@ -1048,9 +1166,9 @@ const AddMedicines = () => {
                     </div>
                   </div>
                   {formData.sellingPrice && (
-                    <div className="text-right sm:text-right w-full sm:w-auto bg-white px-3 py-1.5 rounded-lg border border-blue-200 shrink-0">
+                    <div className="text-right sm:text-right w-full sm:w-auto bg-white dark:bg-slate-800 px-3 py-1.5 rounded-lg border border-blue-200 dark:border-blue-800/80 shrink-0">
                       <span className="text-[10px] uppercase font-bold text-slate-400 block">Rate / Tablet</span>
-                      <span className="text-sm font-extrabold text-blue-700">₹{Number(formData.sellingPrice).toFixed(2)}</span>
+                      <span className="text-sm font-extrabold text-blue-700 dark:text-blue-400">₹{Number(formData.sellingPrice).toFixed(2)}</span>
                     </div>
                   )}
                 </div>
@@ -1058,12 +1176,12 @@ const AddMedicines = () => {
 
               {/* Profitability Live Summary */}
               {purchaseNum > 0 && sellingNum > 0 && (
-                <div className="mt-4 p-4 rounded-xl bg-slate-50/80 border border-slate-200/90 grid grid-cols-2 sm:grid-cols-4 gap-4">
+                <div className="mt-4 p-4 rounded-xl bg-slate-50/80 dark:bg-slate-800/70 border border-slate-200/90 dark:border-slate-700/80 grid grid-cols-2 sm:grid-cols-4 gap-4">
                   <div>
                     <span className="text-[11px] font-medium text-slate-400">
                       Purchase Cost
                     </span>
-                    <p className="text-base font-bold text-slate-800 mt-0.5">
+                    <p className="text-base font-bold text-slate-800 dark:text-slate-100 mt-0.5">
                       ₹{purchaseNum.toFixed(2)}
                     </p>
                   </div>
@@ -1071,7 +1189,7 @@ const AddMedicines = () => {
                     <span className="text-[11px] font-medium text-slate-400">
                       Selling MRP
                     </span>
-                    <p className="text-base font-bold text-slate-800 mt-0.5">
+                    <p className="text-base font-bold text-slate-800 dark:text-slate-100 mt-0.5">
                       ₹{sellingNum.toFixed(2)}
                     </p>
                   </div>
@@ -1079,7 +1197,7 @@ const AddMedicines = () => {
                     <span className="text-[11px] font-medium text-slate-400">
                       Profit Margin
                     </span>
-                    <p className="text-base font-bold text-emerald-600 mt-0.5 flex items-center gap-1">
+                    <p className="text-base font-bold text-emerald-600 dark:text-emerald-400 mt-0.5 flex items-center gap-1">
                       <TrendingUp size={14} />
                       {marginPercentage}%
                     </p>
@@ -1088,7 +1206,7 @@ const AddMedicines = () => {
                     <span className="text-[11px] font-medium text-slate-400">
                       Net Gain / Unit
                     </span>
-                    <p className="text-base font-bold text-emerald-600 mt-0.5">
+                    <p className="text-base font-bold text-emerald-600 dark:text-emerald-400 mt-0.5">
                       ₹{profitPerUnit.toFixed(2)}
                     </p>
                   </div>
@@ -1096,7 +1214,7 @@ const AddMedicines = () => {
               )}
             </div>
 
-            <hr className="border-slate-100" />
+            <hr className="border-slate-100 dark:border-slate-800" />
 
             {/* SECTION C: Batch & Expiry Management */}
             <div>
@@ -1189,7 +1307,7 @@ const AddMedicines = () => {
           </div>
 
           {/* Form Action Footer */}
-          <div className="p-5 sm:p-6 bg-slate-50/60 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-3">
+          <div className="p-5 sm:p-6 bg-slate-50/60 dark:bg-slate-900/60 border-t border-slate-100 dark:border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-3">
             <div className="flex items-center gap-2 text-xs text-slate-400">
               <CheckCircle2 size={15} className="text-emerald-500" />
               <span>Ensure all mandatory details are verified before saving.</span>
@@ -1199,7 +1317,7 @@ const AddMedicines = () => {
               <button
                 type="button"
                 onClick={handleReset}
-                className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-xl text-sm font-semibold shadow-xs transition-colors"
+                className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 rounded-xl text-sm font-semibold shadow-xs transition-colors"
               >
                 <RotateCcw size={15} />
                 <span>Reset</span>
@@ -1232,18 +1350,18 @@ const AddMedicines = () => {
       {isSupplierModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div
-            className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs transition-opacity"
+            className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs transition-opacity"
             onClick={() => setIsSupplierModalOpen(false)}
           />
 
-          <div className="relative z-10 w-full max-w-lg bg-white rounded-2xl p-6 shadow-2xl border border-slate-200 animate-in fade-in zoom-in-95 duration-150">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100 mb-4">
+          <div className="relative z-10 w-full max-w-lg bg-white dark:bg-slate-900 rounded-2xl p-6 shadow-2xl border border-slate-200 dark:border-slate-800 animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800 mb-4">
               <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold">
+                <div className="w-9 h-9 rounded-xl bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 flex items-center justify-center font-bold">
                   <Truck size={18} />
                 </div>
                 <div>
-                  <h3 className="text-base font-bold text-slate-800 leading-tight">
+                  <h3 className="text-base font-bold text-slate-800 dark:text-white leading-tight">
                     Add New Supplier
                   </h3>
                   <p className="text-xs text-slate-400">
@@ -1254,7 +1372,7 @@ const AddMedicines = () => {
               <button
                 type="button"
                 onClick={() => setIsSupplierModalOpen(false)}
-                className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+                className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
               >
                 <X size={18} />
               </button>
@@ -1325,7 +1443,7 @@ const AddMedicines = () => {
                 />
 
                 <div className="sm:col-span-2">
-                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
                     Supplier Address (Optional)
                   </label>
                   <div className="relative">
@@ -1337,17 +1455,17 @@ const AddMedicines = () => {
                       value={newSupplier.address}
                       onChange={(e) => setNewSupplier({ ...newSupplier, address: e.target.value })}
                       placeholder="e.g. Plot 42, GIDC Phase 2, Industrial Area"
-                      className="w-full bg-slate-50/80 border border-slate-200 rounded-xl pl-10 pr-3.5 py-2 text-sm text-slate-900 placeholder-slate-400 outline-none focus:ring-2 focus:ring-blue-500 transition-all resize-none"
+                      className="w-full bg-slate-50/80 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl pl-10 pr-3.5 py-2 text-sm text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 outline-none focus:ring-2 focus:ring-blue-500 transition-all resize-none"
                     />
                   </div>
                 </div>
               </div>
 
-              <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100">
+              <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100 dark:border-slate-800">
                 <button
                   type="button"
                   onClick={() => setIsSupplierModalOpen(false)}
-                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold transition-colors"
+                  className="px-4 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-semibold transition-colors"
                 >
                   Cancel
                 </button>

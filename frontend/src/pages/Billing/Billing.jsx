@@ -4,6 +4,7 @@ import {
   Search,
   User,
   Plus,
+  Minus,
   Trash2,
   Edit,
   Edit3,
@@ -50,6 +51,7 @@ const Billing = () => {
       gender: "",
       doctorName: "",
       prescriptionNumber: "",
+      address: "",
     },
     selectedPatientId: "",
     billItems: [],
@@ -70,6 +72,7 @@ const Billing = () => {
     gender: "",
     doctorName: "",
     prescriptionNumber: "",
+    address: "",
   };
   const selectedPatientId = activeBill?.selectedPatientId || "";
   const billItems = activeBill?.billItems || [];
@@ -242,6 +245,7 @@ const Billing = () => {
           gender: fullBill.gender || "",
           doctorName: fullBill.doctor_name || "",
           prescriptionNumber: fullBill.prescription_number || "",
+          address: fullBill.address || "",
         });
         setPaymentMode(fullBill.payment_mode || "Cash");
         setBillItems(
@@ -249,12 +253,9 @@ const Billing = () => {
             const qty = Number(it.quantity || 1);
             const price = Number(it.price || 0);
             const disc = Number(it.discount || 0);
-            const gst = Number(it.gst || 0);
             const sub = qty * price;
             const discAmt = (sub * disc) / 100;
-            const taxable = sub - discAmt;
-            const gstAmt = (taxable * gst) / 100;
-            const total = Number(it.total || taxable + gstAmt);
+            const total = Number(it.total || sub - discAmt);
 
             return {
               id: it.bill_item_id || it.medicine_id || Date.now() + Math.random(),
@@ -264,10 +265,10 @@ const Billing = () => {
               price,
               quantity: qty,
               discount: disc,
-              gst,
+              gst: 0,
               subtotal: sub,
               discountAmount: discAmt,
-              gstAmount: gstAmt,
+              gstAmount: 0,
               total,
             };
           })
@@ -305,22 +306,43 @@ const Billing = () => {
       gender: "",
       doctorName: "",
       prescriptionNumber: "",
+      address: "",
     });
     setSelectedPatientId("");
   };
 
-  const selectMedicine = (medicine) => {
-    setSelectedMedicine(medicine);
-    setSearch(medicine.name);
-    setQuantity(1);
-    setDiscount(0);
-    setIsSearchOpen(false);
-    setHighlightedIndex(-1);
-    setTimeout(() => {
-      quantityInputRef.current?.focus();
-      quantityInputRef.current?.select();
-    }, 50);
+  const calculateLineItem = (item, newQuantity, newDiscount = (item.discount ?? 0)) => {
+    const price = Number(item.price) || 0;
+    const qty = Math.max(1, Number(newQuantity) || 1);
+    const disc = Math.min(100, Math.max(0, Number(newDiscount) || 0));
+
+    const subtotal = price * qty;
+    const discountAmount = (subtotal * disc) / 100;
+    const total = subtotal - discountAmount;
+
+    return {
+      ...item,
+      quantity: qty,
+      discount: disc,
+      gst: 0,
+      gstAmount: 0,
+      subtotal,
+      discountAmount,
+      total,
+    };
   };
+
+  const isExpired = (expiryDate) => {
+    if (!expiryDate) return false;
+    return new Date(expiryDate) < new Date();
+  };
+
+  const filteredMedicines = useMemo(() => {
+    if (!search.trim()) return [];
+    return medicinesData.filter((medicine) =>
+      medicine.name.toLowerCase().includes(search.toLowerCase()),
+    );
+  }, [search, medicinesData]);
 
   const scrollIndexIntoView = (index) => {
     if (dropdownListRef.current) {
@@ -370,7 +392,6 @@ const Billing = () => {
     }
   };
 
-  // Close search dropdown on click outside
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (searchRef.current && !searchRef.current.contains(event.target)) {
@@ -381,21 +402,8 @@ const Billing = () => {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const filteredMedicines = useMemo(() => {
-    if (!search.trim()) return [];
-    return medicinesData.filter((medicine) =>
-      medicine.name.toLowerCase().includes(search.toLowerCase()),
-    );
-  }, [search, medicinesData]);
-
-  const isExpired = (expiryDate) => {
-    if (!expiryDate) return false;
-    return new Date(expiryDate) < new Date();
-  };
-
-  const addMedicineToBill = () => {
-    if (!selectedMedicine) return;
-    if (isExpired(selectedMedicine.expiry)) {
+  const selectMedicine = (medicine) => {
+    if (isExpired(medicine.expiry)) {
       Swal.fire({
         icon: "error",
         title: "Expired Medicine",
@@ -404,78 +412,139 @@ const Billing = () => {
       });
       return;
     }
-    const qty = Number(quantity);
-    if (!qty || qty <= 0) {
+
+    if (medicine.stock <= 0) {
       Swal.fire({
         icon: "warning",
-        title: "Invalid Quantity",
-        text: "Quantity must be greater than 0",
+        title: "Out of Stock",
+        text: "This medicine is currently out of stock.",
         confirmButtonColor: "#2563eb",
       });
       return;
     }
-    if (qty > selectedMedicine.stock) {
-      Swal.fire({
-        icon: "error",
-        title: "Insufficient Stock",
-        text: `Only ${selectedMedicine.stock} items available in inventory`,
-        confirmButtonColor: "#2563eb",
-      });
-      return;
-    }
-    const price = Number(selectedMedicine.price);
-    const gst = Number(selectedMedicine.gst);
-    const discountPercent = Number(discount) || 0;
-    const subtotal = price * qty;
-    const discountAmount = (subtotal * discountPercent) / 100;
-    const taxableAmount = subtotal - discountAmount;
-    const gstAmount = (taxableAmount * gst) / 100;
-    const finalTotal = taxableAmount + gstAmount;
 
-    const newItem = {
-      medicine_id: selectedMedicine.id,
-      id: selectedMedicine.id,
-      name: selectedMedicine.name,
-      batch: selectedMedicine.batch,
-      quantity: qty,
-      price,
-      gst,
-      discount: discountPercent,
-      subtotal,
-      discountAmount,
-      gstAmount,
-      total: finalTotal,
-      category: selectedMedicine.category,
-    };
-
-    const existingItem = billItems.find(
-      (item) => item.id === selectedMedicine.id,
+    const existingIndex = billItems.findIndex(
+      (item) => item.medicine_id === medicine.id || item.id === medicine.id
     );
 
-    if (existingItem) {
-      Swal.fire({
-        icon: "warning",
-        title: "Medicine Already in Bill",
-        text: "Remove the medicine from the list or edit its quantity.",
-        confirmButtonColor: "#2563eb",
-      });
-      return;
+    if (existingIndex !== -1) {
+      const existing = billItems[existingIndex];
+      const maxStock = medicine.stock ?? existing.stock ?? 9999;
+      if (existing.quantity >= maxStock) {
+        Swal.fire({
+          icon: "warning",
+          title: "Maximum Stock Reached",
+          text: `All available inventory (${maxStock} units) already added to bill.`,
+          confirmButtonColor: "#2563eb",
+        });
+        return;
+      }
+      increaseQuantity(existing.id);
+    } else {
+      const newItem = calculateLineItem(
+        {
+          medicine_id: medicine.id,
+          id: medicine.id,
+          name: medicine.name,
+          batch: medicine.batch,
+          price: Number(medicine.price),
+          gst: 0,
+          stock: Number(medicine.stock),
+          expiry: medicine.expiry,
+          category: medicine.category,
+        },
+        1,
+        0
+      );
+      setBillItems([...billItems, newItem]);
     }
 
-    setBillItems([...billItems, newItem]);
     setSearch("");
-    setSelectedMedicine(null);
-    setQuantity(1);
-    setDiscount(0);
     setIsSearchOpen(false);
     setHighlightedIndex(-1);
+    setSelectedMedicine(null);
     setTimeout(() => {
       searchInputRef.current?.focus();
     }, 50);
   };
 
+  const increaseQuantity = (id) => {
+    setBillItems((prev) =>
+      prev.map((item) => {
+        if (item.id !== id) return item;
+        const maxStock = item.stock != null ? item.stock : 9999;
+        if (item.quantity >= maxStock) {
+          Swal.fire({
+            icon: "warning",
+            title: "Stock Limit Reached",
+            text: `Only ${maxStock} units available in stock.`,
+            timer: 1500,
+            showConfirmButton: false,
+          });
+          return item;
+        }
+        return calculateLineItem(item, item.quantity + 1);
+      })
+    );
+  };
+
+  const decreaseQuantity = (id) => {
+    setBillItems((prev) =>
+      prev.map((item) => {
+        if (item.id !== id) return item;
+        if (item.quantity <= 1) return item;
+        return calculateLineItem(item, item.quantity - 1);
+      })
+    );
+  };
+
+  const updateItemQuantity = (id, newQty) => {
+    setBillItems((prev) =>
+      prev.map((item) => {
+        if (item.id !== id) return item;
+        const maxStock = item.stock != null ? item.stock : 9999;
+        if (newQty === "" || newQty === null) {
+          return { ...item, quantity: "" };
+        }
+        let qty = parseInt(newQty, 10);
+        if (isNaN(qty) || qty < 1) qty = 1;
+        if (qty > maxStock) {
+          qty = maxStock;
+          Swal.fire({
+            icon: "warning",
+            title: "Stock Limit Reached",
+            text: `Quantity adjusted to maximum available stock (${maxStock} units).`,
+            timer: 1500,
+            showConfirmButton: false,
+          });
+        }
+        return calculateLineItem(item, qty);
+      })
+    );
+  };
+
+  const handleQuantityBlur = (id, currentVal) => {
+    let qty = parseInt(currentVal, 10);
+    if (isNaN(qty) || qty < 1) qty = 1;
+    setBillItems((prev) =>
+      prev.map((item) => (item.id === id ? calculateLineItem(item, qty) : item))
+    );
+  };
+
+  const updateItemDiscount = (id, newDisc) => {
+    setBillItems((prev) =>
+      prev.map((item) => {
+        if (item.id !== id) return item;
+        let disc = parseFloat(newDisc);
+        if (isNaN(disc) || disc < 0) disc = 0;
+        if (disc > 100) disc = 100;
+        return calculateLineItem(item, item.quantity || 1, disc);
+      })
+    );
+  };
+
   const removeItem = (id) => {
-    setBillItems(billItems.filter((item) => item.id !== id));
+    setBillItems((prev) => prev.filter((item) => item.id !== id));
   };
 
   const handlePatientSelect = (e) => {
@@ -494,6 +563,7 @@ const Billing = () => {
         gender: selectedPatient.gender || "",
         doctorName: selectedPatient.doctor_name || "",
         prescriptionNumber: selectedPatient.prescription_number || "",
+        address: selectedPatient.address || "",
       });
     } else {
       setPatient({
@@ -504,27 +574,26 @@ const Billing = () => {
         gender: "",
         doctorName: "",
         prescriptionNumber: "",
+        address: "",
       });
     }
   };
 
-  // Helper to calculate totals for any bill items list
+  // Helper to calculate totals for any bill items list (GST removed)
   const calculateItemsTotals = (items = []) => {
     let subtotal = 0;
-    let gstTotal = 0;
     let discountTotal = 0;
     let grandTotal = 0;
 
     items.forEach((item) => {
       subtotal += item.subtotal || 0;
-      gstTotal += item.gstAmount || 0;
       discountTotal += item.discountAmount || 0;
       grandTotal += item.total || 0;
     });
 
     return {
       subtotal,
-      gstTotal,
+      gstTotal: 0,
       discountTotal,
       grandTotal,
     };
@@ -710,6 +779,7 @@ const Billing = () => {
           patient_id: billData.patient.patientId || "",
           patient_name: billData.patient.name || "",
           mobile_number: billData.patient.mobile || "",
+          address: billData.patient.address || "",
           doctor_name: billData.patient.doctorName || "",
           prescription_number: billData.patient.prescriptionNumber || "",
           age: billData.patient.age || "",
@@ -717,7 +787,7 @@ const Billing = () => {
           bill_number: isEditingBill ? editingBillNumber : billData.invoiceNo,
           subtotal: billData.totals.subtotal,
           total_discount: billData.totals.discountTotal,
-          total_gst: billData.totals.gstTotal,
+          total_gst: 0,
           grand_total: billData.totals.grandTotal,
           payment_mode: billData.paymentMode,
           payment_status: "Completed",
@@ -729,7 +799,7 @@ const Billing = () => {
           batch: m.batch || m.batch_number || "-",
           quantity: Number(m.quantity || 1),
           price: Number(m.price || 0),
-          gst: Number(m.gst || 0),
+          gst: 0,
           discount: Number(m.discount || 0),
           total: Number(m.total || 0),
         })),
@@ -750,6 +820,17 @@ const Billing = () => {
       } else {
         const res = await apiClient.post("/bills", payload);
         if (res.data.success) {
+          if (res.data.data?.patient) {
+            const registeredPat = res.data.data.patient;
+            setPatients((prev) => [
+              registeredPat,
+              ...prev.filter(
+                (p) => String(p.patient_id || p.id) !== String(registeredPat.patient_id || registeredPat.id)
+              ),
+            ]);
+          }
+          fetchPatients();
+
           Swal.fire({
             icon: "success",
             title: "Bill Generated",
@@ -770,6 +851,7 @@ const Billing = () => {
               gender: "",
               doctorName: "",
               prescriptionNumber: "",
+              address: "",
             });
             setSelectedPatientId("");
           }
@@ -848,6 +930,7 @@ const Billing = () => {
             patient_id: b.patient.patientId || "",
             patient_name: b.patient.name || "",
             mobile_number: b.patient.mobile || "",
+            address: b.patient.address || "",
             doctor_name: b.patient.doctorName || "",
             prescription_number: b.patient.prescriptionNumber || "",
             age: b.patient.age || "",
@@ -855,7 +938,7 @@ const Billing = () => {
             bill_number: b.invoiceNo,
             subtotal: bTotals.subtotal,
             total_discount: bTotals.discountTotal,
-            total_gst: bTotals.gstTotal,
+            total_gst: 0,
             grand_total: bTotals.grandTotal,
             payment_mode: b.paymentMode,
             payment_status: "Completed",
@@ -867,7 +950,7 @@ const Billing = () => {
             batch: m.batch || m.batch_number || "-",
             quantity: Number(m.quantity || 1),
             price: Number(m.price || 0),
-            gst: Number(m.gst || 0),
+            gst: 0,
             discount: Number(m.discount || 0),
             total: Number(m.total || 0),
           })),
@@ -893,7 +976,8 @@ const Billing = () => {
         }
       }
 
-      // Refresh stock
+      // Refresh patients & stock
+      fetchPatients();
       fetchMedicines();
 
       // Show Session Summary
@@ -963,17 +1047,16 @@ const Billing = () => {
 
       const subtotal = item.price * qty;
       const discountAmount = (subtotal * disc) / 100;
-      const taxableAmount = subtotal - discountAmount;
-      const gstAmount = (taxableAmount * item.gst) / 100;
-      const total = taxableAmount + gstAmount;
+      const total = subtotal - discountAmount;
 
       return {
         ...item,
         quantity: qty,
         discount: disc,
+        gst: 0,
         subtotal,
         discountAmount,
-        gstAmount,
+        gstAmount: 0,
         total,
       };
     });
@@ -1006,39 +1089,36 @@ const Billing = () => {
     });
   };
 
-  // Preview calculations for selected medicine
+  // Preview calculations for selected medicine (GST removed)
   const livePreview = useMemo(() => {
     if (!selectedMedicine) return null;
     const p = Number(selectedMedicine.price) || 0;
     const q = Number(quantity) || 0;
     const d = Number(discount) || 0;
-    const g = Number(selectedMedicine.gst) || 0;
     const sub = p * q;
     const dAmt = (sub * d) / 100;
-    const taxable = sub - dAmt;
-    const gAmt = (taxable * g) / 100;
-    const tot = taxable + gAmt;
-    return { subtotal: sub, discountAmount: dAmt, gstAmount: gAmt, total: tot };
+    const tot = sub - dAmt;
+    return { subtotal: sub, discountAmount: dAmt, gstAmount: 0, total: tot };
   }, [selectedMedicine, quantity, discount]);
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8 max-w-[1600px] mx-auto space-y-6">
-      {/* 1. HEADER SECTION (No icon next to title per design standards) */}
+    <div className="p-3 sm:p-6 lg:p-8 max-w-[1600px] mx-auto space-y-5 sm:space-y-6">
+      {/* 1. HEADER SECTION */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight flex items-center gap-2">
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight flex items-center gap-2">
             <span>New Billing</span>
           </h1>
-          <p className="text-slate-500 text-xs sm:text-sm mt-0.5">
+          <p className="text-slate-500 dark:text-slate-400 text-xs sm:text-sm mt-0.5">
             Create patient prescriptions, calculate taxes & discounts, and generate invoices.
           </p>
         </div>
 
-        <div className="flex items-center gap-2.5 flex-wrap">
+        <div className="flex items-center gap-2 sm:gap-2.5 flex-wrap">
           {billItems.length > 0 && (
             <button
               onClick={clearCart}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2.5 bg-white hover:bg-rose-50 border border-slate-200 hover:border-rose-200 text-rose-600 rounded-xl text-sm font-semibold shadow-xs transition-colors"
+              className="inline-flex items-center gap-1.5 px-3 py-2 sm:px-3.5 sm:py-2.5 bg-white dark:bg-slate-900 hover:bg-rose-50 dark:hover:bg-rose-950/30 border border-slate-200 dark:border-slate-700 hover:border-rose-200 dark:hover:border-rose-900 text-rose-600 dark:text-rose-400 rounded-xl text-xs sm:text-sm font-semibold shadow-xs transition-colors"
             >
               <RotateCcw size={15} />
               <span>Clear Cart</span>
@@ -1046,16 +1126,16 @@ const Billing = () => {
           )}
           <Link
             to="/billing-history"
-            className="inline-flex items-center gap-2 px-4 py-2.5 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-xl text-sm font-semibold shadow-xs transition-colors"
+            className="inline-flex items-center gap-1.5 sm:gap-2 px-3 py-2 sm:px-4 sm:py-2.5 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 rounded-xl text-xs sm:text-sm font-semibold shadow-xs transition-colors"
           >
-            <History size={16} className="text-slate-500" />
+            <History size={16} className="text-slate-500 dark:text-slate-400" />
             <span>Bill History</span>
           </Link>
           <Link
             to="/patients"
-            className="inline-flex items-center gap-2 px-4 py-2.5 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-xl text-sm font-semibold shadow-xs transition-colors"
+            className="inline-flex items-center gap-1.5 sm:gap-2 px-3 py-2 sm:px-4 sm:py-2.5 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 rounded-xl text-xs sm:text-sm font-semibold shadow-xs transition-colors"
           >
-            <Users size={16} className="text-slate-500" />
+            <Users size={16} className="text-slate-500 dark:text-slate-400" />
             <span>Patients</span>
           </Link>
         </div>
@@ -1063,21 +1143,21 @@ const Billing = () => {
 
       {/* EDIT MODE BANNER */}
       {isEditingBill && (
-        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
+        <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/60 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
           <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-xl bg-amber-100 text-amber-800 shrink-0">
+            <div className="p-2.5 rounded-xl bg-amber-100 dark:bg-amber-900/60 text-amber-800 dark:text-amber-300 shrink-0">
               <Edit size={20} />
             </div>
             <div>
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-amber-200/80 text-amber-900">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-xs font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-amber-200/80 dark:bg-amber-800/80 text-amber-900 dark:text-amber-100">
                   Editing Mode
                 </span>
-                <h3 className="text-sm font-bold text-amber-950">
+                <h3 className="text-sm font-bold text-amber-950 dark:text-amber-200">
                   Invoice #{editingBillNumber}
                 </h3>
               </div>
-              <p className="text-xs text-amber-700 mt-0.5">
+              <p className="text-xs text-amber-700 dark:text-amber-400 mt-0.5">
                 Saving updates will synchronize stock (restoring previous items and deducting newly selected medicines).
               </p>
             </div>
@@ -1086,7 +1166,7 @@ const Billing = () => {
             <button
               type="button"
               onClick={exitEditMode}
-              className="px-4 py-2 bg-white hover:bg-amber-100/60 border border-amber-300 text-amber-900 rounded-xl text-xs font-bold transition-colors shadow-2xs"
+              className="w-full sm:w-auto px-4 py-2 bg-white dark:bg-slate-900 hover:bg-amber-100/60 dark:hover:bg-amber-950/50 border border-amber-300 dark:border-amber-700 text-amber-900 dark:text-amber-300 rounded-xl text-xs font-bold transition-colors shadow-2xs text-center"
             >
               Cancel Edit & New Bill
             </button>
@@ -1096,28 +1176,28 @@ const Billing = () => {
 
       {/* MULTI-PATIENT BILLING SESSION TABS */}
       {!isEditingBill && (
-        <div className="bg-white rounded-2xl p-4 border border-slate-200/90 shadow-xs space-y-3">
+        <div className="bg-white dark:bg-slate-900 rounded-2xl p-3.5 sm:p-4 border border-slate-200/90 dark:border-slate-800 shadow-xs space-y-3">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
-                <Layers size={14} className="text-blue-600" />
+              <span className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+                <Layers size={14} className="text-blue-600 dark:text-blue-400" />
                 Multi-Patient Session:
               </span>
-              <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
+              <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
                 {bills.length} {bills.length === 1 ? "Patient Bill" : "Patient Bills"}
               </span>
-              <span className="text-xs text-slate-500 font-medium">
-                • Combined Total: <strong className="text-slate-900 font-bold">₹{sessionGrandTotal.toFixed(2)}</strong>
+              <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">
+                • Combined Total: <strong className="text-slate-900 dark:text-white font-bold">₹{sessionGrandTotal.toFixed(2)}</strong>
               </span>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               {bills.length > 1 && (
                 <button
                   type="button"
                   onClick={generateAllSessionBills}
                   disabled={isSavingAll}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 text-white rounded-xl text-xs font-semibold shadow-xs transition-colors"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 dark:disabled:bg-slate-700 text-white rounded-xl text-xs font-semibold shadow-xs transition-colors"
                 >
                   <CheckCircle2 size={14} />
                   <span>{isSavingAll ? "Saving All..." : `Save All (${bills.length}) Bills`}</span>
@@ -1126,15 +1206,15 @@ const Billing = () => {
               <button
                 type="button"
                 onClick={addNewPatientBill}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-xl text-xs font-semibold shadow-2xs transition-colors"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 dark:bg-blue-950/40 hover:bg-blue-100 dark:hover:bg-blue-900/50 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 rounded-xl text-xs font-semibold shadow-2xs transition-colors"
               >
                 <Plus size={14} />
-                <span>+ Add Patient Bill</span>
+                <span>Add Patient Bill</span>
               </button>
             </div>
           </div>
 
-          <div className="flex items-center gap-2 overflow-x-auto pb-1 pt-0.5">
+          <div className="flex items-center gap-2 overflow-x-auto pb-1 pt-0.5 scrollbar-thin">
             {bills.map((b, idx) => {
               const isActive = idx === activeBillIndex;
               const bTot = calculateItemsTotals(b.billItems);
@@ -1143,19 +1223,17 @@ const Billing = () => {
                 <div
                   key={b.sessionKey || idx}
                   onClick={() => setActiveBillIndex(idx)}
-                  className={`group flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold cursor-pointer border transition-all shrink-0 select-none ${
-                    isActive
-                      ? "bg-blue-600 text-white border-blue-600 shadow-xs"
-                      : "bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200"
-                  }`}
+                  className={`group flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold cursor-pointer border transition-all shrink-0 select-none ${isActive
+                    ? "bg-blue-600 text-white border-blue-600 shadow-xs"
+                    : "bg-slate-50 dark:bg-slate-800/60 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700"
+                    }`}
                 >
                   <div className="flex items-center gap-1.5">
-                    <User size={13} className={isActive ? "text-blue-100" : "text-slate-400"} />
+                    <User size={13} className={isActive ? "text-blue-100" : "text-slate-400 dark:text-slate-500"} />
                     <span className="max-w-[120px] truncate">{pName}</span>
                     <span
-                      className={`text-[10px] px-1.5 py-0.2 rounded font-mono ${
-                        isActive ? "bg-blue-700/80 text-white" : "bg-slate-200 text-slate-700"
-                      }`}
+                      className={`text-[10px] px-1.5 py-0.2 rounded font-mono ${isActive ? "bg-blue-700/80 text-white" : "bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200"
+                        }`}
                     >
                       {b.billItems.length}
                     </span>
@@ -1168,9 +1246,8 @@ const Billing = () => {
                         e.stopPropagation();
                         removePatientBill(idx);
                       }}
-                      className={`p-0.5 rounded transition-colors ${
-                        isActive ? "text-blue-200 hover:bg-blue-700 hover:text-white" : "text-slate-400 hover:bg-slate-200 hover:text-rose-600"
-                      }`}
+                      className={`p-0.5 rounded transition-colors ${isActive ? "text-blue-200 hover:bg-blue-700 hover:text-white" : "text-slate-400 dark:text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-700 hover:text-rose-600 dark:hover:text-rose-400"
+                        }`}
                       title="Remove patient bill from session"
                     >
                       <X size={13} />
@@ -1188,17 +1265,17 @@ const Billing = () => {
         {/* LEFT WORKSPACE (8 COLS) */}
         <div className="xl:col-span-8 space-y-6">
           {/* PATIENT DETAILS CARD */}
-          <div className="bg-white rounded-2xl p-5 sm:p-6 border border-slate-200/90 shadow-xs space-y-4">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl p-4 sm:p-5 md:p-6 border border-slate-200/90 dark:border-slate-800 shadow-xs space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800 gap-3">
               <div className="flex items-center gap-3">
-                <div className="p-2.5 rounded-xl bg-blue-50 text-blue-600 border border-blue-100">
+                <div className="p-2.5 rounded-xl bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 border border-blue-100 dark:border-blue-900/50 shrink-0">
                   <User size={18} />
                 </div>
                 <div>
-                  <h2 className="text-base font-bold text-slate-900">
+                  <h2 className="text-base font-bold text-slate-900 dark:text-white">
                     Patient Details
                   </h2>
-                  <p className="text-xs text-slate-500">
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
                     Select a registered patient to auto-populate billing information.
                   </p>
                 </div>
@@ -1207,14 +1284,14 @@ const Billing = () => {
                 <button
                   type="button"
                   onClick={() => setIsPatientModalOpen(true)}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-600 border border-blue-200 rounded-xl text-xs font-semibold transition-colors"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 dark:bg-blue-950/40 hover:bg-blue-100 dark:hover:bg-blue-900/50 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800 rounded-xl text-xs font-semibold transition-colors"
                 >
                   <UserPlus size={13} />
-                  <span>+ Register New Patient</span>
+                  <span>Register New Patient</span>
                 </button>
                 <Link
                   to="/patients"
-                  className="text-xs font-medium text-slate-400 hover:text-slate-600 hover:underline hidden sm:inline"
+                  className="text-xs font-medium text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:underline hidden sm:inline"
                 >
                   Directory
                 </Link>
@@ -1223,108 +1300,207 @@ const Billing = () => {
 
             {/* Patient Selector */}
             <div>
-              <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
-                Select Patient <span className="text-rose-500">*</span>
-              </label>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
+                  Select Registered Patient
+                </label>
+                {selectedPatientId && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedPatientId("");
+                      setPatient({
+                        patientId: "",
+                        name: "",
+                        mobile: "",
+                        age: "",
+                        gender: "",
+                        doctorName: "",
+                        prescriptionNumber: "",
+                        address: "",
+                      });
+                    }}
+                    className="text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline"
+                  >
+                    + Switch to Manual / New Patient
+                  </button>
+                )}
+              </div>
               <select
                 value={selectedPatientId}
                 onChange={handlePatientSelect}
-                className="w-full bg-slate-50/60 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all font-medium"
+                className="w-full bg-slate-50/60 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all font-medium"
               >
-                <option value="">-- Choose a patient --</option>
+                <option value="">-- Choose registered patient (or enter details manually below) --</option>
                 {patients.map((p) => (
-                  <option key={p.patient_id} value={p.patient_id}>
+                  <option key={p.patient_id || p.id} value={p.patient_id || p.id} className="dark:bg-slate-900 dark:text-white">
                     {p.patient_name} — {p.mobile_number} {p.age ? `(${p.age}y)` : ""}
                   </option>
                 ))}
               </select>
             </div>
 
-            {/* Patient Info Fields */}
-            {patient.patientId ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 pt-2">
-                <div className="p-3 rounded-xl bg-slate-50/70 border border-slate-100">
-                  <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block">
-                    Mobile
-                  </span>
-                  <span className="text-sm font-semibold text-slate-800 flex items-center gap-1.5 mt-0.5">
-                    <Phone size={13} className="text-slate-400" />
-                    {patient.mobile || "—"}
-                  </span>
-                </div>
-                <div className="p-3 rounded-xl bg-slate-50/70 border border-slate-100">
-                  <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block">
-                    Age & Gender
-                  </span>
-                  <span className="text-sm font-semibold text-slate-800 block mt-0.5">
-                    {patient.age ? `${patient.age} yrs` : "—"}{" "}
-                    {patient.gender ? `• ${patient.gender}` : ""}
-                  </span>
-                </div>
-                <div className="p-3 rounded-xl bg-slate-50/70 border border-slate-100">
-                  <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block">
-                    Prescribed By
-                  </span>
-                  <span className="text-sm font-semibold text-slate-800 flex items-center gap-1.5 mt-0.5 truncate">
-                    <Stethoscope size={13} className="text-slate-400 shrink-0" />
-                    <span className="truncate">{patient.doctorName || "Self / None"}</span>
-                  </span>
-                </div>
-                <div className="p-3 rounded-xl bg-slate-50/70 border border-slate-100">
-                  <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block">
-                    Prescription No
-                  </span>
-                  <span className="text-sm font-semibold text-slate-800 flex items-center gap-1.5 mt-0.5 truncate">
-                    <FileText size={13} className="text-slate-400 shrink-0" />
-                    <span className="truncate font-mono">{patient.prescriptionNumber || "—"}</span>
-                  </span>
-                </div>
-              </div>
-            ) : (
-              <div className="p-3.5 rounded-xl bg-blue-50/50 border border-blue-100 text-xs text-blue-700 flex items-center gap-2">
-                <User size={15} className="shrink-0 text-blue-500" />
-                <span>
-                  Please select a patient from the dropdown above to associate with this bill.
+            {/* Editable Patient Details Grid */}
+            <div className="space-y-3 pt-1">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                  <span className={`w-2 h-2 rounded-full ${selectedPatientId ? "bg-blue-500" : "bg-emerald-500"}`}></span>
+                  {selectedPatientId ? "Registered Patient Details (Prefilled)" : "Patient Details (Manual Entry)"}
                 </span>
+                {!selectedPatientId && (
+                  <span className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 px-2.5 py-0.5 rounded-full border border-emerald-100 dark:border-emerald-900/40">
+                    Will Auto-Register in System on Billing
+                  </span>
+                )}
               </div>
-            )}
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+                <div className="w-full">
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                    Patient Name <span className="text-rose-500">*</span>
+                  </label>
+                  <div className="relative">
+                    <User size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500 pointer-events-none" />
+                    <input
+                      type="text"
+                      placeholder="e.g. Ramesh Kumar"
+                      value={patient.name || ""}
+                      onChange={(e) => setPatient((prev) => ({ ...prev, name: e.target.value }))}
+                      className="w-full bg-slate-50/70 dark:bg-slate-800/70 border border-slate-200 dark:border-slate-700 rounded-xl pl-8 pr-3 py-2 text-xs sm:text-sm font-semibold text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                    />
+                  </div>
+                </div>
+
+                <div className="w-full">
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                    Mobile Number
+                  </label>
+                  <div className="relative">
+                    <Phone size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500 pointer-events-none" />
+                    <input
+                      type="tel"
+                      maxLength={10}
+                      placeholder="10-digit mobile"
+                      value={patient.mobile || ""}
+                      onChange={(e) => setPatient((prev) => ({ ...prev, mobile: e.target.value }))}
+                      className="w-full bg-slate-50/70 dark:bg-slate-800/70 border border-slate-200 dark:border-slate-700 rounded-xl pl-8 pr-3 py-2 text-xs sm:text-sm font-semibold text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                    />
+                  </div>
+                </div>
+
+                <div className="w-full">
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                    Age & Gender
+                  </label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <input
+                      type="number"
+                      placeholder="Age"
+                      min="0"
+                      max="125"
+                      value={patient.age || ""}
+                      onChange={(e) => setPatient((prev) => ({ ...prev, age: e.target.value }))}
+                      className="w-full bg-slate-50/70 dark:bg-slate-800/70 border border-slate-200 dark:border-slate-700 rounded-xl px-2.5 py-2 text-xs sm:text-sm font-semibold text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                    />
+                    <select
+                      value={patient.gender || ""}
+                      onChange={(e) => setPatient((prev) => ({ ...prev, gender: e.target.value }))}
+                      className="w-full bg-slate-50/70 dark:bg-slate-800/70 border border-slate-200 dark:border-slate-700 rounded-xl px-2 py-2 text-xs font-semibold text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                    >
+                      <option value="" className="dark:bg-slate-900">Gender</option>
+                      <option value="Male" className="dark:bg-slate-900">Male</option>
+                      <option value="Female" className="dark:bg-slate-900">Female</option>
+                      <option value="Other" className="dark:bg-slate-900">Other</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="w-full">
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                    Prescribed By (Doctor)
+                  </label>
+                  <div className="relative">
+                    <Stethoscope size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500 pointer-events-none" />
+                    <input
+                      type="text"
+                      placeholder="Doctor Name / Self"
+                      value={patient.doctorName || ""}
+                      onChange={(e) => setPatient((prev) => ({ ...prev, doctorName: e.target.value }))}
+                      className="w-full bg-slate-50/70 dark:bg-slate-800/70 border border-slate-200 dark:border-slate-700 rounded-xl pl-8 pr-3 py-2 text-xs sm:text-sm font-semibold text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                    />
+                  </div>
+                </div>
+
+                <div className="w-full">
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                    Prescription Number
+                  </label>
+                  <div className="relative">
+                    <FileText size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500 pointer-events-none" />
+                    <input
+                      type="text"
+                      placeholder="Rx Number (Optional)"
+                      value={patient.prescriptionNumber || ""}
+                      onChange={(e) => setPatient((prev) => ({ ...prev, prescriptionNumber: e.target.value }))}
+                      className="w-full bg-slate-50/70 dark:bg-slate-800/70 border border-slate-200 dark:border-slate-700 rounded-xl pl-8 pr-3 py-2 text-xs sm:text-sm font-mono font-semibold text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                    />
+                  </div>
+                </div>
+
+                <div className="sm:col-span-2 md:col-span-3">
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                    Patient Address (Optional)
+                  </label>
+                  <div className="relative">
+                    <MapPin size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500 pointer-events-none" />
+                    <input
+                      type="text"
+                      placeholder="Address or locality details"
+                      value={patient.address || ""}
+                      onChange={(e) => setPatient((prev) => ({ ...prev, address: e.target.value }))}
+                      className="w-full bg-slate-50/70 dark:bg-slate-800/70 border border-slate-200 dark:border-slate-700 rounded-xl pl-8 pr-3 py-2 text-xs sm:text-sm font-semibold text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
 
-            {/* ADD MEDICINE CARD */}
-          <div className="bg-white rounded-2xl p-5 sm:p-6 border border-slate-200/90 shadow-xs space-y-4 relative z-20">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+          {/* ADD MEDICINE CARD */}
+          <div className="bg-white dark:bg-slate-900 rounded-2xl p-4 sm:p-5 md:p-6 border border-slate-200/90 dark:border-slate-800 shadow-xs space-y-4 relative z-20">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
               <div className="flex items-center gap-3">
-                <div className="p-2.5 rounded-xl bg-indigo-50 text-indigo-600 border border-indigo-100">
+                <div className="p-2.5 rounded-xl bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-900/50 shrink-0">
                   <Search size={18} />
                 </div>
                 <div>
-                  <h2 className="text-base font-bold text-slate-900">
+                  <h2 className="text-base font-bold text-slate-900 dark:text-white">
                     Add Medicines
                   </h2>
-                  <p className="text-xs text-slate-500">
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
                     Search medicine catalog by name, check stock availability, and apply line discounts.
                   </p>
                 </div>
               </div>
-              <span className="text-xs font-semibold px-2.5 py-1 rounded-lg bg-slate-100 text-slate-600 border border-slate-200">
+              <span className="text-xs font-semibold px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 shrink-0">
                 {medicinesData.length} in Catalog
               </span>
             </div>
 
             {/* Search Input with Popover Dropdown */}
             <div className="relative" ref={searchRef}>
-              <div className="flex items-center justify-between mb-1.5">
-                <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider">
+              <div className="flex items-center justify-between mb-1.5 gap-2">
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
                   Search Medicine
                 </label>
-                <span className="text-[11px] text-slate-400 font-medium">
-                  Use <kbd className="px-1.5 py-0.5 bg-slate-100 rounded border border-slate-200 text-slate-600 font-mono text-[10px]">↑</kbd> <kbd className="px-1.5 py-0.5 bg-slate-100 rounded border border-slate-200 text-slate-600 font-mono text-[10px]">↓</kbd> to navigate, <kbd className="px-1.5 py-0.5 bg-slate-100 rounded border border-slate-200 text-slate-600 font-mono text-[10px]">Enter</kbd> to pick
+                <span className="hidden sm:inline-block text-[11px] text-slate-400 dark:text-slate-500 font-medium">
+                  Use <kbd className="px-1.5 py-0.5 bg-slate-100 dark:bg-slate-800 rounded border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 font-mono text-[10px]">↑</kbd> <kbd className="px-1.5 py-0.5 bg-slate-100 dark:bg-slate-800 rounded border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 font-mono text-[10px]">↓</kbd> to navigate, <kbd className="px-1.5 py-0.5 bg-slate-100 dark:bg-slate-800 rounded border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 font-mono text-[10px]">Enter</kbd> to pick
                 </span>
               </div>
               <div className="relative">
                 <Search
                   size={16}
-                  className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"
+                  className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500 pointer-events-none"
                 />
                 <input
                   ref={searchInputRef}
@@ -1342,7 +1518,7 @@ const Billing = () => {
                     }
                   }}
                   onKeyDown={handleSearchKeyDown}
-                  className="w-full bg-slate-50/60 border border-slate-200 rounded-xl pl-10 pr-10 py-2.5 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all font-medium"
+                  className="w-full bg-slate-50/60 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl pl-10 pr-10 py-2.5 text-sm text-slate-800 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all font-medium"
                 />
                 {search && (
                   <button
@@ -1352,7 +1528,7 @@ const Billing = () => {
                       setIsSearchOpen(false);
                       setHighlightedIndex(-1);
                     }}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1"
                   >
                     <X size={15} />
                   </button>
@@ -1363,10 +1539,10 @@ const Billing = () => {
               {isSearchOpen && search.trim() && (
                 <div
                   ref={dropdownListRef}
-                  className="absolute left-0 right-0 top-full mt-1.5 bg-white border border-slate-200 rounded-2xl shadow-xl w-full max-h-72 overflow-y-auto z-50 divide-y divide-slate-100"
+                  className="absolute left-0 right-0 top-full mt-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-750 rounded-2xl shadow-xl w-full max-h-72 overflow-y-auto z-50 divide-y divide-slate-100 dark:divide-slate-800 scrollbar-thin"
                 >
                   {loading ? (
-                    <div className="p-4 text-center text-xs text-slate-500 font-medium">
+                    <div className="p-4 text-center text-xs text-slate-500 dark:text-slate-400 font-medium">
                       Loading medicine inventory...
                     </div>
                   ) : filteredMedicines.length > 0 ? (
@@ -1381,29 +1557,26 @@ const Billing = () => {
                           key={medicine.id}
                           onMouseEnter={() => setHighlightedIndex(index)}
                           onClick={() => selectMedicine(medicine)}
-                          className={`w-full text-left p-3.5 transition-colors flex items-center justify-between gap-3 ${
-                            isHighlighted
-                              ? "bg-blue-50/90 text-blue-900 border-l-4 border-blue-600 pl-2.5"
-                              : "hover:bg-slate-50 text-slate-800"
-                          }`}
+                          className={`w-full text-left p-3.5 transition-colors flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-3 ${isHighlighted
+                            ? "bg-blue-50/90 dark:bg-blue-950/60 text-blue-900 dark:text-blue-100 border-l-4 border-blue-600 dark:border-blue-500 pl-2.5"
+                            : "hover:bg-slate-50 dark:hover:bg-slate-800/70 text-slate-800 dark:text-slate-200"
+                            }`}
                         >
-                          <div className="min-w-0">
-                            <div className="font-semibold text-sm flex items-center gap-2">
-                              <span>{medicine.name}</span>
+                          <div className="min-w-0 flex-1">
+                            <div className="font-semibold text-sm flex items-center gap-2 flex-wrap">
+                              <span className="text-slate-900 dark:text-white">{medicine.name}</span>
                               {medicine.batch && (
-                                <span className="font-mono text-[11px] font-normal px-1.5 py-0.2 bg-slate-100 text-slate-600 rounded">
+                                <span className="font-mono text-[11px] font-normal px-1.5 py-0.2 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200/60 dark:border-slate-700 rounded">
                                   {medicine.batch}
                                 </span>
                               )}
                             </div>
-                            <div className="text-xs text-slate-500 mt-0.5 flex items-center gap-2">
+                            <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 flex items-center gap-2 flex-wrap">
                               <span>Stock: {medicine.stock} units</span>
-                              <span>•</span>
-                              <span>GST: {medicine.gst}%</span>
                               {medicine.expiry && (
                                 <>
                                   <span>•</span>
-                                  <span className={expired ? "text-rose-600 font-medium" : ""}>
+                                  <span className={expired ? "text-rose-600 dark:text-rose-400 font-medium" : ""}>
                                     Exp: {new Date(medicine.expiry).toLocaleDateString("en-IN", { month: "short", year: "numeric" })}
                                   </span>
                                 </>
@@ -1411,27 +1584,29 @@ const Billing = () => {
                             </div>
                           </div>
 
-                          <div className="text-right shrink-0">
-                            <div className="font-bold text-slate-900 text-sm">
-                              ₹{medicine.price.toFixed(2)}
+                          <div className="sm:text-right shrink-0 flex sm:flex-col items-center sm:items-end justify-between sm:justify-center gap-2 sm:gap-0 pt-1 sm:pt-0 border-t sm:border-t-0 border-slate-100/60 dark:border-slate-800/60">
+                            <div>
+                              <div className="font-bold text-slate-900 dark:text-white text-sm">
+                                ₹{medicine.price.toFixed(2)}
+                              </div>
+                              <span className="text-[10px] text-slate-400 dark:text-slate-500 block font-normal -mt-0.5">
+                                per tablet
+                              </span>
                             </div>
-                            <span className="text-[10px] text-slate-400 block font-normal -mt-0.5">
-                              per tablet
-                            </span>
                             {outOfStock ? (
-                              <span className="text-[11px] font-semibold text-rose-600 bg-rose-50 px-2 py-0.5 rounded-full border border-rose-100 mt-0.5 inline-block">
+                              <span className="text-[11px] font-semibold text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/40 px-2 py-0.5 rounded-full border border-rose-100 dark:border-rose-900/50 mt-0.5 inline-block">
                                 Out of Stock
                               </span>
                             ) : expired ? (
-                              <span className="text-[11px] font-semibold text-rose-600 bg-rose-50 px-2 py-0.5 rounded-full border border-rose-100 mt-0.5 inline-block">
+                              <span className="text-[11px] font-semibold text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/40 px-2 py-0.5 rounded-full border border-rose-100 dark:border-rose-900/50 mt-0.5 inline-block">
                                 Expired
                               </span>
                             ) : medicine.stock <= 10 ? (
-                              <span className="text-[11px] font-semibold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-100 mt-0.5 inline-block">
+                              <span className="text-[11px] font-semibold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 px-2 py-0.5 rounded-full border border-amber-100 dark:border-amber-900/50 mt-0.5 inline-block">
                                 Low ({medicine.stock})
                               </span>
                             ) : (
-                              <span className="text-[11px] font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100 mt-0.5 inline-block">
+                              <span className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 px-2 py-0.5 rounded-full border border-emerald-100 dark:border-emerald-900/50 mt-0.5 inline-block">
                                 In Stock
                               </span>
                             )}
@@ -1440,7 +1615,7 @@ const Billing = () => {
                       );
                     })
                   ) : (
-                    <div className="p-4 text-center text-xs text-slate-500 font-medium">
+                    <div className="p-4 text-center text-xs text-slate-500 dark:text-slate-400 font-medium">
                       No medicines matching "{search}" found
                     </div>
                   )}
@@ -1448,313 +1623,240 @@ const Billing = () => {
               )}
             </div>
 
-            {/* Selected Medicine Action Card */}
-            {selectedMedicine && (
-              <div className="p-4 sm:p-5 rounded-2xl bg-slate-50/70 border border-slate-200 space-y-4">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-200/70">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <h3 className="font-bold text-slate-900 text-base">
-                        {selectedMedicine.name}
-                      </h3>
-                      {selectedMedicine.batch && (
-                        <span className="font-mono text-xs font-semibold px-2 py-0.5 rounded bg-white border border-slate-200 text-slate-700">
-                          {selectedMedicine.batch}
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-xs text-slate-500 mt-0.5">
-                      Available Inventory: <strong className="text-slate-800">{selectedMedicine.stock}</strong> units • GST Rate: <strong className="text-slate-800">{selectedMedicine.gst}%</strong>
-                    </p>
-                  </div>
-
-                  <div className="text-right">
-                    <span className="text-xs text-slate-400 uppercase tracking-wider block">
-                      Per-Tablet Price
+            {/* MEDICINES TABULAR LIST */}
+            <div className="pt-2">
+              <div className="flex items-center justify-between pb-3">
+                <div className="flex items-center gap-2">
+                  <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
+                    <span>Selected Medicines</span>
+                    <span className="px-2 py-0.5 rounded-full bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 text-xs font-semibold border border-blue-100 dark:border-blue-900/40">
+                      {billItems.length} {billItems.length === 1 ? "item" : "items"}
                     </span>
-                    <span className="text-lg font-extrabold text-slate-900">
-                      ₹{selectedMedicine.price.toFixed(2)}
-                    </span>
-                    <span className="text-[11px] text-slate-400 block font-normal">
-                      / tablet
-                    </span>
-                  </div>
+                  </h3>
                 </div>
-
-                {isExpired(selectedMedicine.expiry) ? (
-                  <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-medium flex items-center gap-2">
-                    <AlertTriangle size={16} className="text-rose-500 shrink-0" />
-                    <span>
-                      This medicine expired on {new Date(selectedMedicine.expiry).toLocaleDateString("en-IN")}. Pharmacy regulations prohibit billing expired stock.
-                    </span>
-                  </div>
-                ) : (
-                  <>
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                      <div>
-                        <label className="block text-xs font-semibold text-slate-700 mb-1">
-                          Tablet Quantity (Max {selectedMedicine.stock}) <span className="text-[11px] text-slate-400 font-normal">Press Enter ↵ to add</span>
-                        </label>
-                        <input
-                          ref={quantityInputRef}
-                          type="number"
-                          min="1"
-                          max={selectedMedicine.stock}
-                          value={quantity}
-                          onChange={(e) => setQuantity(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter") {
-                              e.preventDefault();
-                              addMedicineToBill();
-                            }
-                          }}
-                          className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-800 font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-semibold text-slate-700 mb-1">
-                          Discount (%)
-                        </label>
-                        <input
-                          type="number"
-                          min="0"
-                          max="100"
-                          step="0.5"
-                          value={discount}
-                          onChange={(e) => setDiscount(e.target.value)}
-                          className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-800 font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-semibold text-slate-500 mb-1">
-                          Live Item Total
-                        </label>
-                        <div className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-sm font-extrabold text-emerald-600 flex items-center justify-between">
-                          <span>₹{livePreview ? livePreview.total.toFixed(2) : "0.00"}</span>
-                          <span className="text-[11px] font-normal text-slate-400">
-                            incl. GST
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center justify-end gap-2.5 pt-2">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setSelectedMedicine(null);
-                          setSearch("");
-                        }}
-                        className="px-4 py-2 bg-white hover:bg-slate-100 border border-slate-200 text-slate-600 rounded-xl text-xs font-semibold transition-colors"
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        type="button"
-                        onClick={addMedicineToBill}
-                        className="inline-flex items-center gap-1.5 px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold shadow-xs transition-colors"
-                      >
-                        <Plus size={15} />
-                        <span>Add To Bill</span>
-                      </button>
-                    </div>
-                  </>
+                {billItems.length > 0 && (
+                  <span className="text-xs text-slate-500 dark:text-slate-400">
+                    Total Units: <strong className="text-slate-800 dark:text-slate-200">{billItems.reduce((acc, i) => acc + (Number(i.quantity) || 0), 0)}</strong>
+                  </span>
                 )}
               </div>
-            )}
-          </div>
 
-          {/* BILL ITEMS TABLE */}
-          <div className="bg-white rounded-2xl border border-slate-200/90 shadow-xs overflow-hidden">
-            <div className="p-4 sm:p-5 flex items-center justify-between border-b border-slate-100">
-              <div className="flex items-center gap-2.5">
-                <div className="p-2 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-100">
-                  <IndianRupee size={16} />
-                </div>
-                <div>
-                  <h3 className="text-base font-bold text-slate-900">
-                    Bill Items
-                  </h3>
-                  <p className="text-xs text-slate-500">
-                    {billItems.length} items added ({billItems.reduce((acc, i) => acc + (i.quantity || 0), 0)} total units)
-                  </p>
+              <div className="border border-slate-200/90 dark:border-slate-800 rounded-2xl overflow-hidden bg-white dark:bg-slate-900">
+                <div className="overflow-x-auto scrollbar-thin">
+                  <table className="w-full text-left border-collapse min-w-[650px]">
+                    <thead>
+                      <tr className="border-b border-slate-100 dark:border-slate-800 text-[11px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider bg-slate-50/80 dark:bg-slate-800/60">
+                        <th className="py-3 px-3 sm:px-4 w-10 text-center">#</th>
+                        <th className="py-3 px-3 sm:px-4">Medicine & Details</th>
+                        <th className="py-3 px-3 sm:px-4 text-right">Price / Tab</th>
+                        <th className="py-3 px-3 sm:px-4 text-center w-36">Quantity</th>
+                        <th className="py-3 px-3 sm:px-4 text-right w-24">Discount</th>
+                        <th className="py-3 px-3 sm:px-4 text-right">Total</th>
+                        <th className="py-3 px-3 sm:px-4 text-center w-16">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-sm">
+                      {billItems.map((item, index) => {
+                        const isOutOfMaxStock = item.stock != null && item.quantity >= item.stock;
+                        const isMinQty = (Number(item.quantity) || 1) <= 1;
+
+                        return (
+                          <tr
+                            key={item.id}
+                            className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition-colors"
+                          >
+                            <td className="py-3 px-3 sm:px-4 text-center text-xs font-medium text-slate-400 dark:text-slate-500">
+                              {index + 1}
+                            </td>
+                            <td className="py-3 px-3 sm:px-4">
+                              <div className="font-semibold text-slate-900 dark:text-white text-sm">
+                                {item.name}
+                              </div>
+                              <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                                {item.batch && (
+                                  <span className="font-mono text-[11px] px-1.5 py-0.2 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200/70 dark:border-slate-700 rounded">
+                                    Batch: {item.batch}
+                                  </span>
+                                )}
+                                {item.stock != null && (
+                                  <span
+                                    className={`text-[11px] font-medium ${
+                                      item.stock <= 10
+                                        ? "text-amber-600 dark:text-amber-400"
+                                        : "text-slate-500 dark:text-slate-400"
+                                    }`}
+                                  >
+                                    Stock: {item.stock}
+                                  </span>
+                                )}
+                                {item.expiry && (
+                                  <span className="text-[11px] text-slate-400 dark:text-slate-500">
+                                    Exp: {new Date(item.expiry).toLocaleDateString("en-IN", { month: "short", year: "numeric" })}
+                                  </span>
+                                )}
+                              </div>
+                            </td>
+                            <td className="py-3 px-3 sm:px-4 text-right text-slate-700 dark:text-slate-200 font-semibold">
+                              ₹{Number(item.price).toFixed(2)}
+                              <span className="text-[10px] text-slate-400 dark:text-slate-500 block font-normal">/ tab</span>
+                            </td>
+                            <td className="py-3 px-3 sm:px-4 text-center">
+                              <div className="inline-flex items-center justify-center border border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50/90 dark:bg-slate-800/90 p-0.5 shadow-2xs">
+                                <button
+                                  type="button"
+                                  onClick={() => decreaseQuantity(item.id)}
+                                  disabled={isMinQty}
+                                  className={`p-1.5 rounded-lg transition-colors ${
+                                    isMinQty
+                                      ? "text-slate-300 dark:text-slate-600 cursor-not-allowed"
+                                      : "text-slate-600 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-700 hover:text-blue-600 dark:hover:text-blue-400 active:scale-95"
+                                  }`}
+                                  title="Decrease Quantity"
+                                >
+                                  <Minus size={13} />
+                                </button>
+                                <input
+                                  type="number"
+                                  min="1"
+                                  max={item.stock || 9999}
+                                  value={item.quantity}
+                                  onChange={(e) => updateItemQuantity(item.id, e.target.value)}
+                                  onBlur={(e) => handleQuantityBlur(item.id, e.target.value)}
+                                  className="w-12 text-center bg-transparent text-slate-900 dark:text-white font-bold text-xs sm:text-sm focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => increaseQuantity(item.id)}
+                                  disabled={isOutOfMaxStock}
+                                  className={`p-1.5 rounded-lg transition-colors ${
+                                    isOutOfMaxStock
+                                      ? "text-slate-300 dark:text-slate-600 cursor-not-allowed"
+                                      : "text-slate-600 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-700 hover:text-blue-600 dark:hover:text-blue-400 active:scale-95"
+                                  }`}
+                                  title={
+                                    isOutOfMaxStock
+                                      ? `Max available stock reached (${item.stock})`
+                                      : "Increase Quantity"
+                                  }
+                                >
+                                  <Plus size={13} />
+                                </button>
+                              </div>
+                            </td>
+                            <td className="py-3 px-3 sm:px-4 text-right">
+                              <div className="inline-flex items-center justify-end gap-1">
+                                <input
+                                  type="number"
+                                  min="0"
+                                  max="100"
+                                  step="1"
+                                  value={item.discount ?? 0}
+                                  onChange={(e) => updateItemDiscount(item.id, e.target.value)}
+                                  className="w-12 text-right bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-1.5 py-1 text-xs font-semibold text-slate-800 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                />
+                                <span className="text-xs text-slate-400 dark:text-slate-500">%</span>
+                              </div>
+                              {item.discountAmount > 0 && (
+                                <div className="text-[11px] text-rose-500/90 dark:text-rose-400/90 mt-0.5">
+                                  -₹{Number(item.discountAmount).toFixed(2)}
+                                </div>
+                              )}
+                            </td>
+                            <td className="py-3 px-3 sm:px-4 text-right font-bold text-slate-900 dark:text-white">
+                              ₹{Number(item.total || 0).toFixed(2)}
+                            </td>
+                            <td className="py-3 px-3 sm:px-4 text-center">
+                              <button
+                                type="button"
+                                onClick={() => removeItem(item.id)}
+                                className="p-1.5 text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-xl transition-colors active:scale-95"
+                                title="Delete row from table"
+                              >
+                                <Trash2 size={16} />
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+
+                  {billItems.length === 0 && (
+                    <div className="text-center py-10 px-4 space-y-2 bg-slate-50/40 dark:bg-slate-850/40">
+                      <div className="w-11 h-11 rounded-2xl bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500 mx-auto flex items-center justify-center">
+                        <Package size={20} />
+                      </div>
+                      <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+                        No medicines added to bill yet
+                      </p>
+                      <p className="text-xs text-slate-400 dark:text-slate-500 max-w-sm mx-auto">
+                        Search and select medicines from the dropdown above to add them to this table.
+                      </p>
+                    </div>
+                  )}
                 </div>
               </div>
-            </div>
-
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse min-w-[700px]">
-                <thead>
-                  <tr className="border-b border-slate-100 text-[11px] font-semibold text-slate-400 uppercase tracking-wider bg-slate-50/60">
-                    <th className="py-3 px-4 w-10 text-center">#</th>
-                    <th className="py-3 px-4">Medicine & Batch</th>
-                    <th className="py-3 px-4 text-right">Rate / Tab</th>
-                    <th className="py-3 px-4 text-center">Qty (Tabs)</th>
-                    <th className="py-3 px-4 text-right">GST</th>
-                    <th className="py-3 px-4 text-right">Discount</th>
-                    <th className="py-3 px-4 text-right">Total</th>
-                    <th className="py-3 px-4 text-center w-24">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 text-sm">
-                  {billItems.map((item, index) => (
-                    <tr
-                      key={item.id}
-                      className="hover:bg-slate-50/60 transition-colors"
-                    >
-                      <td className="py-3.5 px-4 text-center text-xs font-medium text-slate-400">
-                        {index + 1}
-                      </td>
-                      <td className="py-3.5 px-4">
-                        <div className="font-semibold text-slate-900">
-                          {item.name}
-                        </div>
-                        <div className="flex items-center gap-2 mt-0.5">
-                          {item.batch && (
-                            <span className="font-mono text-[11px] text-slate-500 font-normal">
-                              Batch: {item.batch}
-                            </span>
-                          )}
-                          {item.category && (
-                            <span className="text-[11px] text-slate-400">
-                              • {item.category}
-                            </span>
-                          )}
-                        </div>
-                      </td>
-                      <td className="py-3.5 px-4 text-right text-slate-700 font-semibold">
-                        ₹{item.price.toFixed(2)}
-                        <span className="text-[10px] text-slate-400 block font-normal">/ tab</span>
-                      </td>
-                      <td className="py-3.5 px-4 text-center">
-                        <span className="font-bold text-slate-900 px-2 py-0.5 rounded-md bg-slate-100">
-                          {item.quantity}
-                        </span>
-                      </td>
-                      <td className="py-3.5 px-4 text-right">
-                        <div className="text-xs text-slate-600 font-medium">
-                          {item.gst}%
-                        </div>
-                        <div className="text-[11px] text-slate-400">
-                          ₹{item.gstAmount.toFixed(2)}
-                        </div>
-                      </td>
-                      <td className="py-3.5 px-4 text-right">
-                        <div className="text-xs text-rose-600 font-medium">
-                          {item.discount}%
-                        </div>
-                        <div className="text-[11px] text-rose-500/80">
-                          -₹{item.discountAmount.toFixed(2)}
-                        </div>
-                      </td>
-                      <td className="py-3.5 px-4 text-right font-bold text-slate-900">
-                        ₹{item.total.toFixed(2)}
-                      </td>
-                      <td className="py-3.5 px-4 text-center">
-                        <div className="flex items-center justify-center gap-1">
-                          <button
-                            type="button"
-                            onClick={() => editItem(item.id)}
-                            className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                            title="Edit quantity / discount"
-                          >
-                            <Edit size={15} />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => removeItem(item.id)}
-                            className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
-                            title="Remove item"
-                          >
-                            <Trash2 size={15} />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-
-              {billItems.length === 0 && (
-                <div className="text-center py-12 px-4 space-y-2">
-                  <div className="w-12 h-12 rounded-2xl bg-slate-100 text-slate-400 mx-auto flex items-center justify-center">
-                    <IndianRupee size={24} />
-                  </div>
-                  <p className="text-sm font-semibold text-slate-700">
-                    No medicines added to bill yet
-                  </p>
-                  <p className="text-xs text-slate-400 max-w-sm mx-auto">
-                    Search and select medicines from the catalog above to populate invoice items.
-                  </p>
-                </div>
-              )}
             </div>
           </div>
         </div>
 
         {/* RIGHT CHECKOUT SIDEBAR (4 COLS) */}
         <div className="xl:col-span-4 space-y-6">
-          <div className="bg-white rounded-2xl p-5 sm:p-6 border border-slate-200/90 shadow-xs space-y-5 sticky top-6">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl p-4 sm:p-5 md:p-6 border border-slate-200/90 dark:border-slate-800 shadow-xs space-y-5 sticky top-6">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
               <div className="flex items-center gap-2.5">
-                <div className="p-2.5 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-100">
+                <div className="p-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-900/50 shrink-0">
                   <Calculator size={18} />
                 </div>
                 <div>
-                  <h3 className="text-base font-bold text-slate-900">
+                  <h3 className="text-base font-bold text-slate-900 dark:text-white">
                     Bill Summary
                   </h3>
-                  <p className="text-xs text-slate-500">
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
                     Review totals and complete payment.
                   </p>
                 </div>
               </div>
-              <span className="text-[11px] font-mono font-semibold px-2 py-0.5 rounded bg-slate-100 text-slate-600">
+              <span className="text-[11px] font-mono font-semibold px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 shrink-0">
                 Draft
               </span>
             </div>
 
             {/* Calculations Breakdown */}
             <div className="space-y-3 text-sm">
-              <div className="flex items-center justify-between text-slate-600">
+              <div className="flex items-center justify-between text-slate-600 dark:text-slate-400">
                 <span>Subtotal ({billItems.length} items)</span>
-                <span className="font-semibold text-slate-900">
+                <span className="font-semibold text-slate-900 dark:text-white">
                   ₹{totals.subtotal.toFixed(2)}
                 </span>
               </div>
-              <div className="flex items-center justify-between text-slate-600">
-                <span className="flex items-center gap-1 text-rose-600 font-medium">
+              <div className="flex items-center justify-between text-slate-600 dark:text-slate-400">
+                <span className="flex items-center gap-1 text-rose-600 dark:text-rose-400 font-medium">
                   Total Discount
                 </span>
-                <span className="font-semibold text-rose-600">
+                <span className="font-semibold text-rose-600 dark:text-rose-400">
                   - ₹{totals.discountTotal.toFixed(2)}
                 </span>
               </div>
-              <div className="flex items-center justify-between text-slate-600">
-                <span className="text-slate-600">Total GST</span>
-                <span className="font-semibold text-slate-900">
-                  + ₹{totals.gstTotal.toFixed(2)}
-                </span>
-              </div>
 
-              <div className="pt-3 border-t border-slate-100 flex items-baseline justify-between">
+              <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex items-baseline justify-between">
                 <div>
-                  <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">
+                  <span className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider block">
                     Grand Total
                   </span>
-                  <span className="text-[11px] text-slate-400">
-                    (Inclusive of all taxes)
+                  <span className="text-[11px] text-slate-400 dark:text-slate-500">
+                    (Net Payable Amount)
                   </span>
                 </div>
-                <div className="text-2xl sm:text-3xl font-extrabold text-slate-900">
+                <div className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white">
                   ₹{totals.grandTotal.toFixed(2)}
                 </div>
               </div>
             </div>
 
             {/* Payment Mode Pills */}
-            <div className="pt-2 border-t border-slate-100 space-y-2">
-              <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider">
+            <div className="pt-2 border-t border-slate-100 dark:border-slate-800 space-y-2">
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
                 Payment Mode
               </label>
               <div className="grid grid-cols-3 gap-2">
@@ -1769,11 +1871,10 @@ const Billing = () => {
                     key={mode.id}
                     type="button"
                     onClick={() => setPaymentMode(mode.id)}
-                    className={`px-3 py-2 rounded-xl text-xs font-semibold border flex items-center justify-center gap-1.5 transition-all ${
-                      paymentMode === mode.id
-                        ? "bg-blue-50 text-blue-700 border-blue-200 shadow-2xs"
-                        : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
-                    }`}
+                    className={`px-3 py-2 rounded-xl text-xs font-semibold border flex items-center justify-center gap-1.5 transition-all ${paymentMode === mode.id
+                      ? "bg-blue-50 dark:bg-blue-950/50 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800 shadow-2xs"
+                      : "bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-750"
+                      }`}
                   >
                     {mode.icon}
                     <span>{mode.id}</span>
@@ -1788,15 +1889,15 @@ const Billing = () => {
                 type="button"
                 onClick={generateBill}
                 disabled={billItems.length === 0}
-                className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 text-white px-4 py-3 rounded-xl font-semibold text-sm shadow-xs flex items-center justify-center gap-2 transition-colors disabled:cursor-not-allowed"
+                className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 dark:disabled:bg-slate-700 text-white px-4 py-3 rounded-xl font-semibold text-sm shadow-xs flex items-center justify-center gap-2 transition-colors disabled:cursor-not-allowed"
               >
                 <CheckCircle2 size={18} />
                 <span>
                   {isEditingBill
                     ? "Update Bill"
                     : bills.length > 1
-                    ? `Save Active Patient Bill (${bills[activeBillIndex]?.patient?.name || `Patient #${activeBillIndex + 1}`})`
-                    : "Generate & Save Bill"}
+                      ? `Save Active Patient Bill (${bills[activeBillIndex]?.patient?.name || `Patient #${activeBillIndex + 1}`})`
+                      : "Generate & Save Bill"}
                 </span>
               </button>
 
@@ -1805,7 +1906,7 @@ const Billing = () => {
                   type="button"
                   onClick={generateAllSessionBills}
                   disabled={isSavingAll}
-                  className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 text-white px-4 py-3 rounded-xl font-semibold text-sm shadow-xs flex items-center justify-center gap-2 transition-colors disabled:cursor-not-allowed"
+                  className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 dark:disabled:bg-slate-700 text-white px-4 py-3 rounded-xl font-semibold text-sm shadow-xs flex items-center justify-center gap-2 transition-colors disabled:cursor-not-allowed"
                 >
                   <CheckCircle2 size={18} />
                   <span>
@@ -1821,7 +1922,7 @@ const Billing = () => {
                   type="button"
                   onClick={handlePrintBill}
                   disabled={billItems.length === 0}
-                  className="bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 px-3 py-2.5 rounded-xl font-semibold text-xs shadow-xs flex items-center justify-center gap-1.5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-750 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 px-3 py-2.5 rounded-xl font-semibold text-xs shadow-xs flex items-center justify-center gap-1.5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <Printer size={15} />
                   <span>Print Receipt</span>
@@ -1830,7 +1931,7 @@ const Billing = () => {
                   type="button"
                   onClick={handleDownloadPDF}
                   disabled={billItems.length === 0}
-                  className="bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 px-3 py-2.5 rounded-xl font-semibold text-xs shadow-xs flex items-center justify-center gap-1.5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-750 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 px-3 py-2.5 rounded-xl font-semibold text-xs shadow-xs flex items-center justify-center gap-1.5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <Download size={15} />
                   <span>Download PDF</span>
@@ -1839,8 +1940,8 @@ const Billing = () => {
             </div>
 
             {/* Inventory Note */}
-            <div className="p-3 rounded-xl bg-slate-50 border border-slate-100 text-[11px] text-slate-500 leading-relaxed flex items-center gap-2">
-              <Shield size={14} className="text-slate-400 shrink-0" />
+            <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed flex items-center gap-2">
+              <Shield size={14} className="text-slate-400 dark:text-slate-500 shrink-0" />
               <span>
                 Inventory stock levels update automatically upon saving the bill.
               </span>
@@ -1851,27 +1952,27 @@ const Billing = () => {
 
       {/* 3. EDIT ITEM MODAL */}
       {isEditOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center px-4 bg-slate-900/40 backdrop-blur-xs">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
           <div
             className="fixed inset-0"
             onClick={closeEditModal}
           />
-          <div className="relative z-10 w-full max-w-md mx-auto bg-white border border-slate-200/90 rounded-2xl p-6 shadow-2xl space-y-4">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-              <h3 className="text-base font-bold text-slate-900">
+          <div className="relative z-10 w-full max-w-md mx-auto bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 rounded-2xl p-5 sm:p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
+              <h3 className="text-base font-bold text-slate-900 dark:text-white">
                 Edit Bill Item
               </h3>
               <button
                 type="button"
                 onClick={closeEditModal}
-                className="text-slate-400 hover:text-slate-600 p-1"
+                className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1"
               >
                 <X size={18} />
               </button>
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1">
                 Quantity
               </label>
               <input
@@ -1880,12 +1981,12 @@ const Billing = () => {
                 step="1"
                 value={editQuantity}
                 onChange={(e) => setEditQuantity(Number(e.target.value))}
-                className="w-full bg-slate-50/60 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm text-slate-800 font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                className="w-full bg-slate-50/60 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-slate-800 dark:text-white font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
               />
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1">
                 Discount (%)
               </label>
               <input
@@ -1895,15 +1996,15 @@ const Billing = () => {
                 step="0.5"
                 value={editDiscount}
                 onChange={(e) => setEditDiscount(Number(e.target.value))}
-                className="w-full bg-slate-50/60 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm text-slate-800 font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                className="w-full bg-slate-50/60 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-slate-800 dark:text-white font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
               />
             </div>
 
-            <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-100">
+            <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-100 dark:border-slate-800">
               <button
                 type="button"
                 onClick={closeEditModal}
-                className="px-4 py-2 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-xl text-xs font-semibold shadow-xs transition-colors"
+                className="px-4 py-2 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-750 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-semibold shadow-xs transition-colors"
               >
                 Cancel
               </button>
@@ -1921,22 +2022,22 @@ const Billing = () => {
 
       {/* 4. DIRECT PATIENT REGISTRATION MODAL */}
       {isPatientModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs overflow-y-auto">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs overflow-y-auto">
           <div
             className="fixed inset-0"
             onClick={() => !isRegisteringPatient && setIsPatientModalOpen(false)}
           />
-          <div className="relative z-10 w-full max-w-xl mx-auto bg-white border border-slate-200/90 rounded-2xl shadow-2xl overflow-hidden my-8">
-            <div className="px-6 py-4 bg-slate-50 border-b border-slate-200/80 flex items-center justify-between">
+          <div className="relative z-10 w-full max-w-xl mx-auto bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 rounded-2xl shadow-2xl overflow-hidden my-4 sm:my-8">
+            <div className="px-5 sm:px-6 py-4 bg-slate-50 dark:bg-slate-800/80 border-b border-slate-200/80 dark:border-slate-700 flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="p-2 rounded-xl bg-blue-600 text-white shadow-xs">
+                <div className="p-2 rounded-xl bg-blue-600 text-white shadow-xs shrink-0">
                   <UserPlus size={18} />
                 </div>
                 <div>
-                  <h3 className="text-base font-bold text-slate-900">
+                  <h3 className="text-base font-bold text-slate-900 dark:text-white">
                     Register New Patient
                   </h3>
-                  <p className="text-xs text-slate-500">
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
                     Patient will be saved to registration database and assigned to this bill.
                   </p>
                 </div>
@@ -1945,17 +2046,17 @@ const Billing = () => {
                 type="button"
                 onClick={() => setIsPatientModalOpen(false)}
                 disabled={isRegisteringPatient}
-                className="text-slate-400 hover:text-slate-600 p-1 rounded-lg"
+                className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1 rounded-lg"
               >
                 <X size={18} />
               </button>
             </div>
 
-            <form onSubmit={handleRegisterPatient} className="p-6 space-y-4">
+            <form onSubmit={handleRegisterPatient} className="p-5 sm:p-6 space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {/* Full Name */}
                 <div className="sm:col-span-2">
-                  <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1">
                     Patient Full Name <span className="text-rose-500">*</span>
                   </label>
                   <input
@@ -1965,9 +2066,8 @@ const Billing = () => {
                     onChange={(e) =>
                       setNewPatient((prev) => ({ ...prev, name: e.target.value }))
                     }
-                    className={`w-full bg-slate-50/60 border rounded-xl px-3.5 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 font-medium ${
-                      patientErrors.name ? "border-rose-400 bg-rose-50/20" : "border-slate-200"
-                    }`}
+                    className={`w-full bg-slate-50/60 dark:bg-slate-800/80 border rounded-xl px-3.5 py-2.5 text-sm text-slate-800 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 font-medium ${patientErrors.name ? "border-rose-400 bg-rose-50/20 dark:bg-rose-950/20" : "border-slate-200 dark:border-slate-700"
+                      }`}
                   />
                   {patientErrors.name && (
                     <span className="text-[11px] text-rose-500 font-medium mt-1 block">
@@ -1978,11 +2078,11 @@ const Billing = () => {
 
                 {/* Mobile */}
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1">
                     Mobile Number <span className="text-rose-500">*</span>
                   </label>
                   <div className="relative">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-slate-400">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-slate-400 dark:text-slate-500">
                       +91
                     </span>
                     <input
@@ -1996,9 +2096,8 @@ const Billing = () => {
                           mobile: e.target.value.replace(/\D/g, ""),
                         }))
                       }
-                      className={`w-full bg-slate-50/60 border rounded-xl pl-12 pr-3.5 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 font-medium ${
-                        patientErrors.mobile ? "border-rose-400 bg-rose-50/20" : "border-slate-200"
-                      }`}
+                      className={`w-full bg-slate-50/60 dark:bg-slate-800/80 border rounded-xl pl-12 pr-3.5 py-2.5 text-sm text-slate-800 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 font-medium ${patientErrors.mobile ? "border-rose-400 bg-rose-50/20 dark:bg-rose-950/20" : "border-slate-200 dark:border-slate-700"
+                        }`}
                     />
                   </div>
                   {patientErrors.mobile && (
@@ -2011,7 +2110,7 @@ const Billing = () => {
                 {/* Age & Gender */}
                 <div className="grid grid-cols-2 gap-2">
                   <div>
-                    <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
+                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1">
                       Age
                     </label>
                     <input
@@ -2023,11 +2122,11 @@ const Billing = () => {
                       onChange={(e) =>
                         setNewPatient((prev) => ({ ...prev, age: e.target.value }))
                       }
-                      className="w-full bg-slate-50/60 border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 font-medium"
+                      className="w-full bg-slate-50/60 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2.5 text-sm text-slate-800 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 font-medium"
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
+                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1">
                       Gender
                     </label>
                     <select
@@ -2035,19 +2134,19 @@ const Billing = () => {
                       onChange={(e) =>
                         setNewPatient((prev) => ({ ...prev, gender: e.target.value }))
                       }
-                      className="w-full bg-slate-50/60 border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 font-medium"
+                      className="w-full bg-slate-50/60 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2.5 text-sm text-slate-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 font-medium"
                     >
-                      <option value="Male">Male</option>
-                      <option value="Female">Female</option>
-                      <option value="Other">Other</option>
+                      <option value="Male" className="dark:bg-slate-900 dark:text-white">Male</option>
+                      <option value="Female" className="dark:bg-slate-900 dark:text-white">Female</option>
+                      <option value="Other" className="dark:bg-slate-900 dark:text-white">Other</option>
                     </select>
                   </div>
                 </div>
 
                 {/* Address */}
                 <div className="sm:col-span-2">
-                  <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
-                    Address <span className="text-slate-400 font-normal lowercase">(optional)</span>
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1">
+                    Address <span className="text-slate-400 dark:text-slate-500 font-normal lowercase">(optional)</span>
                   </label>
                   <input
                     type="text"
@@ -2056,14 +2155,14 @@ const Billing = () => {
                     onChange={(e) =>
                       setNewPatient((prev) => ({ ...prev, address: e.target.value }))
                     }
-                    className="w-full bg-slate-50/60 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 font-medium"
+                    className="w-full bg-slate-50/60 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-slate-800 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 font-medium"
                   />
                 </div>
 
                 {/* Doctor Name */}
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
-                    Doctor Name <span className="text-slate-400 font-normal lowercase">(optional)</span>
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1">
+                    Doctor Name <span className="text-slate-400 dark:text-slate-500 font-normal lowercase">(optional)</span>
                   </label>
                   <input
                     type="text"
@@ -2072,14 +2171,14 @@ const Billing = () => {
                     onChange={(e) =>
                       setNewPatient((prev) => ({ ...prev, doctorName: e.target.value }))
                     }
-                    className="w-full bg-slate-50/60 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 font-medium"
+                    className="w-full bg-slate-50/60 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-slate-800 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 font-medium"
                   />
                 </div>
 
                 {/* Prescription Number */}
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
-                    Prescription No <span className="text-slate-400 font-normal lowercase">(optional)</span>
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1">
+                    Prescription No <span className="text-slate-400 dark:text-slate-500 font-normal lowercase">(optional)</span>
                   </label>
                   <input
                     type="text"
@@ -2091,24 +2190,24 @@ const Billing = () => {
                         prescriptionNumber: e.target.value,
                       }))
                     }
-                    className="w-full bg-slate-50/60 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 font-medium"
+                    className="w-full bg-slate-50/60 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-slate-800 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 font-medium"
                   />
                 </div>
               </div>
 
-              <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
+              <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100 dark:border-slate-800">
                 <button
                   type="button"
                   onClick={() => setIsPatientModalOpen(false)}
                   disabled={isRegisteringPatient}
-                  className="px-4 py-2.5 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-xl text-xs font-semibold shadow-xs transition-colors"
+                  className="px-4 py-2.5 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-750 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-semibold shadow-xs transition-colors"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={isRegisteringPatient}
-                  className="inline-flex items-center gap-1.5 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 text-white rounded-xl text-xs font-semibold shadow-xs transition-colors"
+                  className="inline-flex items-center gap-1.5 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 dark:disabled:bg-blue-800 text-white rounded-xl text-xs font-semibold shadow-xs transition-colors"
                 >
                   <CheckCircle2 size={15} />
                   <span>
@@ -2125,22 +2224,22 @@ const Billing = () => {
 
       {/* 5. MULTI-BILL SESSION SUMMARY MODAL */}
       {sessionSummary && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs overflow-y-auto">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs overflow-y-auto">
           <div
             className="fixed inset-0"
             onClick={() => setSessionSummary(null)}
           />
-          <div className="relative z-10 w-full max-w-2xl mx-auto bg-white border border-slate-200/90 rounded-2xl shadow-2xl overflow-hidden my-8">
-            <div className="px-6 py-4 bg-emerald-50 border-b border-emerald-200/80 flex items-center justify-between">
+          <div className="relative z-10 w-full max-w-2xl mx-auto bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 rounded-2xl shadow-2xl overflow-hidden my-4 sm:my-8">
+            <div className="px-5 sm:px-6 py-4 bg-emerald-50 dark:bg-emerald-950/40 border-b border-emerald-200/80 dark:border-emerald-900/50 flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="p-2 rounded-xl bg-emerald-600 text-white shadow-xs">
+                <div className="p-2 rounded-xl bg-emerald-600 text-white shadow-xs shrink-0">
                   <CheckCircle2 size={20} />
                 </div>
                 <div>
-                  <h3 className="text-base font-bold text-emerald-950">
+                  <h3 className="text-base font-bold text-emerald-950 dark:text-emerald-200">
                     Multi-Patient Billing Completed
                   </h3>
-                  <p className="text-xs text-emerald-700">
+                  <p className="text-xs text-emerald-700 dark:text-emerald-400">
                     All {sessionSummary.totalPatients} bills were successfully recorded and inventory synchronized.
                   </p>
                 </div>
@@ -2148,35 +2247,35 @@ const Billing = () => {
               <button
                 type="button"
                 onClick={() => setSessionSummary(null)}
-                className="text-emerald-700 hover:text-emerald-900 p-1 rounded-lg"
+                className="text-emerald-700 hover:text-emerald-900 dark:text-emerald-400 dark:hover:text-emerald-200 p-1 rounded-lg"
               >
                 <X size={18} />
               </button>
             </div>
 
-            <div className="p-6 space-y-5">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="p-3.5 bg-slate-50 border border-slate-100 rounded-xl">
-                  <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">
+            <div className="p-5 sm:p-6 space-y-5">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="p-3.5 bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 rounded-xl">
+                  <span className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider block">
                     Bills Generated
                   </span>
-                  <span className="text-xl font-bold text-slate-900 mt-0.5 block">
+                  <span className="text-xl font-bold text-slate-900 dark:text-white mt-0.5 block">
                     {sessionSummary.totalPatients} Invoices
                   </span>
                 </div>
-                <div className="p-3.5 bg-slate-50 border border-slate-100 rounded-xl">
-                  <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">
+                <div className="p-3.5 bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 rounded-xl">
+                  <span className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider block">
                     Session Grand Total
                   </span>
-                  <span className="text-xl font-bold text-emerald-600 mt-0.5 block">
+                  <span className="text-xl font-bold text-emerald-600 dark:text-emerald-400 mt-0.5 block">
                     ₹{sessionSummary.sessionTotal.toFixed(2)}
                   </span>
                 </div>
               </div>
 
-              <div className="border border-slate-200 rounded-xl overflow-hidden">
-                <table className="w-full text-left text-xs">
-                  <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 font-semibold uppercase">
+              <div className="border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden overflow-x-auto scrollbar-thin">
+                <table className="w-full text-left text-xs min-w-[500px]">
+                  <thead className="bg-slate-50 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 font-semibold uppercase">
                     <tr>
                       <th className="py-2.5 px-3">Invoice #</th>
                       <th className="py-2.5 px-3">Patient</th>
@@ -2185,26 +2284,26 @@ const Billing = () => {
                       <th className="py-2.5 px-3 text-center">Action</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-100">
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                     {sessionSummary.bills.map((res) => (
-                      <tr key={res.invoiceNo} className="hover:bg-slate-50/50">
-                        <td className="py-2.5 px-3 font-mono font-semibold text-slate-800">
+                      <tr key={res.invoiceNo} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/40">
+                        <td className="py-2.5 px-3 font-mono font-semibold text-slate-800 dark:text-slate-200">
                           {res.invoiceNo}
                         </td>
-                        <td className="py-2.5 px-3 font-medium text-slate-900">
+                        <td className="py-2.5 px-3 font-medium text-slate-900 dark:text-white">
                           {res.patientName}
                         </td>
-                        <td className="py-2.5 px-3 text-center text-slate-600">
+                        <td className="py-2.5 px-3 text-center text-slate-600 dark:text-slate-400">
                           {res.itemCount} items
                         </td>
-                        <td className="py-2.5 px-3 text-right font-bold text-slate-900">
+                        <td className="py-2.5 px-3 text-right font-bold text-slate-900 dark:text-white">
                           ₹{res.grandTotal.toFixed(2)}
                         </td>
                         <td className="py-2.5 px-3 text-center">
                           <button
                             type="button"
                             onClick={() => printBill(res.billData)}
-                            className="inline-flex items-center gap-1 px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold transition-colors"
+                            className="inline-flex items-center gap-1 px-2.5 py-1 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-lg text-xs font-semibold transition-colors"
                           >
                             <Printer size={12} />
                             <span>Print</span>
@@ -2216,11 +2315,11 @@ const Billing = () => {
                 </table>
               </div>
 
-              <div className="flex items-center justify-between pt-2">
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2">
                 <button
                   type="button"
                   onClick={() => navigate("/billing-history")}
-                  className="inline-flex items-center gap-1.5 px-4 py-2.5 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-xl text-xs font-semibold shadow-xs transition-colors"
+                  className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 px-4 py-2.5 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-750 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-semibold shadow-xs transition-colors"
                 >
                   <History size={15} />
                   <span>View Billing History</span>
@@ -2228,7 +2327,7 @@ const Billing = () => {
                 <button
                   type="button"
                   onClick={() => setSessionSummary(null)}
-                  className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold shadow-xs transition-colors"
+                  className="w-full sm:w-auto px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold shadow-xs transition-colors"
                 >
                   Start New Bill
                 </button>

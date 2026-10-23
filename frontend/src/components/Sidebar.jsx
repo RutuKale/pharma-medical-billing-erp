@@ -179,7 +179,7 @@ const Sidebar = () => {
   return (
     <>
       {/* MOBILE TOPBAR */}
-      <div className="lg:hidden fixed top-0 left-0 right-0 flex items-center justify-between bg-white text-slate-800 px-4 py-3 z-50 border-b border-slate-200 shadow-sm">
+      <div className="lg:hidden fixed top-0 left-0 right-0 flex items-center justify-between bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 px-4 py-3 z-50 border-b border-slate-200 dark:border-slate-800 shadow-sm">
         <div className="flex items-center gap-3">
           <div className="relative group">
             <div className="absolute inset-0 bg-gradient-to-r from-blue-400 to-indigo-400 rounded-xl blur-lg opacity-75 group-hover:opacity-100 transition-opacity"></div>
@@ -191,12 +191,12 @@ const Sidebar = () => {
             <h1 className="font-bold text-lg bg-gradient-to-r from-blue-400 to-indigo-400 bg-clip-text text-transparent">
               PharmaMed
             </h1>
-            <p className="text-xs text-slate-500">ERP System</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400">ERP System</p>
           </div>
         </div>
         <button
           onClick={() => setIsOpen(true)}
-          className="p-2 rounded-xl hover:bg-slate-100 transition-colors"
+          className="p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 transition-colors"
         >
           <Menu size={22} />
         </button>
@@ -212,7 +212,7 @@ const Sidebar = () => {
 
       {/* SIDEBAR */}
       <aside
-        className={`fixed lg:sticky top-0 left-0 z-50 h-screen w-72 max-w-[85%] bg-white text-slate-800 flex flex-col transform transition-transform duration-300 border-r border-slate-200 shadow-sm
+        className={`fixed lg:sticky top-0 left-0 z-50 h-screen w-full md:w-64 lg:w-72 max-w-full lg:max-w-none bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 flex flex-col transform transition-transform duration-300 border-r border-slate-200 dark:border-slate-800 shadow-sm
         ${isOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}`}
       >
         {/* Animated Background Pattern */}
@@ -225,7 +225,7 @@ const Sidebar = () => {
         </div>
 
         {/* HEADER */}
-        <div className="relative z-10 flex items-center justify-between px-5 py-4 border-b border-slate-200">
+        <div className="relative z-10 flex items-center justify-between px-5 py-4 border-b border-slate-200 dark:border-slate-800">
           <div className="flex items-center gap-3">
             <div className="relative group">
               <div className="absolute inset-0 bg-gradient-to-r from-blue-400 to-indigo-400 rounded-xl blur-lg opacity-75 group-hover:opacity-100 transition-opacity"></div>
@@ -237,11 +237,11 @@ const Sidebar = () => {
               <h1 className="font-bold text-lg bg-gradient-to-r from-blue-400 to-indigo-400 bg-clip-text text-transparent">
                 PharmaMed
               </h1>
-              <p className="text-xs text-slate-500">ERP System</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400">ERP System</p>
             </div>
           </div>
           <button
-            className="lg:hidden p-1.5 rounded-lg hover:bg-slate-100 transition-colors"
+            className="lg:hidden p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 transition-colors"
             onClick={() => setIsOpen(false)}
           >
             <X size={20} />
@@ -249,7 +249,7 @@ const Sidebar = () => {
         </div>
 
         {/* NAVIGATION */}
-        <div className="relative z-10 flex-1 overflow-y-auto px-3 py-4 scrollbar-thin scrollbar-thumb-slate-200 scrollbar-track-transparent">
+        <div className="relative z-10 flex-1 overflow-y-auto px-3 py-4 scrollbar-thin scrollbar-thumb-slate-200 dark:scrollbar-thumb-slate-800 scrollbar-track-transparent">
           {menuItems.map((section, sectionIndex) => {
             const isDropdown = !['MAIN', 'ANALYTICS', 'SETTINGS'].includes(section.section);
 
@@ -266,19 +266,19 @@ const Sidebar = () => {
                         `flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-200 group relative
                         ${isActive
                           ? "bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-md shadow-blue-500/25 font-medium"
-                          : "hover:bg-slate-50 text-slate-600 hover:text-slate-900 border border-transparent"
+                          : "hover:bg-slate-50 dark:hover:bg-slate-800/60 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white border border-transparent"
                         }`
                       }
                     >
                       {({ isActive }) => (
                         <>
                           <span
-                            className={`transition-transform group-hover:scale-105 ${isActive ? "text-white" : "text-slate-500"
+                            className={`transition-transform group-hover:scale-105 ${isActive ? "text-white" : "text-slate-500 dark:text-slate-400"
                               }`}
                           >
                             {item.icon}
                           </span>
-                          <span className={`text-sm ${isActive ? "text-white font-medium" : "text-slate-600 font-medium"}`}>{item.name}</span>
+                          <span className={`text-sm ${isActive ? "text-white font-medium" : "text-slate-600 dark:text-slate-300 font-medium"}`}>{item.name}</span>
                         </>
                       )}
                     </NavLink>
@@ -292,11 +292,11 @@ const Sidebar = () => {
                 {/* SECTION TITLE - Clickable */}
                 <button
                   onClick={() => toggleSection(section.section)}
-                  className="w-full px-3 py-2 flex items-center justify-between group hover:bg-slate-50 rounded-lg transition-all duration-200"
+                  className="w-full px-3 py-2 flex items-center justify-between group hover:bg-slate-50 dark:hover:bg-slate-800/60 rounded-lg transition-all duration-200"
                 >
                   <div className="flex items-center gap-2">
                     <span className="text-blue-400/70">{section.icon}</span>
-                    <p className="text-xs font-semibold tracking-wider text-slate-500 uppercase group-hover:text-slate-700 transition-colors">
+                    <p className="text-xs font-semibold tracking-wider text-slate-500 dark:text-slate-400 uppercase group-hover:text-slate-700 dark:group-hover:text-slate-200 transition-colors">
                       {section.section}
                     </p>
                   </div>
@@ -324,19 +324,19 @@ const Sidebar = () => {
                         `flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-200 group relative
                         ${isActive
                           ? "bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-md shadow-blue-500/25 font-medium"
-                          : "hover:bg-slate-50 text-slate-600 hover:text-slate-900 border border-transparent"
+                          : "hover:bg-slate-50 dark:hover:bg-slate-800/60 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white border border-transparent"
                         }`
                       }
                     >
                       {({ isActive }) => (
                         <>
                           <span
-                            className={`transition-transform group-hover:scale-105 ${isActive ? "text-white" : "text-slate-500"
+                            className={`transition-transform group-hover:scale-105 ${isActive ? "text-white" : "text-slate-500 dark:text-slate-400"
                               }`}
                           >
                             {item.icon}
                           </span>
-                          <span className={`text-sm ${isActive ? "text-white font-medium" : "text-slate-600 font-medium"}`}>{item.name}</span>
+                          <span className={`text-sm ${isActive ? "text-white font-medium" : "text-slate-600 dark:text-slate-300 font-medium"}`}>{item.name}</span>
                         </>
                       )}
                     </NavLink>

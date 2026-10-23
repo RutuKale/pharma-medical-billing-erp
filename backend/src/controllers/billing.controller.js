@@ -9,6 +9,54 @@ exports.createBill = async (req, res) => {
     await connection.beginTransaction();
     const billData = req.body.bill;
     const items = req.body.items;
+
+    let patient_id = billData.patient_id || null;
+    let autoRegisteredPatient = null;
+
+    // Auto-register patient if not already registered
+    if (!patient_id && (billData.patient_name || billData.mobile_number)) {
+      const patientName = (billData.patient_name || "Walk-in Patient").trim();
+      const mobileNumber = (billData.mobile_number || "").replace(/\D/g, "");
+
+      if (mobileNumber) {
+        const [existing] = await connection.query(
+          "SELECT * FROM patients WHERE mobile_number = ? LIMIT 1",
+          [mobileNumber]
+        );
+        if (existing && existing.length > 0) {
+          patient_id = existing[0].patient_id;
+          autoRegisteredPatient = existing[0];
+        }
+      }
+
+      if (!patient_id) {
+        const [patientResult] = await connection.query(
+          `INSERT INTO patients (patient_name, mobile_number, age, gender, doctor_name, prescription_number, address)
+           VALUES (?, ?, ?, ?, ?, ?, ?)`,
+          [
+            patientName,
+            mobileNumber,
+            billData.age ? Number(billData.age) : null,
+            billData.gender || null,
+            billData.doctor_name || null,
+            billData.prescription_number || null,
+            billData.address || null,
+          ]
+        );
+        patient_id = patientResult.insertId;
+        autoRegisteredPatient = {
+          patient_id,
+          patient_name: patientName,
+          mobile_number: mobileNumber,
+          age: billData.age || null,
+          gender: billData.gender || null,
+          doctor_name: billData.doctor_name || null,
+          prescription_number: billData.prescription_number || null,
+          address: billData.address || null,
+        };
+      }
+    }
+
     const [billResult] = await connection.query(
       `
             INSERT INTO bills (
@@ -25,15 +73,15 @@ exports.createBill = async (req, res) => {
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         `,
       [
-        billData.patient_id,
+        patient_id,
         billData.bill_number,
         billData.subtotal,
-        billData.total_discount,
-        billData.total_gst,
+        billData.total_discount || 0,
+        billData.total_gst || 0,
         billData.grand_total,
-        billData.payment_mode,
-        billData.payment_status,
-        billData.notes,
+        billData.payment_mode || "Cash",
+        billData.payment_status || "Completed",
+        billData.notes || "",
       ],
     );
     const bill_id = billResult.insertId;
@@ -117,6 +165,8 @@ exports.createBill = async (req, res) => {
       success: true,
       message: "Bill created successfully",
       bill_id,
+      patient_id,
+      patient: autoRegisteredPatient,
     });
   } catch (error) {
     await connection.rollback();

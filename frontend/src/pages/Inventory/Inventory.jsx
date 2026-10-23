@@ -53,9 +53,11 @@ const Inventory = () => {
   const [stockMedicineId, setStockMedicineId] = useState(null);
   const [stockMedicineName, setStockMedicineName] = useState("");
 
-  // Filters & Sorting
+  // Filters, Sorting & View Mode
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("All");
+  const [supplierFilter, setSupplierFilter] = useState("All");
+  const [viewMode, setViewMode] = useState("table"); // "table" or "grouped"
   const [sortBy, setSortBy] = useState("medicine_name");
   const [sortOrder, setSortOrder] = useState("asc");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -69,6 +71,15 @@ const Inventory = () => {
       "All",
       ...new Set(
         medicinesData.map((medicine) => medicine.category).filter(Boolean)
+      ),
+    ];
+  }, [medicinesData]);
+
+  const suppliersList = useMemo(() => {
+    return [
+      "All",
+      ...new Set(
+        medicinesData.map((medicine) => medicine.supplier_name).filter(Boolean)
       ),
     ];
   }, [medicinesData]);
@@ -411,12 +422,18 @@ const Inventory = () => {
         medicine.medicine_name?.toLowerCase().includes(q) ||
         medicine.salt_name?.toLowerCase().includes(q) ||
         medicine.brand_name?.toLowerCase().includes(q) ||
-        medicine.manufacturer?.toLowerCase().includes(q);
+        medicine.manufacturer?.toLowerCase().includes(q) ||
+        medicine.supplier_name?.toLowerCase().includes(q) ||
+        medicine.supplier_contact?.toLowerCase().includes(q) ||
+        medicine.supplier_mobile?.toLowerCase().includes(q);
 
       const matchesCategory =
         category === "All" || medicine.category === category;
 
-      return matchesSearch && matchesCategory;
+      const matchesSupplier =
+        supplierFilter === "All" || medicine.supplier_name === supplierFilter;
+
+      return matchesSearch && matchesCategory && matchesSupplier;
     });
 
     filtered.sort((a, b) => {
@@ -440,7 +457,29 @@ const Inventory = () => {
     });
 
     return filtered;
-  }, [medicinesData, search, category, sortBy, sortOrder]);
+  }, [medicinesData, search, category, supplierFilter, sortBy, sortOrder]);
+
+  // Grouped by Supplier memo
+  const groupedBySupplier = useMemo(() => {
+    const map = new Map();
+    filteredMedicines.forEach((med) => {
+      const supKey = med.supplier_name || "Unassigned / General Supplier";
+      if (!map.has(supKey)) {
+        map.set(supKey, {
+          supplierName: supKey,
+          supplierId: med.supplier_id,
+          supplierContact: med.supplier_contact || "",
+          supplierMobile: med.supplier_mobile || "",
+          supplierEmail: med.supplier_email || "",
+          supplierAddress: med.supplier_address || "",
+          supplierGst: med.supplier_gst || "",
+          medicines: [],
+        });
+      }
+      map.get(supKey).medicines.push(med);
+    });
+    return Array.from(map.values());
+  }, [filteredMedicines]);
 
   const totalPages =
     itemsPerPage === "All"
@@ -513,19 +552,19 @@ const Inventory = () => {
       {isStockModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div
-            className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs transition-opacity"
+            className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs transition-opacity"
             onClick={closeStockModal}
           />
 
           <div className="relative z-10 w-full max-w-md mx-auto">
-            <div className="bg-white rounded-2xl p-6 shadow-xl border border-slate-200/90 animate-in fade-in zoom-in-95 duration-150">
-              <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+            <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 shadow-xl border border-slate-200/90 dark:border-slate-800 animate-in fade-in zoom-in-95 duration-150">
+              <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
                 <div className="flex items-center gap-2.5">
                   <div
                     className={`w-9 h-9 rounded-xl flex items-center justify-center ${
                       stockType === "IN"
-                        ? "bg-emerald-50 text-emerald-600"
-                        : "bg-amber-50 text-amber-600"
+                        ? "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400"
+                        : "bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400"
                     }`}
                   >
                     {stockType === "IN" ? (
@@ -535,7 +574,7 @@ const Inventory = () => {
                     )}
                   </div>
                   <div>
-                    <h3 className="text-base font-bold text-slate-800">
+                    <h3 className="text-base font-bold text-slate-800 dark:text-white">
                       {stockType === "IN" ? "Stock In" : "Stock Out"}
                     </h3>
                     <p className="text-xs text-slate-400 truncate max-w-[240px]">
@@ -545,7 +584,7 @@ const Inventory = () => {
                 </div>
                 <button
                   onClick={closeStockModal}
-                  className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
+                  className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
                 >
                   <X size={18} />
                 </button>
@@ -553,7 +592,7 @@ const Inventory = () => {
 
               <div className="mt-4 space-y-4">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
                     Quantity
                   </label>
                   <input
@@ -562,12 +601,12 @@ const Inventory = () => {
                     step={1}
                     value={stockQuantity}
                     onChange={(e) => setStockQuantity(Number(e.target.value))}
-                    className="w-full bg-slate-50/80 border border-slate-200 rounded-xl px-3.5 py-2.5 text-slate-900 outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm transition-all"
+                    className="w-full bg-slate-50/80 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl px-3.5 py-2.5 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm transition-all"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
                     Remarks / Reason <span className="text-slate-400 font-normal">(optional)</span>
                   </label>
                   <input
@@ -575,15 +614,15 @@ const Inventory = () => {
                     placeholder="e.g. Received new shipment or expired disposal"
                     value={stockRemarks}
                     onChange={(e) => setStockRemarks(e.target.value)}
-                    className="w-full bg-slate-50/80 border border-slate-200 rounded-xl px-3.5 py-2.5 text-slate-900 placeholder-slate-400 outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm transition-all"
+                    className="w-full bg-slate-50/80 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl px-3.5 py-2.5 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm transition-all"
                   />
                 </div>
               </div>
 
-              <div className="flex items-center justify-end gap-3 mt-6 pt-3 border-t border-slate-100">
+              <div className="flex items-center justify-end gap-3 mt-6 pt-3 border-t border-slate-100 dark:border-slate-800">
                 <button
                   onClick={closeStockModal}
-                  className="px-4 py-2 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-600 text-sm font-semibold transition-colors"
+                  className="px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 text-sm font-semibold transition-colors"
                 >
                   Cancel
                 </button>
@@ -607,23 +646,23 @@ const Inventory = () => {
       {isDetailsModalOpen && selectedMedicine && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div
-            className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs transition-opacity"
+            className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs transition-opacity"
             onClick={closeDetailsModal}
           />
 
-          <div className="relative z-10 w-full max-w-2xl bg-white rounded-2xl shadow-2xl border border-slate-200 animate-in fade-in zoom-in-95 duration-150 max-h-[90vh] overflow-y-auto">
+          <div className="relative z-10 w-full max-w-2xl bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 animate-in fade-in zoom-in-95 duration-150 max-h-[90vh] overflow-y-auto">
             {/* Header */}
-            <div className="p-6 border-b border-slate-100 flex items-start justify-between gap-4 sticky top-0 bg-white/95 backdrop-blur-xs z-10">
+            <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex items-start justify-between gap-4 sticky top-0 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xs z-10">
               <div className="flex items-center gap-3">
-                <div className="w-11 h-11 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold text-lg shrink-0 shadow-2xs">
+                <div className="w-11 h-11 rounded-2xl bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 flex items-center justify-center font-bold text-lg shrink-0 shadow-2xs">
                   {(selectedMedicine.medicine_name || "M").charAt(0).toUpperCase()}
                 </div>
                 <div>
                   <div className="flex items-center gap-2 flex-wrap">
-                    <h3 className="text-lg font-bold text-slate-900">
+                    <h3 className="text-lg font-bold text-slate-900 dark:text-white">
                       {selectedMedicine.medicine_name}
                     </h3>
-                    <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200/60">
+                    <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400 border border-blue-200/60 dark:border-blue-900/50">
                       {selectedMedicine.category || "General"}
                     </span>
                     <span
@@ -634,7 +673,7 @@ const Inventory = () => {
                       {getStockStatus(selectedMedicine.quantity, selectedMedicine.min_stock).label}
                     </span>
                   </div>
-                  <p className="text-xs text-slate-500 mt-1">
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
                     {selectedMedicine.brand_name || "Generic"}
                     {selectedMedicine.salt_name ? ` • Composition: ${selectedMedicine.salt_name}` : ""}
                   </p>
@@ -642,7 +681,7 @@ const Inventory = () => {
               </div>
               <button
                 onClick={closeDetailsModal}
-                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors shrink-0"
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors shrink-0"
               >
                 <X size={18} />
               </button>
@@ -654,55 +693,55 @@ const Inventory = () => {
               <div>
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-2">
-                    <Truck size={16} className="text-blue-600" />
-                    <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
+                    <Truck size={16} className="text-blue-600 dark:text-blue-400" />
+                    <h4 className="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider">
                       Supplier & Vendor Details
                     </h4>
                   </div>
                   {selectedMedicine.supplier_name && (
-                    <span className="text-[11px] font-semibold text-blue-600 bg-blue-50 px-2.5 py-0.5 rounded-full border border-blue-200/60">
+                    <span className="text-[11px] font-semibold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/40 px-2.5 py-0.5 rounded-full border border-blue-200/60 dark:border-blue-900/50">
                       Verified Supplier
                     </span>
                   )}
                 </div>
 
                 {selectedMedicine.supplier_name || selectedMedicine.supplier_id ? (
-                  <div className="bg-gradient-to-br from-blue-50/60 to-slate-50/80 rounded-2xl p-4 sm:p-5 border border-blue-200/80 shadow-2xs">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-blue-100">
+                  <div className="bg-gradient-to-br from-blue-50/60 to-slate-50/80 dark:from-blue-950/30 dark:to-slate-900/80 rounded-2xl p-4 sm:p-5 border border-blue-200/80 dark:border-blue-900/60 shadow-2xs">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-blue-100 dark:border-blue-900/50">
                       <div className="flex items-center gap-3">
                         <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center font-bold shrink-0 shadow-xs">
                           <Truck size={20} />
                         </div>
                         <div>
-                          <h5 className="font-bold text-slate-900 text-sm sm:text-base">
+                          <h5 className="font-bold text-slate-900 dark:text-white text-sm sm:text-base">
                             {selectedMedicine.supplier_name}
                           </h5>
                           {selectedMedicine.supplier_contact && (
-                            <p className="text-xs text-slate-600 flex items-center gap-1.5 mt-0.5">
+                            <p className="text-xs text-slate-600 dark:text-slate-300 flex items-center gap-1.5 mt-0.5">
                               <User size={13} className="text-slate-400" />
-                              <span>Contact Person: <strong className="text-slate-800">{selectedMedicine.supplier_contact}</strong></span>
+                              <span>Contact Person: <strong className="text-slate-800 dark:text-white">{selectedMedicine.supplier_contact}</strong></span>
                             </p>
                           )}
                         </div>
                       </div>
 
                       {selectedMedicine.supplier_gst && (
-                        <div className="px-3 py-1 bg-white border border-slate-200 rounded-lg text-xs self-start sm:self-center">
+                        <div className="px-3 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs self-start sm:self-center">
                           <span className="text-slate-400 text-[10px] uppercase block">GST Number</span>
-                          <span className="font-mono font-bold text-slate-700">{selectedMedicine.supplier_gst}</span>
+                          <span className="font-mono font-bold text-slate-700 dark:text-slate-200">{selectedMedicine.supplier_gst}</span>
                         </div>
                       )}
                     </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-3 text-xs">
                       {selectedMedicine.supplier_mobile && (
-                        <div className="flex items-center gap-2.5 p-2.5 bg-white/80 rounded-xl border border-slate-100">
+                        <div className="flex items-center gap-2.5 p-2.5 bg-white/80 dark:bg-slate-850 dark:bg-slate-800/80 rounded-xl border border-slate-100 dark:border-slate-800">
                           <Phone size={15} className="text-blue-500 shrink-0" />
                           <div>
                             <span className="text-[10px] text-slate-400 uppercase block">Phone / Mobile</span>
                             <a
                               href={`tel:${selectedMedicine.supplier_mobile}`}
-                              className="font-semibold text-blue-600 hover:underline"
+                              className="font-semibold text-blue-600 dark:text-blue-400 hover:underline"
                             >
                               {selectedMedicine.supplier_mobile}
                             </a>
@@ -711,13 +750,13 @@ const Inventory = () => {
                       )}
 
                       {selectedMedicine.supplier_email && (
-                        <div className="flex items-center gap-2.5 p-2.5 bg-white/80 rounded-xl border border-slate-100">
+                        <div className="flex items-center gap-2.5 p-2.5 bg-white/80 dark:bg-slate-800/80 rounded-xl border border-slate-100 dark:border-slate-800">
                           <Mail size={15} className="text-blue-500 shrink-0" />
                           <div>
                             <span className="text-[10px] text-slate-400 uppercase block">Email Address</span>
                             <a
                               href={`mailto:${selectedMedicine.supplier_email}`}
-                              className="font-semibold text-blue-600 hover:underline truncate block"
+                              className="font-semibold text-blue-600 dark:text-blue-400 hover:underline truncate block"
                             >
                               {selectedMedicine.supplier_email}
                             </a>
@@ -726,11 +765,11 @@ const Inventory = () => {
                       )}
 
                       {selectedMedicine.supplier_address && (
-                        <div className="sm:col-span-2 flex items-start gap-2.5 p-2.5 bg-white/80 rounded-xl border border-slate-100">
+                        <div className="sm:col-span-2 flex items-start gap-2.5 p-2.5 bg-white/80 dark:bg-slate-800/80 rounded-xl border border-slate-100 dark:border-slate-800">
                           <MapPin size={15} className="text-slate-400 shrink-0 mt-0.5" />
                           <div>
                             <span className="text-[10px] text-slate-400 uppercase block">Supplier Address</span>
-                            <p className="text-slate-700 font-medium leading-relaxed">
+                            <p className="text-slate-700 dark:text-slate-300 font-medium leading-relaxed">
                               {selectedMedicine.supplier_address}
                             </p>
                           </div>
@@ -739,8 +778,8 @@ const Inventory = () => {
                     </div>
                   </div>
                 ) : (
-                  <div className="p-4 rounded-xl bg-slate-50 border border-dashed border-slate-200 text-center text-xs text-slate-500">
-                    <p className="font-medium text-slate-600">No supplier linked to this medicine record</p>
+                  <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-dashed border-slate-200 dark:border-slate-700 text-center text-xs text-slate-500 dark:text-slate-400">
+                    <p className="font-medium text-slate-600 dark:text-slate-300">No supplier linked to this medicine record</p>
                     <p className="text-slate-400 mt-1">Existing or legacy medicines can be associated with a supplier anytime by clicking Edit.</p>
                   </div>
                 )}
@@ -751,30 +790,30 @@ const Inventory = () => {
                 <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">
                   Specification & Classification
                 </h4>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3.5 bg-slate-50/70 p-4 rounded-xl border border-slate-100 text-xs">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3.5 bg-slate-50/70 dark:bg-slate-800/60 p-4 rounded-xl border border-slate-100 dark:border-slate-800 text-xs">
                   <div>
                     <span className="text-slate-400 block text-[11px]">Brand Name</span>
-                    <span className="font-semibold text-slate-800">{selectedMedicine.brand_name || "—"}</span>
+                    <span className="font-semibold text-slate-800 dark:text-slate-200">{selectedMedicine.brand_name || "—"}</span>
                   </div>
                   <div>
                     <span className="text-slate-400 block text-[11px]">Manufacturer</span>
-                    <span className="font-semibold text-slate-800">{selectedMedicine.manufacturer || "—"}</span>
+                    <span className="font-semibold text-slate-800 dark:text-slate-200">{selectedMedicine.manufacturer || "—"}</span>
                   </div>
                   <div>
                     <span className="text-slate-400 block text-[11px]">Category</span>
-                    <span className="font-semibold text-slate-800">{selectedMedicine.category || "—"}</span>
+                    <span className="font-semibold text-slate-800 dark:text-slate-200">{selectedMedicine.category || "—"}</span>
                   </div>
                   <div>
                     <span className="text-slate-400 block text-[11px]">Pack Size</span>
-                    <span className="font-semibold text-slate-800">{selectedMedicine.pack_size || "—"}</span>
+                    <span className="font-semibold text-slate-800 dark:text-slate-200">{selectedMedicine.pack_size || "—"}</span>
                   </div>
                   <div>
                     <span className="text-slate-400 block text-[11px]">Dosage Unit</span>
-                    <span className="font-semibold text-slate-800">{selectedMedicine.unit || "—"}</span>
+                    <span className="font-semibold text-slate-800 dark:text-slate-200">{selectedMedicine.unit || "—"}</span>
                   </div>
                   <div>
                     <span className="text-slate-400 block text-[11px]">Shelf / Location</span>
-                    <span className="font-semibold text-slate-800">{selectedMedicine.rack_location || selectedMedicine.rackLocation || "Not Assigned"}</span>
+                    <span className="font-semibold text-slate-800 dark:text-slate-200">{selectedMedicine.rack_location || selectedMedicine.rackLocation || "Not Assigned"}</span>
                   </div>
                 </div>
               </div>
@@ -785,21 +824,21 @@ const Inventory = () => {
                   Stock & Pricing Breakdown
                 </h4>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                  <div className="p-3 bg-white rounded-xl border border-slate-200">
+                  <div className="p-3 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700">
                     <span className="text-[11px] text-slate-400 block">Purchase Price</span>
-                    <span className="text-sm font-bold text-slate-700">₹{Number(selectedMedicine.purchase_price || 0).toFixed(2)}</span>
+                    <span className="text-sm font-bold text-slate-700 dark:text-slate-200">₹{Number(selectedMedicine.purchase_price || 0).toFixed(2)}</span>
                   </div>
-                  <div className="p-3 bg-emerald-50/50 rounded-xl border border-emerald-200/60">
-                    <span className="text-[11px] text-emerald-600 font-medium block">Selling Price</span>
-                    <span className="text-sm font-bold text-emerald-700">₹{Number(selectedMedicine.selling_price || 0).toFixed(2)}</span>
+                  <div className="p-3 bg-emerald-50/50 dark:bg-emerald-950/30 rounded-xl border border-emerald-200/60 dark:border-emerald-900/50">
+                    <span className="text-[11px] text-emerald-600 dark:text-emerald-400 font-medium block">Selling Price</span>
+                    <span className="text-sm font-bold text-emerald-700 dark:text-emerald-300">₹{Number(selectedMedicine.selling_price || 0).toFixed(2)}</span>
                   </div>
-                  <div className="p-3 bg-blue-50/50 rounded-xl border border-blue-200/60">
-                    <span className="text-[11px] text-blue-600 font-medium block">Current Stock</span>
-                    <span className="text-sm font-bold text-blue-700">{selectedMedicine.quantity} units</span>
+                  <div className="p-3 bg-blue-50/50 dark:bg-blue-950/30 rounded-xl border border-blue-200/60 dark:border-blue-900/50">
+                    <span className="text-[11px] text-blue-600 dark:text-blue-400 font-medium block">Current Stock</span>
+                    <span className="text-sm font-bold text-blue-700 dark:text-blue-300">{selectedMedicine.quantity} units</span>
                   </div>
-                  <div className="p-3 bg-amber-50/50 rounded-xl border border-amber-200/60">
-                    <span className="text-[11px] text-amber-600 font-medium block">Min Stock Alert</span>
-                    <span className="text-sm font-bold text-amber-700">{selectedMedicine.min_stock || 10} units</span>
+                  <div className="p-3 bg-amber-50/50 dark:bg-amber-950/30 rounded-xl border border-amber-200/60 dark:border-amber-900/50">
+                    <span className="text-[11px] text-amber-600 dark:text-amber-400 font-medium block">Min Stock Alert</span>
+                    <span className="text-sm font-bold text-amber-700 dark:text-amber-300">{selectedMedicine.min_stock || 10} units</span>
                   </div>
                 </div>
               </div>
@@ -809,19 +848,19 @@ const Inventory = () => {
                 <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">
                   Batch & Expiry Details
                 </h4>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 bg-slate-50/70 p-4 rounded-xl border border-slate-100 text-xs">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 bg-slate-50/70 dark:bg-slate-800/60 p-4 rounded-xl border border-slate-100 dark:border-slate-800 text-xs">
                   <div>
                     <span className="text-slate-400 block text-[11px]">Batch Number</span>
-                    <span className="font-mono font-semibold text-slate-800">{selectedMedicine.batch_number || "—"}</span>
+                    <span className="font-mono font-semibold text-slate-800 dark:text-slate-200">{selectedMedicine.batch_number || "—"}</span>
                   </div>
                   <div>
                     <span className="text-slate-400 block text-[11px]">Manufacture Date</span>
-                    <span className="font-semibold text-slate-800">{formatCleanDate(selectedMedicine.manufacture_date)}</span>
+                    <span className="font-semibold text-slate-800 dark:text-slate-200">{formatCleanDate(selectedMedicine.manufacture_date)}</span>
                   </div>
                   <div>
                     <span className="text-slate-400 block text-[11px]">Expiry Date</span>
                     <div className="flex items-center gap-1.5 mt-0.5">
-                      <span className="font-semibold text-slate-800">{formatCleanDate(selectedMedicine.expiry_date)}</span>
+                      <span className="font-semibold text-slate-800 dark:text-slate-200">{formatCleanDate(selectedMedicine.expiry_date)}</span>
                       <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold border ${getExpiryStatus(selectedMedicine.expiry_date).color}`}>
                         {getExpiryStatus(selectedMedicine.expiry_date).label}
                       </span>
@@ -833,11 +872,11 @@ const Inventory = () => {
             </div>
 
             {/* Modal Footer */}
-            <div className="p-4 sm:p-5 bg-slate-50/70 border-t border-slate-100 flex items-center justify-between gap-3 sticky bottom-0">
+            <div className="p-4 sm:p-5 bg-slate-50/70 dark:bg-slate-900/90 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between gap-3 sticky bottom-0">
               <button
                 type="button"
                 onClick={closeDetailsModal}
-                className="px-4 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 text-xs sm:text-sm font-semibold transition-colors"
+                className="px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 text-xs sm:text-sm font-semibold transition-colors"
               >
                 Close View
               </button>
@@ -861,11 +900,11 @@ const Inventory = () => {
       {/* 2. HEADER SECTION */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight flex items-center gap-2">
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight flex items-center gap-2">
             <span>Inventory Management</span>
           </h1>
-          <p className="text-slate-500 text-xs sm:text-sm mt-1">
-            Track medicine stock levels, batch numbers, expiry dates, and catalog pricing.
+          <p className="text-slate-500 dark:text-slate-400 text-xs sm:text-sm mt-1">
+            Track medicine stock levels, batch numbers, expiry dates, catalog pricing, and supplier allocations.
           </p>
         </div>
 
@@ -873,17 +912,17 @@ const Inventory = () => {
         <div className="hidden sm:flex items-center gap-2.5">
           <button
             onClick={handleExportCSV}
-            className="inline-flex items-center gap-2 px-4 py-2.5 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-xl text-sm font-semibold shadow-xs transition-colors"
+            className="inline-flex items-center gap-2 px-4 py-2.5 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-200 rounded-xl text-sm font-semibold shadow-xs transition-colors"
           >
-            <Download size={16} className="text-slate-500" />
+            <Download size={16} className="text-slate-500 dark:text-slate-400" />
             <span>Export CSV</span>
           </button>
 
           <button
             onClick={handlePrint}
-            className="inline-flex items-center gap-2 px-4 py-2.5 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-xl text-sm font-semibold shadow-xs transition-colors"
+            className="inline-flex items-center gap-2 px-4 py-2.5 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-200 rounded-xl text-sm font-semibold shadow-xs transition-colors"
           >
-            <Printer size={16} className="text-slate-500" />
+            <Printer size={16} className="text-slate-500 dark:text-slate-400" />
             <span>Print</span>
           </button>
 
@@ -900,7 +939,7 @@ const Inventory = () => {
         <div className="sm:hidden flex justify-end">
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="p-2.5 rounded-xl bg-white border border-slate-200 text-slate-700 shadow-xs"
+            className="p-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-200 shadow-xs"
           >
             {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
           </button>
@@ -909,7 +948,7 @@ const Inventory = () => {
 
       {/* Mobile Action Dropdown */}
       {mobileMenuOpen && (
-        <div className="sm:hidden p-4 bg-white border border-slate-200/90 rounded-2xl shadow-xs space-y-2.5 animate-in slide-in-from-top-2">
+        <div className="sm:hidden p-4 bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 rounded-2xl shadow-xs space-y-2.5 animate-in slide-in-from-top-2">
           <Link
             to="/inventory/add-medicine"
             className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-semibold shadow-xs transition-colors"
@@ -920,14 +959,14 @@ const Inventory = () => {
           <div className="grid grid-cols-2 gap-2">
             <button
               onClick={handleExportCSV}
-              className="inline-flex items-center justify-center gap-2 px-3 py-2 bg-white border border-slate-200 text-slate-700 rounded-xl text-sm font-semibold shadow-xs"
+              className="inline-flex items-center justify-center gap-2 px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 rounded-xl text-sm font-semibold shadow-xs"
             >
               <Download size={16} />
               <span>Export</span>
             </button>
             <button
               onClick={handlePrint}
-              className="inline-flex items-center justify-center gap-2 px-3 py-2 bg-white border border-slate-200 text-slate-700 rounded-xl text-sm font-semibold shadow-xs"
+              className="inline-flex items-center justify-center gap-2 px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 rounded-xl text-sm font-semibold shadow-xs"
             >
               <Printer size={16} />
               <span>Print</span>
@@ -939,115 +978,115 @@ const Inventory = () => {
       {/* 3. STAT CARDS ROW */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
         {/* Total Medicines */}
-        <div className="bg-white rounded-2xl p-5 border border-slate-200/90 shadow-xs hover:shadow-sm transition-all flex flex-col justify-between">
+        <div className="bg-white dark:bg-slate-900 rounded-2xl p-5 border border-slate-200/90 dark:border-slate-800 shadow-xs hover:shadow-sm transition-all flex flex-col justify-between">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold">
+              <div className="w-10 h-10 rounded-xl bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 flex items-center justify-center font-bold">
                 <Package size={20} />
               </div>
-              <span className="text-sm font-medium text-slate-500">
+              <span className="text-sm font-medium text-slate-500 dark:text-slate-400">
                 Total Medicines
               </span>
             </div>
           </div>
           <div className="mt-4">
-            <h2 className="text-2xl lg:text-[28px] font-bold text-slate-900 tracking-tight">
+            <h2 className="text-2xl lg:text-[28px] font-bold text-slate-900 dark:text-white tracking-tight">
               {stats.total.toLocaleString()}
             </h2>
           </div>
           <div className="flex items-center gap-2 mt-3 pt-1">
-            <span className="inline-flex items-center gap-0.5 text-xs font-semibold px-2 py-0.5 rounded-full bg-blue-50 text-blue-600">
+            <span className="inline-flex items-center gap-0.5 text-xs font-semibold px-2 py-0.5 rounded-full bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400">
               Active in catalog
             </span>
           </div>
         </div>
 
         {/* Low Stock */}
-        <div className="bg-white rounded-2xl p-5 border border-slate-200/90 shadow-xs hover:shadow-sm transition-all flex flex-col justify-between">
+        <div className="bg-white dark:bg-slate-900 rounded-2xl p-5 border border-slate-200/90 dark:border-slate-800 shadow-xs hover:shadow-sm transition-all flex flex-col justify-between">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-500 flex items-center justify-center font-bold">
+              <div className="w-10 h-10 rounded-xl bg-amber-50 dark:bg-amber-950/40 text-amber-500 dark:text-amber-400 flex items-center justify-center font-bold">
                 <AlertTriangle size={20} />
               </div>
-              <span className="text-sm font-medium text-slate-500">
+              <span className="text-sm font-medium text-slate-500 dark:text-slate-400">
                 Low Stock
               </span>
             </div>
           </div>
           <div className="mt-4">
-            <h2 className="text-2xl lg:text-[28px] font-bold text-slate-900 tracking-tight">
+            <h2 className="text-2xl lg:text-[28px] font-bold text-slate-900 dark:text-white tracking-tight">
               {stats.lowStock}
             </h2>
           </div>
           <div className="flex items-center gap-2 mt-3 pt-1">
-            <span className="inline-flex items-center gap-0.5 text-xs font-semibold px-2 py-0.5 rounded-full bg-amber-50 text-amber-600">
+            <span className="inline-flex items-center gap-0.5 text-xs font-semibold px-2 py-0.5 rounded-full bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400">
               Below min level
             </span>
           </div>
         </div>
 
         {/* Out Of Stock */}
-        <div className="bg-white rounded-2xl p-5 border border-slate-200/90 shadow-xs hover:shadow-sm transition-all flex flex-col justify-between">
+        <div className="bg-white dark:bg-slate-900 rounded-2xl p-5 border border-slate-200/90 dark:border-slate-800 shadow-xs hover:shadow-sm transition-all flex flex-col justify-between">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-rose-50 text-rose-500 flex items-center justify-center font-bold">
+              <div className="w-10 h-10 rounded-xl bg-rose-50 dark:bg-rose-950/40 text-rose-500 dark:text-rose-400 flex items-center justify-center font-bold">
                 <XCircle size={20} />
               </div>
-              <span className="text-sm font-medium text-slate-500">
+              <span className="text-sm font-medium text-slate-500 dark:text-slate-400">
                 Out of Stock
               </span>
             </div>
           </div>
           <div className="mt-4">
-            <h2 className="text-2xl lg:text-[28px] font-bold text-slate-900 tracking-tight">
+            <h2 className="text-2xl lg:text-[28px] font-bold text-slate-900 dark:text-white tracking-tight">
               {stats.outOfStock}
             </h2>
           </div>
           <div className="flex items-center gap-2 mt-3 pt-1">
-            <span className="inline-flex items-center gap-0.5 text-xs font-semibold px-2 py-0.5 rounded-full bg-rose-50 text-rose-600">
+            <span className="inline-flex items-center gap-0.5 text-xs font-semibold px-2 py-0.5 rounded-full bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400">
               Needs restocking
             </span>
           </div>
         </div>
 
         {/* Expiring Soon */}
-        <div className="bg-white rounded-2xl p-5 border border-slate-200/90 shadow-xs hover:shadow-sm transition-all flex flex-col justify-between">
+        <div className="bg-white dark:bg-slate-900 rounded-2xl p-5 border border-slate-200/90 dark:border-slate-800 shadow-xs hover:shadow-sm transition-all flex flex-col justify-between">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center font-bold">
+              <div className="w-10 h-10 rounded-xl bg-purple-50 dark:bg-purple-950/40 text-purple-600 dark:text-purple-400 flex items-center justify-center font-bold">
                 <Clock3 size={20} />
               </div>
-              <span className="text-sm font-medium text-slate-500">
+              <span className="text-sm font-medium text-slate-500 dark:text-slate-400">
                 Expiring Soon
               </span>
             </div>
           </div>
           <div className="mt-4">
-            <h2 className="text-2xl lg:text-[28px] font-bold text-slate-900 tracking-tight">
+            <h2 className="text-2xl lg:text-[28px] font-bold text-slate-900 dark:text-white tracking-tight">
               {stats.expiringSoon}
             </h2>
           </div>
           <div className="flex items-center gap-2 mt-3 pt-1">
-            <span className="inline-flex items-center gap-0.5 text-xs font-semibold px-2 py-0.5 rounded-full bg-purple-50 text-purple-600">
+            <span className="inline-flex items-center gap-0.5 text-xs font-semibold px-2 py-0.5 rounded-full bg-purple-50 dark:bg-purple-950/40 text-purple-600 dark:text-purple-400">
               Within 30 days
             </span>
           </div>
         </div>
 
         {/* Total Inventory Value */}
-        <div className="bg-white rounded-2xl p-5 border border-slate-200/90 shadow-xs hover:shadow-sm transition-all flex flex-col justify-between sm:col-span-2 lg:col-span-1">
+        <div className="bg-white dark:bg-slate-900 rounded-2xl p-5 border border-slate-200/90 dark:border-slate-800 shadow-xs hover:shadow-sm transition-all flex flex-col justify-between sm:col-span-2 lg:col-span-1">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-emerald-50 text-emerald-500 flex items-center justify-center font-bold">
+              <div className="w-10 h-10 rounded-full bg-emerald-50 dark:bg-emerald-950/40 text-emerald-500 dark:text-emerald-400 flex items-center justify-center font-bold">
                 <IndianRupee size={20} />
               </div>
-              <span className="text-sm font-medium text-slate-500">
+              <span className="text-sm font-medium text-slate-500 dark:text-slate-400">
                 Inventory Value
               </span>
             </div>
           </div>
           <div className="mt-4">
-            <h2 className="text-2xl lg:text-[28px] font-bold text-slate-900 tracking-tight truncate">
+            <h2 className="text-2xl lg:text-[28px] font-bold text-slate-900 dark:text-white tracking-tight truncate">
               ₹
               {Number(stats.totalValue).toLocaleString("en-IN", {
                 maximumFractionDigits: 0,
@@ -1055,7 +1094,7 @@ const Inventory = () => {
             </h2>
           </div>
           <div className="flex items-center gap-2 mt-3 pt-1">
-            <span className="inline-flex items-center gap-0.5 text-xs font-semibold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-600">
+            <span className="inline-flex items-center gap-0.5 text-xs font-semibold px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400">
               Total stock valuation
             </span>
           </div>
@@ -1063,7 +1102,7 @@ const Inventory = () => {
       </div>
 
       {/* 4. FILTERS & SEARCH CARD */}
-      <div className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200/90 shadow-xs">
+      <div className="bg-white dark:bg-slate-900 rounded-2xl p-4 sm:p-5 border border-slate-200/90 dark:border-slate-800 shadow-xs">
         <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-4">
           {/* Search Bar - Direct Input as requested */}
           <div className="relative flex-1">
@@ -1073,26 +1112,27 @@ const Inventory = () => {
             />
             <input
               type="text"
-              placeholder="Search by medicine name, salt, brand, or manufacturer..."
+              placeholder="Search by medicine name, salt, brand, manufacturer, or supplier..."
               value={search}
               onChange={(e) => {
                 setSearch(e.target.value);
                 setCurrentPage(1);
               }}
-              className="w-full bg-slate-50/80 border border-slate-200 rounded-xl pl-10 pr-4 py-2.5 text-slate-800 placeholder-slate-400 outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm transition-all"
+              className="w-full bg-slate-50/80 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl pl-10 pr-4 py-2.5 text-slate-800 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm transition-all"
             />
             {search && (
               <button
                 onClick={() => setSearch("")}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-xs"
               >
                 Clear
               </button>
             )}
           </div>
 
-          {/* Category & Per Page Dropdowns */}
+          {/* Filter Dropdowns & View Mode Toggle */}
           <div className="flex flex-wrap items-center gap-3">
+            {/* Category Dropdown */}
             <div className="relative">
               <select
                 value={category}
@@ -1100,7 +1140,7 @@ const Inventory = () => {
                   setCategory(e.target.value);
                   setCurrentPage(1);
                 }}
-                className="bg-slate-50/80 border border-slate-200 rounded-xl pl-3.5 pr-8 py-2.5 text-slate-700 outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer text-sm font-medium appearance-none transition-all"
+                className="bg-slate-50/80 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl pl-3.5 pr-8 py-2.5 text-slate-700 dark:text-slate-200 outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer text-sm font-medium appearance-none transition-all"
               >
                 {categories.map((cat, index) => (
                   <option key={index} value={cat}>
@@ -1114,28 +1154,87 @@ const Inventory = () => {
               />
             </div>
 
+            {/* Supplier Filter Dropdown */}
             <div className="relative">
               <select
-                value={itemsPerPage}
+                value={supplierFilter}
                 onChange={(e) => {
-                  setItemsPerPage(
-                    e.target.value === "All" ? "All" : Number(e.target.value)
-                  );
+                  setSupplierFilter(e.target.value);
                   setCurrentPage(1);
                 }}
-                className="bg-slate-50/80 border border-slate-200 rounded-xl pl-3.5 pr-8 py-2.5 text-slate-700 outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer text-sm font-medium appearance-none transition-all"
+                className="bg-slate-50/80 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl pl-8 pr-8 py-2.5 text-slate-700 dark:text-slate-200 outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer text-sm font-medium appearance-none transition-all max-w-[210px] truncate"
               >
-                <option value={10}>10 per page</option>
-                <option value={20}>20 per page</option>
-                <option value={50}>50 per page</option>
-                <option value={100}>100 per page</option>
-                <option value="All">All Items</option>
+                {suppliersList.map((sup, index) => (
+                  <option key={index} value={sup}>
+                    {sup === "All" ? "All Suppliers" : sup}
+                  </option>
+                ))}
               </select>
+              <Truck
+                size={14}
+                className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"
+              />
               <ChevronDown
                 size={14}
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"
               />
             </div>
+
+            {/* View Mode Switcher: Table View vs Group by Supplier */}
+            <div className="flex items-center bg-slate-100 dark:bg-slate-800 p-1 rounded-xl border border-slate-200/80 dark:border-slate-700">
+              <button
+                type="button"
+                onClick={() => setViewMode("table")}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                  viewMode === "table"
+                    ? "bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-xs"
+                    : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+                }`}
+                title="Table view of all medicines"
+              >
+                <Layers size={14} />
+                <span className="hidden sm:inline">Table View</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode("grouped")}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                  viewMode === "grouped"
+                    ? "bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-xs"
+                    : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+                }`}
+                title="Group medicines by supplier"
+              >
+                <Truck size={14} />
+                <span className="hidden sm:inline">Group by Supplier</span>
+              </button>
+            </div>
+
+            {/* Items Per Page (Table mode only) */}
+            {viewMode === "table" && (
+              <div className="relative">
+                <select
+                  value={itemsPerPage}
+                  onChange={(e) => {
+                    setItemsPerPage(
+                      e.target.value === "All" ? "All" : Number(e.target.value)
+                    );
+                    setCurrentPage(1);
+                  }}
+                  className="bg-slate-50/80 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl pl-3.5 pr-8 py-2.5 text-slate-700 dark:text-slate-200 outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer text-sm font-medium appearance-none transition-all"
+                >
+                  <option value={10}>10 per page</option>
+                  <option value={20}>20 per page</option>
+                  <option value={50}>50 per page</option>
+                  <option value={100}>100 per page</option>
+                  <option value="All">All Items</option>
+                </select>
+                <ChevronDown
+                  size={14}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"
+                />
+              </div>
+            )}
 
             {/* Quick Bulk Actions */}
             {selectedIds.length > 0 ? (
@@ -1160,461 +1259,747 @@ const Inventory = () => {
         </div>
       </div>
 
-      {/* 5. DESKTOP INVENTORY TABLE */}
-      <div className="hidden lg:block bg-white rounded-2xl border border-slate-200/90 shadow-xs overflow-hidden">
-        <div className="p-5 flex items-center justify-between border-b border-slate-100">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
-              <Layers size={18} />
-            </div>
-            <div>
-              <h3 className="text-base font-bold text-slate-800 leading-tight">
-                Medicine Inventory Catalog
-              </h3>
-              <p className="text-xs text-slate-400">
-                Showing {paginatedMedicines.length} of {filteredMedicines.length} medicines
+      {/* 5. VIEW MODES: GROUPED BY SUPPLIER OR STANDARD TABLE VIEW */}
+      {viewMode === "grouped" ? (
+        /* SUPPLIER-WISE GROUPED MEDICINES VIEW */
+        <div className="space-y-6">
+          {groupedBySupplier.length === 0 ? (
+            <div className="text-center py-16 px-4 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/90 dark:border-slate-800 shadow-xs">
+              <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 mb-3">
+                <Truck size={24} />
+              </div>
+              <h4 className="text-base font-bold text-slate-800 dark:text-white">
+                No supplier records found
+              </h4>
+              <p className="text-xs text-slate-400 mt-1 max-w-sm mx-auto">
+                No medicines matched your current search filters or supplier selection.
               </p>
+              <button
+                onClick={() => {
+                  setSearch("");
+                  setCategory("All");
+                  setSupplierFilter("All");
+                }}
+                className="mt-4 inline-flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold transition-colors shadow-xs"
+              >
+                Reset Filters
+              </button>
             </div>
-          </div>
+          ) : (
+            groupedBySupplier.map((group, groupIdx) => {
+              const totalStock = group.medicines.reduce(
+                (acc, m) => acc + (Number(m.quantity) || 0),
+                0
+              );
+              const totalVal = group.medicines.reduce(
+                (acc, m) =>
+                  acc +
+                  (Number(m.selling_price || 0) * Number(m.quantity || 0)),
+                0
+              );
 
-          {selectedIds.length > 0 && (
-            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-blue-50 text-blue-600 text-xs font-semibold">
-              <CheckCircle2 size={14} />
-              <span>{selectedIds.length} item(s) selected</span>
-            </div>
+              return (
+                <div
+                  key={groupIdx}
+                  className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/90 dark:border-slate-800 shadow-xs overflow-hidden"
+                >
+                  {/* Supplier Header Banner */}
+                  <div className="p-5 bg-gradient-to-r from-blue-50/70 via-slate-50/50 to-white dark:from-blue-950/30 dark:via-slate-850 dark:to-slate-900 border-b border-slate-200/80 dark:border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div className="flex items-start sm:items-center gap-3.5">
+                      <div className="w-11 h-11 rounded-2xl bg-blue-600 text-white flex items-center justify-center font-bold text-base shadow-xs shrink-0">
+                        <Truck size={22} />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <h3 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white">
+                            {group.supplierName}
+                          </h3>
+                          {group.supplierGst && (
+                            <span className="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
+                              GST: {group.supplierGst}
+                            </span>
+                          )}
+                          <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-blue-100/70 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 border border-blue-200/60 dark:border-blue-800">
+                            {group.medicines.length} {group.medicines.length === 1 ? "Medicine" : "Medicines"}
+                          </span>
+                        </div>
+
+                        {/* Supplier contact details row */}
+                        <div className="flex items-center gap-4 flex-wrap text-xs text-slate-600 dark:text-slate-300 mt-1">
+                          {group.supplierContact && (
+                            <span className="flex items-center gap-1">
+                              <User size={13} className="text-slate-400" />
+                              <span>Contact: <strong>{group.supplierContact}</strong></span>
+                            </span>
+                          )}
+                          {group.supplierMobile && (
+                            <a
+                              href={`tel:${group.supplierMobile}`}
+                              className="flex items-center gap-1 text-blue-600 dark:text-blue-400 hover:underline font-mono"
+                            >
+                              <Phone size={13} />
+                              <span>{group.supplierMobile}</span>
+                            </a>
+                          )}
+                          {group.supplierEmail && (
+                            <a
+                              href={`mailto:${group.supplierEmail}`}
+                              className="flex items-center gap-1 text-blue-600 dark:text-blue-400 hover:underline"
+                            >
+                              <Mail size={13} />
+                              <span>{group.supplierEmail}</span>
+                            </a>
+                          )}
+                          {group.supplierAddress && (
+                            <span className="flex items-center gap-1 text-slate-500 dark:text-slate-400">
+                              <MapPin size={13} className="shrink-0" />
+                              <span className="truncate max-w-xs">{group.supplierAddress}</span>
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Group Stock & Value Summary */}
+                    <div className="flex items-center gap-3 shrink-0 self-start md:self-auto">
+                      <div className="px-3.5 py-1.5 bg-white dark:bg-slate-800 rounded-xl border border-slate-200/80 dark:border-slate-700 text-right">
+                        <span className="text-[10px] text-slate-400 block uppercase font-bold">Total Stock</span>
+                        <span className="text-sm font-extrabold text-slate-800 dark:text-slate-100">{totalStock} units</span>
+                      </div>
+                      <div className="px-3.5 py-1.5 bg-emerald-50/60 dark:bg-emerald-950/30 rounded-xl border border-emerald-200/70 dark:border-emerald-900/50 text-right">
+                        <span className="text-[10px] text-emerald-600 dark:text-emerald-400 block uppercase font-bold">Catalog Value</span>
+                        <span className="text-sm font-extrabold text-emerald-700 dark:text-emerald-300">₹{totalVal.toLocaleString("en-IN", { maximumFractionDigits: 0 })}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Complete Tabular List of Medicines for this Supplier */}
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left border-collapse">
+                      <thead>
+                        <tr className="border-b border-slate-100 dark:border-slate-800 text-[11px] font-semibold text-slate-400 uppercase tracking-wider bg-slate-50/60 dark:bg-slate-800/50">
+                          <th className="py-3 px-4 w-10">#</th>
+                          <th className="py-3 px-4 whitespace-nowrap">Medicine Details</th>
+                          <th className="py-3 px-3 whitespace-nowrap">Category</th>
+                          <th className="py-3 px-3 whitespace-nowrap">Batch No</th>
+                          <th className="py-3 px-3 whitespace-nowrap">Pack / Unit</th>
+                          <th className="py-3 px-3 text-right whitespace-nowrap">Cost Price</th>
+                          <th className="py-3 px-3 text-right whitespace-nowrap">Selling MRP</th>
+                          <th className="py-3 px-3 text-center whitespace-nowrap">Stock Level</th>
+                          <th className="py-3 px-3 whitespace-nowrap">Expiry Date</th>
+                          <th className="py-3 px-3 whitespace-nowrap">Rack / Shelf</th>
+                          <th className="py-3 px-3 text-center whitespace-nowrap">Status</th>
+                          <th className="py-3 px-4 text-right whitespace-nowrap">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-xs">
+                        {group.medicines.map((med, mIdx) => {
+                          const expStatus = getExpiryStatus(med.expiry_date);
+                          const stkStatus = getStockStatus(med.quantity, med.min_stock);
+
+                          return (
+                            <tr
+                              key={med.medicine_id || mIdx}
+                              className="hover:bg-slate-50/80 dark:hover:bg-slate-800/60 transition-colors group"
+                            >
+                              <td className="py-3 px-4 text-slate-400 font-mono text-[11px]">
+                                {mIdx + 1}
+                              </td>
+                              <td className="py-3 px-4 whitespace-nowrap">
+                                <div className="flex items-center gap-2.5">
+                                  <div className="w-7 h-7 rounded-lg bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 flex items-center justify-center font-bold text-xs shrink-0">
+                                    {(med.medicine_name || "M").charAt(0).toUpperCase()}
+                                  </div>
+                                  <div>
+                                    <h4
+                                      onClick={() => openDetailsModal(med)}
+                                      className="font-semibold text-slate-800 dark:text-slate-100 text-sm leading-tight cursor-pointer hover:text-blue-600 dark:hover:text-blue-400"
+                                    >
+                                      {med.medicine_name}
+                                    </h4>
+                                    <p className="text-[11px] text-slate-400 mt-0.5">
+                                      {med.brand_name || "Generic"} {med.salt_name ? `• ${med.salt_name}` : ""}
+                                    </p>
+                                    {med.manufacturer && (
+                                      <p className="text-[10px] text-slate-400/90">{med.manufacturer}</p>
+                                    )}
+                                  </div>
+                                </div>
+                              </td>
+                              <td className="py-3 px-3 whitespace-nowrap">
+                                <span className="px-2 py-0.5 rounded-md text-[11px] font-medium bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200/60 dark:border-slate-700">
+                                  {med.category || "General"}
+                                </span>
+                              </td>
+                              <td className="py-3 px-3 font-mono text-xs text-slate-700 dark:text-slate-300 whitespace-nowrap">
+                                {med.batch_number || "—"}
+                              </td>
+                              <td className="py-3 px-3 text-slate-600 dark:text-slate-300 whitespace-nowrap">
+                                {med.pack_size || "1"} {med.unit ? `(${med.unit})` : ""}
+                              </td>
+                              <td className="py-3 px-3 text-right font-semibold text-slate-700 dark:text-slate-300 whitespace-nowrap">
+                                ₹{Number(med.purchase_price || 0).toFixed(2)}
+                              </td>
+                              <td className="py-3 px-3 text-right font-bold text-slate-900 dark:text-white whitespace-nowrap">
+                                ₹{Number(med.selling_price || 0).toFixed(2)}
+                              </td>
+                              <td className="py-3 px-3 text-center whitespace-nowrap">
+                                <span className={`font-bold ${stkStatus.color}`}>
+                                  {med.quantity}
+                                </span>
+                                <span className="text-[10px] text-slate-400 ml-1">
+                                  / min {med.min_stock || 10}
+                                </span>
+                              </td>
+                              <td className="py-3 px-3 whitespace-nowrap">
+                                <p className="font-medium text-slate-700 dark:text-slate-300 text-[11px]">
+                                  {formatCleanDate(med.expiry_date)}
+                                </p>
+                                <span className={`inline-block mt-0.5 px-2 py-0.2 rounded-full text-[9px] font-bold border ${expStatus.color}`}>
+                                  {expStatus.label}
+                                </span>
+                              </td>
+                              <td className="py-3 px-3 text-slate-600 dark:text-slate-400 text-xs whitespace-nowrap">
+                                {med.rack_location || "—"}
+                              </td>
+                              <td className="py-3 px-3 text-center whitespace-nowrap">
+                                <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border ${stkStatus.badgeBg}`}>
+                                  {stkStatus.label}
+                                </span>
+                              </td>
+                              <td className="py-3 px-4 text-right whitespace-nowrap">
+                                <div className="flex items-center justify-end gap-1">
+                                  <button
+                                    onClick={() => openDetailsModal(med)}
+                                    title="View Details"
+                                    className="w-7 h-7 rounded-lg bg-slate-50 dark:bg-slate-800 hover:bg-blue-50 dark:hover:bg-blue-900/50 text-slate-500 dark:text-slate-400 hover:text-blue-600 flex items-center justify-center transition-colors"
+                                  >
+                                    <Eye size={13} />
+                                  </button>
+                                  <button
+                                    onClick={() => handleEdit(med)}
+                                    title="Edit"
+                                    className="w-7 h-7 rounded-lg bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 flex items-center justify-center"
+                                  >
+                                    <SquarePen size={13} />
+                                  </button>
+                                  <button
+                                    onClick={() => openStockModal(med, "in")}
+                                    title="Stock In (+)"
+                                    className="w-7 h-7 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 flex items-center justify-center"
+                                  >
+                                    <TrendingUp size={13} />
+                                  </button>
+                                  <button
+                                    onClick={() => openStockModal(med, "out")}
+                                    title="Stock Out (-)"
+                                    className="w-7 h-7 rounded-lg bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 flex items-center justify-center"
+                                  >
+                                    <TrendingDown size={13} />
+                                  </button>
+                                  <button
+                                    onClick={() => handleDelete(med.medicine_id)}
+                                    title="Delete"
+                                    className="w-7 h-7 rounded-lg bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 flex items-center justify-center"
+                                  >
+                                    <Trash2 size={13} />
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              );
+            })
           )}
         </div>
+      ) : (
+        /* STANDARD INVENTORY TABLE VIEW */
+        <>
+          {/* 5. DESKTOP INVENTORY TABLE */}
+          <div className="hidden lg:block bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/90 dark:border-slate-800 shadow-xs overflow-hidden">
+            <div className="p-5 flex items-center justify-between border-b border-slate-100 dark:border-slate-800">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 flex items-center justify-center">
+                  <Layers size={18} />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-800 dark:text-white leading-tight">
+                    Medicine Inventory Catalog
+                  </h3>
+                  <p className="text-xs text-slate-400">
+                    Showing {paginatedMedicines.length} of {filteredMedicines.length} medicines
+                  </p>
+                </div>
+              </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="border-b border-slate-100 text-[11px] font-semibold text-slate-400 uppercase tracking-wider bg-slate-50/60">
-                <th className="py-3 px-5 whitespace-nowrap w-12">
-                  <input
-                    type="checkbox"
-                    className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer w-4 h-4"
-                    checked={
-                      selectedIds.length === filteredMedicines.length &&
-                      filteredMedicines.length > 0
-                    }
-                    onChange={(e) => {
-                      if (e.target.checked) {
-                        setSelectedIds(
-                          filteredMedicines.map((m) => m.medicine_id)
-                        );
-                      } else {
-                        setSelectedIds([]);
-                      }
-                    }}
-                  />
-                </th>
-                <th
-                  className="py-3 px-4 whitespace-nowrap cursor-pointer hover:text-slate-700 transition-colors"
-                  onClick={() => handleSort("medicine_name")}
-                >
-                  Medicine Details <SortIcon column="medicine_name" />
-                </th>
-                <th
-                  className="py-3 px-4 whitespace-nowrap cursor-pointer hover:text-slate-700 transition-colors"
-                  onClick={() => handleSort("category")}
-                >
-                  Category <SortIcon column="category" />
-                </th>
-                <th
-                  className="py-3 px-4 whitespace-nowrap cursor-pointer hover:text-slate-700 transition-colors"
-                  onClick={() => handleSort("quantity")}
-                >
-                  Stock Level <SortIcon column="quantity" />
-                </th>
-                <th
-                  className="py-3 px-4 whitespace-nowrap cursor-pointer hover:text-slate-700 transition-colors"
-                  onClick={() => handleSort("selling_price")}
-                >
-                  Price <SortIcon column="selling_price" />
-                </th>
-                <th
-                  className="py-3 px-4 whitespace-nowrap cursor-pointer hover:text-slate-700 transition-colors"
-                  onClick={() => handleSort("expiry_date")}
-                >
-                  Expiry Date <SortIcon column="expiry_date" />
-                </th>
-                <th className="py-3 px-4 whitespace-nowrap">Batch No</th>
-                <th className="py-3 px-4 whitespace-nowrap">Status</th>
-                <th className="py-3 px-5 text-right whitespace-nowrap">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 text-xs">
-              {paginatedMedicines.map((medicine) => {
-                const expiryStatus = getExpiryStatus(medicine.expiry_date);
-                const stockStatus = getStockStatus(
-                  medicine.quantity,
-                  medicine.min_stock
-                );
-                const initial = (medicine.medicine_name || "M")
-                  .charAt(0)
-                  .toUpperCase();
+              {selectedIds.length > 0 && (
+                <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 text-xs font-semibold">
+                  <CheckCircle2 size={14} />
+                  <span>{selectedIds.length} item(s) selected</span>
+                </div>
+              )}
+            </div>
 
-                return (
-                  <tr
-                    key={medicine.medicine_id}
-                    className="hover:bg-slate-50/80 transition-colors group"
-                  >
-                    {/* Checkbox */}
-                    <td className="py-3.5 px-5 whitespace-nowrap">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="border-b border-slate-100 dark:border-slate-800 text-[11px] font-semibold text-slate-400 uppercase tracking-wider bg-slate-50/60 dark:bg-slate-800/50">
+                    <th className="py-3 px-5 whitespace-nowrap w-12">
                       <input
                         type="checkbox"
-                        className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer w-4 h-4"
-                        checked={selectedIds.includes(medicine.medicine_id)}
+                        className="rounded border-slate-300 dark:border-slate-600 text-blue-600 focus:ring-blue-500 cursor-pointer w-4 h-4 bg-transparent"
+                        checked={
+                          selectedIds.length === filteredMedicines.length &&
+                          filteredMedicines.length > 0
+                        }
                         onChange={(e) => {
-                          const checked = e.target.checked;
-                          setSelectedIds((prev) =>
-                            checked
-                              ? [...prev, medicine.medicine_id]
-                              : prev.filter((id) => id !== medicine.medicine_id)
-                          );
+                          if (e.target.checked) {
+                            setSelectedIds(
+                              filteredMedicines.map((m) => m.medicine_id)
+                            );
+                          } else {
+                            setSelectedIds([]);
+                          }
                         }}
                       />
-                    </td>
+                    </th>
+                    <th
+                      className="py-3 px-4 whitespace-nowrap cursor-pointer hover:text-slate-700 dark:hover:text-slate-200 transition-colors"
+                      onClick={() => handleSort("medicine_name")}
+                    >
+                      Medicine Details <SortIcon column="medicine_name" />
+                    </th>
+                    <th
+                      className="py-3 px-4 whitespace-nowrap cursor-pointer hover:text-slate-700 dark:hover:text-slate-200 transition-colors"
+                      onClick={() => handleSort("category")}
+                    >
+                      Category <SortIcon column="category" />
+                    </th>
+                    <th className="py-3 px-4 whitespace-nowrap">
+                      Supplier
+                    </th>
+                    <th
+                      className="py-3 px-4 whitespace-nowrap cursor-pointer hover:text-slate-700 dark:hover:text-slate-200 transition-colors"
+                      onClick={() => handleSort("quantity")}
+                    >
+                      Stock Level <SortIcon column="quantity" />
+                    </th>
+                    <th
+                      className="py-3 px-4 whitespace-nowrap cursor-pointer hover:text-slate-700 dark:hover:text-slate-200 transition-colors"
+                      onClick={() => handleSort("selling_price")}
+                    >
+                      Price <SortIcon column="selling_price" />
+                    </th>
+                    <th
+                      className="py-3 px-4 whitespace-nowrap cursor-pointer hover:text-slate-700 dark:hover:text-slate-200 transition-colors"
+                      onClick={() => handleSort("expiry_date")}
+                    >
+                      Expiry Date <SortIcon column="expiry_date" />
+                    </th>
+                    <th className="py-3 px-4 whitespace-nowrap">Batch No</th>
+                    <th className="py-3 px-4 whitespace-nowrap">Status</th>
+                    <th className="py-3 px-5 text-right whitespace-nowrap">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-xs">
+                  {paginatedMedicines.map((medicine) => {
+                    const expiryStatus = getExpiryStatus(medicine.expiry_date);
+                    const stockStatus = getStockStatus(
+                      medicine.quantity,
+                      medicine.min_stock
+                    );
+                    const initial = (medicine.medicine_name || "M")
+                      .charAt(0)
+                      .toUpperCase();
 
-                    {/* Medicine details with avatar */}
-                    <td className="py-3.5 px-4 whitespace-nowrap">
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold text-xs shrink-0 shadow-2xs">
-                          {initial}
-                        </div>
-                        <div>
-                          <h4
-                            onClick={() => openDetailsModal(medicine)}
-                            className="font-semibold text-slate-800 text-sm leading-tight group-hover:text-blue-600 transition-colors cursor-pointer"
-                          >
-                            {medicine.medicine_name}
-                          </h4>
-                          <p className="text-[11px] text-slate-400 mt-0.5">
-                            {medicine.brand_name || "Generic"}{" "}
-                            {medicine.salt_name ? `• ${medicine.salt_name}` : ""}
-                          </p>
-                          {medicine.manufacturer && (
-                            <p className="text-[10px] text-slate-400/90 mt-0.5">
-                              {medicine.manufacturer}
-                            </p>
-                          )}
-                          {medicine.supplier_name && (
-                            <p
-                              onClick={() => openDetailsModal(medicine)}
-                              className="text-[10px] text-blue-600 font-medium mt-0.5 cursor-pointer hover:underline flex items-center gap-1"
-                            >
-                              <Truck size={11} />
-                              <span>Supplier: {medicine.supplier_name} {medicine.supplier_mobile ? `• ${medicine.supplier_mobile}` : ""}</span>
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                    </td>
+                    return (
+                      <tr
+                        key={medicine.medicine_id}
+                        className="hover:bg-slate-50/80 dark:hover:bg-slate-800/60 transition-colors group"
+                      >
+                        {/* Checkbox */}
+                        <td className="py-3.5 px-5 whitespace-nowrap">
+                          <input
+                            type="checkbox"
+                            className="rounded border-slate-300 dark:border-slate-600 text-blue-600 focus:ring-blue-500 cursor-pointer w-4 h-4 bg-transparent"
+                            checked={selectedIds.includes(medicine.medicine_id)}
+                            onChange={(e) => {
+                              const checked = e.target.checked;
+                              setSelectedIds((prev) =>
+                                checked
+                                  ? [...prev, medicine.medicine_id]
+                                  : prev.filter((id) => id !== medicine.medicine_id)
+                              );
+                            }}
+                          />
+                        </td>
 
-                    {/* Category */}
-                    <td className="py-3.5 px-4 whitespace-nowrap">
-                      <span className="inline-block px-2.5 py-1 rounded-lg text-[11px] font-medium bg-slate-100 text-slate-700">
-                        {medicine.category || "General"}
-                      </span>
-                    </td>
+                        {/* Medicine details with avatar */}
+                        <td className="py-3.5 px-4 whitespace-nowrap">
+                          <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 rounded-xl bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 flex items-center justify-center font-bold text-xs shrink-0 shadow-2xs">
+                              {initial}
+                            </div>
+                            <div>
+                              <h4
+                                onClick={() => openDetailsModal(medicine)}
+                                className="font-semibold text-slate-800 dark:text-slate-100 text-sm leading-tight group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors cursor-pointer"
+                              >
+                                {medicine.medicine_name}
+                              </h4>
+                              <p className="text-[11px] text-slate-400 mt-0.5">
+                                {medicine.brand_name || "Generic"}{" "}
+                                {medicine.salt_name ? `• ${medicine.salt_name}` : ""}
+                              </p>
+                              {medicine.manufacturer && (
+                                <p className="text-[10px] text-slate-400/90 mt-0.5">
+                                  {medicine.manufacturer}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        </td>
 
-                    {/* Stock Level */}
-                    <td className="py-3.5 px-4 whitespace-nowrap">
-                      <div className="flex items-center gap-2">
-                        {stockStatus.icon}
-                        <span
-                          className={`font-bold text-sm ${stockStatus.color}`}
-                        >
-                          {medicine.quantity}
-                        </span>
-                        {medicine.min_stock !== undefined && (
-                          <span className="text-[11px] text-slate-400">
-                            / min {medicine.min_stock}
+                        {/* Category */}
+                        <td className="py-3.5 px-4 whitespace-nowrap">
+                          <span className="inline-block px-2.5 py-1 rounded-lg text-[11px] font-medium bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200/60 dark:border-slate-700">
+                            {medicine.category || "General"}
                           </span>
+                        </td>
+
+                        {/* Supplier Info */}
+                        <td className="py-3.5 px-4 whitespace-nowrap">
+                          {medicine.supplier_name ? (
+                            <div
+                              onClick={() => openDetailsModal(medicine)}
+                              className="cursor-pointer group/sup"
+                            >
+                              <span className="font-semibold text-slate-800 dark:text-slate-200 group-hover/sup:text-blue-600 dark:group-hover/sup:text-blue-400 block text-xs">
+                                {medicine.supplier_name}
+                              </span>
+                              {medicine.supplier_contact && (
+                                <span className="text-[10px] text-slate-400 block">
+                                  {medicine.supplier_contact}
+                                </span>
+                              )}
+                              {medicine.supplier_mobile && (
+                                <span className="text-[10px] text-blue-600 dark:text-blue-400 font-mono block">
+                                  {medicine.supplier_mobile}
+                                </span>
+                              )}
+                            </div>
+                          ) : (
+                            <span className="text-slate-400 text-xs italic">Unassigned</span>
+                          )}
+                        </td>
+
+                        {/* Stock Level */}
+                        <td className="py-3.5 px-4 whitespace-nowrap">
+                          <div className="flex items-center gap-2">
+                            {stockStatus.icon}
+                            <span
+                              className={`font-bold text-sm ${stockStatus.color}`}
+                            >
+                              {medicine.quantity}
+                            </span>
+                            {medicine.min_stock !== undefined && (
+                              <span className="text-[11px] text-slate-400">
+                                / min {medicine.min_stock}
+                              </span>
+                            )}
+                          </div>
+                        </td>
+
+                        {/* Price */}
+                        <td className="py-3.5 px-4 whitespace-nowrap font-bold text-slate-900 dark:text-white text-sm">
+                          ₹{Number(medicine.selling_price || 0).toLocaleString("en-IN", {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2,
+                          })}
+                        </td>
+
+                        {/* Expiry Date */}
+                        <td className="py-3.5 px-4 whitespace-nowrap">
+                          <p className="font-medium text-slate-700 dark:text-slate-200">
+                            {formatCleanDate(medicine.expiry_date)}
+                          </p>
+                          <span
+                            className={`inline-block mt-1 px-2 py-0.5 rounded-full text-[10px] font-semibold border ${expiryStatus.color}`}
+                          >
+                            {expiryStatus.label}
+                          </span>
+                        </td>
+
+                        {/* Batch Number */}
+                        <td className="py-3.5 px-4 whitespace-nowrap">
+                          <span className="font-mono text-xs text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-800 px-2 py-1 rounded-md border border-slate-200/80 dark:border-slate-700">
+                            {medicine.batch_number || "—"}
+                          </span>
+                        </td>
+
+                        {/* Stock Status Badge */}
+                        <td className="py-3.5 px-4 whitespace-nowrap">
+                          <span
+                            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold border ${stockStatus.badgeBg}`}
+                          >
+                            {stockStatus.label}
+                          </span>
+                        </td>
+
+                        {/* Action Buttons */}
+                        <td className="py-3.5 px-5 text-right whitespace-nowrap">
+                          <div className="flex items-center justify-end gap-1.5">
+                            <button
+                              onClick={() => openDetailsModal(medicine)}
+                              title="View Medicine & Supplier Details"
+                              className="w-8 h-8 rounded-lg bg-slate-50 dark:bg-slate-800 hover:bg-blue-50 dark:hover:bg-blue-900/50 text-slate-500 dark:text-slate-400 hover:text-blue-600 flex items-center justify-center transition-colors shadow-2xs"
+                            >
+                              <Eye size={14} />
+                            </button>
+
+                            <button
+                              onClick={() => handleEdit(medicine)}
+                              title="Edit Medicine"
+                              className="w-8 h-8 rounded-lg bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 hover:bg-blue-100 flex items-center justify-center transition-colors shadow-2xs"
+                            >
+                              <SquarePen size={14} />
+                            </button>
+
+                            <button
+                              onClick={() => openStockModal(medicine, "in")}
+                              title="Stock In (+)"
+                              className="w-8 h-8 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-100 flex items-center justify-center transition-colors shadow-2xs"
+                            >
+                              <TrendingUp size={14} />
+                            </button>
+
+                            <button
+                              onClick={() => openStockModal(medicine, "out")}
+                              title="Stock Out (-)"
+                              className="w-8 h-8 rounded-lg bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 hover:bg-amber-100 flex items-center justify-center transition-colors shadow-2xs"
+                            >
+                              <TrendingDown size={14} />
+                            </button>
+
+                            <button
+                              onClick={() => handleDelete(medicine.medicine_id)}
+                              title="Delete Medicine"
+                              className="w-8 h-8 rounded-lg bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 hover:bg-rose-100 flex items-center justify-center transition-colors shadow-2xs"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Empty State */}
+            {filteredMedicines.length === 0 && (
+              <div className="text-center py-16 px-4">
+                <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 mb-3">
+                  <Package size={24} />
+                </div>
+                <h4 className="text-base font-bold text-slate-800 dark:text-white">
+                  No medicines found
+                </h4>
+                <p className="text-xs text-slate-400 mt-1 max-w-sm mx-auto">
+                  No medicine matched your current search filters. Try modifying your search term, category, or supplier filter.
+                </p>
+                <button
+                  onClick={() => {
+                    setSearch("");
+                    setCategory("All");
+                    setSupplierFilter("All");
+                  }}
+                  className="mt-4 inline-flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold transition-colors shadow-xs"
+                >
+                  Reset Filters
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* 6. MOBILE & TABLET CARD VIEW (visible on smaller screens) */}
+          <div className="lg:hidden space-y-3.5">
+            {paginatedMedicines.map((medicine) => {
+              const expiryStatus = getExpiryStatus(medicine.expiry_date);
+              const stockStatus = getStockStatus(
+                medicine.quantity,
+                medicine.min_stock
+              );
+              const initial = (medicine.medicine_name || "M")
+                .charAt(0)
+                .toUpperCase();
+
+              return (
+                <div
+                  key={medicine.medicine_id}
+                  className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/90 dark:border-slate-800 p-4 shadow-xs hover:shadow-sm transition-all"
+                >
+                  {/* Header with Title and Actions */}
+                  <div className="flex justify-between items-start gap-2 mb-3">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className="w-8 h-8 rounded-xl bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 flex items-center justify-center font-bold text-xs shrink-0">
+                        {initial}
+                      </div>
+                      <div className="min-w-0">
+                        <h4
+                          onClick={() => openDetailsModal(medicine)}
+                          className="font-semibold text-slate-800 dark:text-slate-100 text-sm truncate cursor-pointer hover:text-blue-600 dark:hover:text-blue-400"
+                        >
+                          {medicine.medicine_name}
+                        </h4>
+                        <p className="text-[11px] text-slate-400 truncate">
+                          {medicine.brand_name || "Generic"}{" "}
+                          {medicine.salt_name ? `• ${medicine.salt_name}` : ""}
+                        </p>
+                        {medicine.supplier_name && (
+                          <p
+                            onClick={() => openDetailsModal(medicine)}
+                            className="text-[10px] text-blue-600 dark:text-blue-400 font-medium truncate cursor-pointer flex items-center gap-1 mt-0.5"
+                          >
+                            <Truck size={10} />
+                            <span>Supplier: {medicine.supplier_name}</span>
+                          </p>
                         )}
                       </div>
-                    </td>
+                    </div>
 
-                    {/* Price */}
-                    <td className="py-3.5 px-4 whitespace-nowrap font-bold text-slate-900 text-sm">
-                      ₹{Number(medicine.selling_price || 0).toLocaleString("en-IN", {
-                        minimumFractionDigits: 2,
-                        maximumFractionDigits: 2,
-                      })}
-                    </td>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <button
+                        onClick={() => openDetailsModal(medicine)}
+                        title="View Details"
+                        className="w-7 h-7 rounded-lg bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-blue-50 hover:text-blue-600 flex items-center justify-center transition-colors"
+                      >
+                        <Eye size={13} />
+                      </button>
+                      <button
+                        onClick={() => handleEdit(medicine)}
+                        title="Edit"
+                        className="w-7 h-7 rounded-lg bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 flex items-center justify-center"
+                      >
+                        <SquarePen size={13} />
+                      </button>
+                      <button
+                        onClick={() => openStockModal(medicine, "in")}
+                        title="Stock In"
+                        className="w-7 h-7 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 flex items-center justify-center"
+                      >
+                        <TrendingUp size={13} />
+                      </button>
+                      <button
+                        onClick={() => openStockModal(medicine, "out")}
+                        title="Stock Out"
+                        className="w-7 h-7 rounded-lg bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 flex items-center justify-center"
+                      >
+                        <TrendingDown size={13} />
+                      </button>
+                      <button
+                        onClick={() => handleDelete(medicine.medicine_id)}
+                        title="Delete"
+                        className="w-7 h-7 rounded-lg bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 flex items-center justify-center"
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    </div>
+                  </div>
 
-                    {/* Expiry Date */}
-                    <td className="py-3.5 px-4 whitespace-nowrap">
-                      <p className="font-medium text-slate-700">
-                        {formatCleanDate(medicine.expiry_date)}
+                  {/* Grid of Key Info */}
+                  <div className="grid grid-cols-2 gap-2.5 pt-2 border-t border-slate-100 dark:border-slate-800 text-xs">
+                    <div>
+                      <span className="text-[10px] text-slate-400 font-medium uppercase">
+                        Category
+                      </span>
+                      <p className="font-medium text-slate-700 dark:text-slate-300 mt-0.5">
+                        {medicine.category || "General"}
                       </p>
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-slate-400 font-medium uppercase">
+                        Batch No
+                      </span>
+                      <p className="font-mono text-slate-700 dark:text-slate-300 mt-0.5">
+                        {medicine.batch_number || "—"}
+                      </p>
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-slate-400 font-medium uppercase">
+                        Price
+                      </span>
+                      <p className="font-bold text-slate-900 dark:text-white text-sm mt-0.5">
+                        ₹{Number(medicine.selling_price || 0).toFixed(2)}
+                      </p>
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-slate-400 font-medium uppercase">
+                        Stock
+                      </span>
+                      <div className="flex items-center gap-1.5 mt-0.5">
+                        {stockStatus.icon}
+                        <span className={`font-bold ${stockStatus.color}`}>
+                          {medicine.quantity} units
+                        </span>
+                      </div>
+                    </div>
+                    <div className="col-span-2 flex items-center justify-between pt-1">
+                      <div className="text-[11px] text-slate-500 dark:text-slate-400">
+                        Expiry: <span className="font-medium text-slate-700 dark:text-slate-300">{formatCleanDate(medicine.expiry_date)}</span>
+                      </div>
                       <span
-                        className={`inline-block mt-1 px-2 py-0.5 rounded-full text-[10px] font-semibold border ${expiryStatus.color}`}
+                        className={`px-2 py-0.5 rounded-full text-[10px] font-semibold border ${expiryStatus.color}`}
                       >
                         {expiryStatus.label}
                       </span>
-                    </td>
-
-                    {/* Batch Number */}
-                    <td className="py-3.5 px-4 whitespace-nowrap">
-                      <span className="font-mono text-xs text-slate-600 bg-slate-50 px-2 py-1 rounded-md border border-slate-200/80">
-                        {medicine.batch_number || "—"}
-                      </span>
-                    </td>
-
-                    {/* Stock Status Badge */}
-                    <td className="py-3.5 px-4 whitespace-nowrap">
-                      <span
-                        className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold border ${stockStatus.badgeBg}`}
-                      >
-                        {stockStatus.label}
-                      </span>
-                    </td>
-
-                    {/* Action Buttons */}
-                    <td className="py-3.5 px-5 text-right whitespace-nowrap">
-                      <div className="flex items-center justify-end gap-1.5">
-                        <button
-                          onClick={() => openDetailsModal(medicine)}
-                          title="View Medicine & Supplier Details"
-                          className="w-8 h-8 rounded-lg bg-slate-50 hover:bg-blue-50 text-slate-500 hover:text-blue-600 flex items-center justify-center transition-colors shadow-2xs"
-                        >
-                          <Eye size={14} />
-                        </button>
-
-                        <button
-                          onClick={() => handleEdit(medicine)}
-                          title="Edit Medicine"
-                          className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 flex items-center justify-center transition-colors shadow-2xs"
-                        >
-                          <SquarePen size={14} />
-                        </button>
-
-                        <button
-                          onClick={() => openStockModal(medicine, "in")}
-                          title="Stock In (+)"
-                          className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 hover:bg-emerald-100 flex items-center justify-center transition-colors shadow-2xs"
-                        >
-                          <TrendingUp size={14} />
-                        </button>
-
-                        <button
-                          onClick={() => openStockModal(medicine, "out")}
-                          title="Stock Out (-)"
-                          className="w-8 h-8 rounded-lg bg-amber-50 text-amber-600 hover:bg-amber-100 flex items-center justify-center transition-colors shadow-2xs"
-                        >
-                          <TrendingDown size={14} />
-                        </button>
-
-                        <button
-                          onClick={() => handleDelete(medicine.medicine_id)}
-                          title="Delete Medicine"
-                          className="w-8 h-8 rounded-lg bg-rose-50 text-rose-600 hover:bg-rose-100 flex items-center justify-center transition-colors shadow-2xs"
-                        >
-                          <Trash2 size={14} />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Empty State */}
-        {filteredMedicines.length === 0 && (
-          <div className="text-center py-16 px-4">
-            <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 mb-3">
-              <Package size={24} />
-            </div>
-            <h4 className="text-base font-bold text-slate-800">
-              No medicines found
-            </h4>
-            <p className="text-xs text-slate-400 mt-1 max-w-sm mx-auto">
-              No medicine matched your current search filters. Try modifying your search term or category.
-            </p>
-            <button
-              onClick={() => {
-                setSearch("");
-                setCategory("All");
-              }}
-              className="mt-4 inline-flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold transition-colors shadow-xs"
-            >
-              Reset Filters
-            </button>
-          </div>
-        )}
-      </div>
-
-      {/* 6. MOBILE & TABLET CARD VIEW (visible on smaller screens) */}
-      <div className="lg:hidden space-y-3.5">
-        {paginatedMedicines.map((medicine) => {
-          const expiryStatus = getExpiryStatus(medicine.expiry_date);
-          const stockStatus = getStockStatus(
-            medicine.quantity,
-            medicine.min_stock
-          );
-          const initial = (medicine.medicine_name || "M")
-            .charAt(0)
-            .toUpperCase();
-
-          return (
-            <div
-              key={medicine.medicine_id}
-              className="bg-white rounded-2xl border border-slate-200/90 p-4 shadow-xs hover:shadow-sm transition-all"
-            >
-              {/* Header with Title and Actions */}
-              <div className="flex justify-between items-start gap-2 mb-3">
-                <div className="flex items-center gap-2.5 min-w-0">
-                  <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold text-xs shrink-0">
-                    {initial}
-                  </div>
-                  <div className="min-w-0">
-                    <h4
-                      onClick={() => openDetailsModal(medicine)}
-                      className="font-semibold text-slate-800 text-sm truncate cursor-pointer hover:text-blue-600"
-                    >
-                      {medicine.medicine_name}
-                    </h4>
-                    <p className="text-[11px] text-slate-400 truncate">
-                      {medicine.brand_name || "Generic"}{" "}
-                      {medicine.salt_name ? `• ${medicine.salt_name}` : ""}
-                    </p>
-                    {medicine.supplier_name && (
-                      <p
-                        onClick={() => openDetailsModal(medicine)}
-                        className="text-[10px] text-blue-600 font-medium truncate cursor-pointer"
-                      >
-                        Supplier: {medicine.supplier_name}
-                      </p>
-                    )}
+                    </div>
                   </div>
                 </div>
+              );
+            })}
 
-                <div className="flex items-center gap-1 shrink-0">
-                  <button
-                    onClick={() => openDetailsModal(medicine)}
-                    title="View Details"
-                    className="w-7 h-7 rounded-lg bg-slate-50 text-slate-600 hover:bg-blue-50 hover:text-blue-600 flex items-center justify-center transition-colors"
-                  >
-                    <Eye size={13} />
-                  </button>
-                  <button
-                    onClick={() => handleEdit(medicine)}
-                    title="Edit"
-                    className="w-7 h-7 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center"
-                  >
-                    <SquarePen size={13} />
-                  </button>
-                  <button
-                    onClick={() => openStockModal(medicine, "in")}
-                    title="Stock In"
-                    className="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center"
-                  >
-                    <TrendingUp size={13} />
-                  </button>
-                  <button
-                    onClick={() => openStockModal(medicine, "out")}
-                    title="Stock Out"
-                    className="w-7 h-7 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center"
-                  >
-                    <TrendingDown size={13} />
-                  </button>
-                  <button
-                    onClick={() => handleDelete(medicine.medicine_id)}
-                    title="Delete"
-                    className="w-7 h-7 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center"
-                  >
-                    <Trash2 size={13} />
-                  </button>
+            {filteredMedicines.length === 0 && (
+              <div className="text-center py-12 px-4 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/90 dark:border-slate-800 shadow-xs">
+                <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 mb-3">
+                  <Package size={24} />
                 </div>
+                <h4 className="text-base font-bold text-slate-800 dark:text-white">
+                  No medicines found
+                </h4>
+                <p className="text-xs text-slate-400 mt-1">
+                  Try adjusting your search criteria or filters.
+                </p>
+                <button
+                  onClick={() => {
+                    setSearch("");
+                    setCategory("All");
+                    setSupplierFilter("All");
+                  }}
+                  className="mt-3 text-blue-600 hover:text-blue-700 dark:text-blue-400 text-xs font-semibold"
+                >
+                  Clear filters
+                </button>
               </div>
-
-              {/* Grid of Key Info */}
-              <div className="grid grid-cols-2 gap-2.5 pt-2 border-t border-slate-100 text-xs">
-                <div>
-                  <span className="text-[10px] text-slate-400 font-medium uppercase">
-                    Category
-                  </span>
-                  <p className="font-medium text-slate-700 mt-0.5">
-                    {medicine.category || "General"}
-                  </p>
-                </div>
-                <div>
-                  <span className="text-[10px] text-slate-400 font-medium uppercase">
-                    Batch No
-                  </span>
-                  <p className="font-mono text-slate-700 mt-0.5">
-                    {medicine.batch_number || "—"}
-                  </p>
-                </div>
-                <div>
-                  <span className="text-[10px] text-slate-400 font-medium uppercase">
-                    Price
-                  </span>
-                  <p className="font-bold text-slate-900 text-sm mt-0.5">
-                    ₹{Number(medicine.selling_price || 0).toFixed(2)}
-                  </p>
-                </div>
-                <div>
-                  <span className="text-[10px] text-slate-400 font-medium uppercase">
-                    Stock
-                  </span>
-                  <div className="flex items-center gap-1.5 mt-0.5">
-                    {stockStatus.icon}
-                    <span className={`font-bold ${stockStatus.color}`}>
-                      {medicine.quantity} units
-                    </span>
-                  </div>
-                </div>
-                <div className="col-span-2 flex items-center justify-between pt-1">
-                  <div className="text-[11px] text-slate-500">
-                    Expiry: <span className="font-medium text-slate-700">{formatCleanDate(medicine.expiry_date)}</span>
-                  </div>
-                  <span
-                    className={`px-2 py-0.5 rounded-full text-[10px] font-semibold border ${expiryStatus.color}`}
-                  >
-                    {expiryStatus.label}
-                  </span>
-                </div>
-              </div>
-            </div>
-          );
-        })}
-
-        {filteredMedicines.length === 0 && (
-          <div className="text-center py-12 px-4 bg-white rounded-2xl border border-slate-200/90 shadow-xs">
-            <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 mb-3">
-              <Package size={24} />
-            </div>
-            <h4 className="text-base font-bold text-slate-800">
-              No medicines found
-            </h4>
-            <p className="text-xs text-slate-400 mt-1">
-              Try adjusting your search criteria or category filter.
-            </p>
-            <button
-              onClick={() => {
-                setSearch("");
-                setCategory("All");
-              }}
-              className="mt-3 text-blue-600 hover:text-blue-700 text-xs font-semibold"
-            >
-              Clear filters
-            </button>
+            )}
           </div>
-        )}
-      </div>
 
-      {/* 7. PAGINATION CONTROLS */}
-      <Pagination
-        currentPage={currentPage}
-        totalPages={totalPages}
-        totalItems={filteredMedicines.length}
-        itemsPerPage={itemsPerPage}
-        onPageChange={setCurrentPage}
-      />
+          {/* 7. PAGINATION CONTROLS */}
+          <Pagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            totalItems={filteredMedicines.length}
+            itemsPerPage={itemsPerPage}
+            onPageChange={setCurrentPage}
+          />
+        </>
+      )}
     </div>
   );
 };
